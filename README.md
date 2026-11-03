@@ -1,4 +1,4 @@
-# Casa in Ordine 2.0 — progetto aggiornato
+# Casa in Ordine 2.1 — progetto aggiornato
 
 **Stato:** codice preparato, non ancora pubblicato online né collaudato con account reali.
 
