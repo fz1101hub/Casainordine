@@ -1,0 +1,549 @@
+'use client';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  LayoutDashboard, ReceiptText, PlugZap, House, UploadCloud, Settings, Bell,
+  Plus, Search, CheckCircle2, CalendarDays, LogOut, ArrowUpRight, TrendingDown,
+  Wallet, LockKeyhole, Trash2, Mail, ShieldCheck, RefreshCcw, Link2,
+  Menu, X, UserRound, Download, Cloud, Info, Clock, AlertCircle, Check,
+  Filter, ChevronRight, Zap, CircleHelp, Send, Eye, EyeOff, FileImage, FileText, Users, ShoppingBasket, Car, Archive, BarChart3, Wrench, Building2, ClipboardList
+} from 'lucide-react';
+import { db } from '../lib/supabase-browser';
+import { addDaysISO, nextRecurringDue, todayRome, normalizeDate, euro } from '../lib/dates.mjs';
+import { parseBillsCsv } from '../lib/csv.mjs';
+import { parseRatePlanText } from '../lib/rate-plan.mjs';
+import { extractBillFields } from '../lib/document-import.mjs';
+import MailImporter from './MailImporter';
+import HouseholdHub from './HouseholdHub';
+import PushSettings from './PushSettings';
+import CalendarFeed from './CalendarFeed';
+import HomeExtra from './HomeExtra';
+import V20Hub from './V20Hub';
+import V21Hub from './V21Hub';
+import { downloadCalendar } from '../lib/calendar.mjs';
+import { billFraudSignals } from '../lib/v20-core.mjs';
+
+const categories = ['Luce','Gas','Acqua','Internet','Telefono','Rifiuti','Condominio','Affitto / Mutuo','Assicurazione','Tasse','Auto','Altro'];
+const frequencies = [{value:'none',label:'Non ricorrente'},{value:'monthly',label:'Ogni mese'},{value:'bimonthly',label:'Ogni 2 mesi'},{value:'quarterly',label:'Ogni 3 mesi'},{value:'yearly',label:'Ogni anno'},{value:'biennial',label:'Ogni 2 anni'}];
+const menu = [
+  {id:'dashboard',title:'Panoramica',icon:LayoutDashboard},
+  {id:'bills',title:'Bollette',icon:ReceiptText},
+  {id:'utilities',title:'Le mie utenze',icon:PlugZap},
+  {id:'tasks',title:'Attività casa',icon:House},
+  {id:'household',title:'Famiglia e inviti',icon:Users},
+  {id:'budget',title:'Budget e spese',icon:Wallet},
+  {id:'shopping',title:'Lista della spesa',icon:ShoppingBasket},
+  {id:'vehicles',title:'Auto e scadenze',icon:Car},
+  {id:'insights',title:'Consumi e previsioni',icon:BarChart3},
+  {id:'archive',title:'Archivio documenti',icon:Archive},
+  {id:'properties',title:'Immobili',icon:Building2},
+  {id:'maintenance',title:'Manutenzioni',icon:Wrench},
+  {id:'contracts',title:'Contratti',icon:ClipboardList},
+  {id:'payments',title:'Ricevute',icon:CheckCircle2},
+  {id:'alerts',title:'Notifiche e backup',icon:Bell},
+  {id:'monitor',title:'Monitoraggio email',icon:Mail},
+  {id:'fraud',title:'Controllo antifrode',icon:ShieldCheck},
+  {id:'pagopa',title:'Avvisi pagoPA',icon:ReceiptText},
+  {id:'history',title:'Cronologia e recupero',icon:Clock},
+  {id:'moving',title:'Assistente trasloco',icon:House},
+  {id:'savings',title:'Obiettivi risparmio',icon:Wallet},
+  {id:'offline',title:'Bozze offline',icon:Cloud},
+  {id:'briefing',title:'La casa in 5 minuti',icon:ClipboardList},
+  {id:'tags',title:'QR degli oggetti',icon:ScanSearch},
+  {id:'sos',title:'SOS Casa',icon:ShieldCheck},
+  {id:'radar',title:'Radar incongruenze',icon:Search},
+  {id:'simulator',title:'Simulatore spese',icon:BarChart3},
+  {id:'passport',title:'Passaporto immobile',icon:FileText},
+  {id:'vacation',title:'Modalità vacanza',icon:House},
+  {id:'inventory',title:'Inventario assicurativo',icon:Archive},
+  {id:'decisions',title:'Decisioni di famiglia',icon:Users},
+  {id:'connect',title:'Importa e collega',icon:Link2},
+  {id:'settings',title:'Impostazioni',icon:Settings},
+];
+const billDefault = {title:'',supplier:'',category:'Luce',amount:'',due_date:addDaysISO(todayRome(),7),paid:false};
+const utilityDefault = {supplier:'',category:'Luce',account_reference:'',estimated_amount:'',frequency:'monthly',next_due_date:addDaysISO(todayRome(),14)};
+const taskDefault = {title:'',due_date:addDaysISO(todayRome(),7),assigned_to:''};
+const uuid = () => crypto.randomUUID();
+
+function fakeData() {
+  const today = todayRome();
+  const bills = [
+    {id:'demo-1',title:'Bolletta elettricità',supplier:'Energia di esempio',category:'Luce',amount:84.50,due_date:addDaysISO(today,3),paid_at:null,source:'manual',is_estimate:false},
+    {id:'demo-2',title:'Fibra casa',supplier:'Internet di esempio',category:'Internet',amount:29.90,due_date:addDaysISO(today,8),paid_at:null,source:'recurring',is_estimate:true},
+    {id:'demo-3',title:'Acqua e fognatura',supplier:'Acquedotto di esempio',category:'Acqua',amount:46.20,due_date:addDaysISO(today,16),paid_at:null,source:'csv',is_estimate:false},
+    {id:'demo-4',title:'Gas',supplier:'Gas di esempio',category:'Gas',amount:97.80,due_date:addDaysISO(today,-5),paid_at:new Date().toISOString(),source:'manual',is_estimate:false},
+  ];
+  return {bills,utilities:[{id:'demo-u1',supplier:'Internet di esempio',category:'Internet',estimated_amount:29.9,frequency:'monthly',next_due_date:addDaysISO(today,38),billing_day:12,active:true,account_reference:'Codice cliente ••••42'}],
+    tasks:[{id:'demo-t1',title:'Controllare il filtro del condizionatore',due_date:addDaysISO(today,5),done_at:null}],
+    suppliers:[],summaries:[],profile:{full_name:'',reminders_enabled:true,auto_confirm_payments:false,summary_frequency:'off',summary_weekday:1,summary_month_day:1,email:''},reminders:[{id:'demo-rem1',reminder_date:today,email_sent_at:null,bills:{id:'demo-1',title:'Bolletta elettricità',due_date:addDaysISO(today,3),amount:84.50,paid_at:null}}]};
+}
+
+function Tag({children,tone='neutral'}) { return <span className={`tag tag-${tone}`}>{children}</span>; }
+function Status({bill}) {
+  if (bill.paid_at) return <Tag tone="green"><Check size={12}/> Pagata</Tag>;
+  const today = todayRome();
+  if (bill.due_date < today) return <Tag tone="red">Scaduta</Tag>;
+  if (bill.due_date <= addDaysISO(today,7)) return <Tag tone="amber">In scadenza</Tag>;
+  return <Tag>Da pagare</Tag>;
+}
+function DateText({iso}) { return <>{iso ? new Date(`${iso}T12:00:00Z`).toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}) : '—'}</>; }
+function CategoryIcon({value}) {
+  return <span className={`category-icon category-${['Luce','Gas','Acqua','Internet'].includes(value)?value.toLowerCase():'other'}`}>
+    {value==='Luce'?<Zap size={19}/>:value==='Internet'?<Cloud size={18}/>:value==='Acqua'?<span>◒</span>:value==='Gas'?<span>♨</span>:<House size={18}/>}
+  </span>;
+}
+function Toast({message,onClose}) { return message && <div className="toast" role="status">{message}<button onClick={onClose} aria-label="Chiudi"><X size={16}/></button></div>; }
+function Empty({icon:Icon,title,body,action,button}) {return <div className="empty-state"><div className="empty-icon"><Icon size={24}/></div><h3>{title}</h3><p>{body}</p>{action&&<button className="btn btn-primary" onClick={action}><Plus size={16}/>{button}</button>}</div>;}
+
+function Auth({client}) {
+  const [signup,setSignup] = useState(false);
+  const [email,setEmail] = useState(''); const [password,setPassword] = useState('');
+  const [error,setError] = useState(''); const [pending,setPending] = useState(false);
+  async function submit(e) {
+    e.preventDefault(); setError(''); setPending(true);
+    const {data,error:err} = signup ? await client.auth.signUp({email,password}) : await client.auth.signInWithPassword({email,password});
+    setPending(false);
+    if (err) setError(err.message);
+    else if (signup && !data.session) setError('Registrazione effettuata. Controlla la tua email per confermare l’account.');
+  }
+  async function google() {
+    const invite=new URLSearchParams(window.location.search).get('invite');
+    if(invite && /^[a-f0-9]{64}$/.test(invite))sessionStorage.setItem('pending_house_invite',invite);
+    const {error:err} = await client.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin}});
+    if (err) setError(err.message);
+  }
+  return <div className="auth-wrap"><div className="auth-decoration"><span className="auth-logo"><House size={23}/></span><p>LE SCADENZE DI CASA, SOTTO CONTROLLO</p><h1>Più casa.<br/>Meno pensieri.</h1><p className="auth-intro">Bollette, utenze e impegni domestici in un unico posto. Privato, semplice e sempre aggiornato.</p><div className="auth-quote"><Bell size={21}/> Un promemoria 3 giorni prima di ogni scadenza non pagata.</div></div>
+    <div className="auth-card"><div className="brand auth-mobile"><span className="brand-icon"><House size={22}/></span><b>Casa<span>inOrdine</span></b></div><div className="eyebrow">IL TUO SPAZIO PERSONALE</div><h2>{signup?'Crea il tuo account':'Bentornato a casa'}</h2><p className="muted">{signup?'I dati personali restano privati; potrai scegliere cosa condividere con la famiglia.':'Accedi per vedere tutte le tue scadenze.'}</p>
+      <form onSubmit={submit}><label>Email<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="tu@esempio.it"/></label><label>Password<input type="password" minLength={6} required value={password} onChange={e=>setPassword(e.target.value)} placeholder="Almeno 6 caratteri"/></label><button className="btn btn-primary full" disabled={pending}>{pending?'Accesso in corso…':signup?'Registrati':'Accedi'}<ChevronRight size={17}/></button></form>
+      <div className="auth-separator">oppure</div><button className="btn btn-soft full" onClick={google}><span className="google-dot">G</span> Continua con Google</button>
+      {error&&<p className="auth-error">{error}</p>}<p className="auth-switch">{signup?'Hai già un account?':'Non hai un account?'} <button onClick={()=>{setSignup(!signup);setError('');}}>{signup?'Accedi':'Registrati gratis'}</button></p><p className="privacy-line"><LockKeyhole size={13}/> Gli spazi personali sono privati. Solo le case scelte possono essere condivise.</p>
+    </div></div>;
+}
+
+export default function Page() {
+  const client = useMemo(()=>db(),[]), demo = !client;
+  const [user,setUser] = useState(null), [initializing,setInitializing] = useState(!demo);
+  const [data,setData] = useState({bills:[],utilities:[],tasks:[],suppliers:[],summaries:[],profile:null,reminders:[]});
+  const [tab,setTab] = useState('dashboard'), [mobile,setMobile] = useState(false);
+  useEffect(()=>{if(new URLSearchParams(window.location.search).has('asset'))setTab('tags')},[]);
+  const [homes,setHomes] = useState([]),[activeHomeId,setActiveHomeId]=useState(null),[homeMembers,setHomeMembers]=useState([]);
+  const homeMembership=homes.find(h=>h.home_id===activeHomeId);
+  const canWrite=!activeHomeId||['owner','editor'].includes(homeMembership?.role);
+  const [modal,setModal] = useState(null), [form,setForm] = useState({});
+  const [toast,setToast] = useState(''),[busy,setBusy] = useState(false);
+  const [search,setSearch] = useState(''), [billFilter,setBillFilter] = useState('all'), [bellOpen,setBellOpen] = useState(false);
+  const [integration,setIntegration] = useState(null), [newToken,setNewToken] = useState('');
+  const [documentState,setDocumentState] = useState({busy:false,message:''});
+  const [mailRefresh,setMailRefresh]=useState(0);
+  const [supplierForm,setSupplierForm]=useState({name:'',category:'Luce',sender_email:''});
+  const [ratePlan,setRatePlan]=useState(null), [ratePaste,setRatePaste]=useState(''), [rateUnit,setRateUnit]=useState(''), [rateSupplier,setRateSupplier]=useState('Condominio'), [billPaste,setBillPaste]=useState('');
+
+  const notify = txt=>{setToast(txt);};
+  const reloadHomes=useCallback(async()=>{
+    if(!client)return;
+    const {data:membership,error}=await client.from('home_members').select('home_id,role,homes(id,name,owner_id)').order('joined_at');
+    if(error){if(error.code!=='42P01')notify(`Case condivise: ${error.message}`);return;}
+    const allowed=membership||[];
+    setHomes(allowed);
+    setActiveHomeId(old=>old && !allowed.some(h=>h.home_id===old)?null:old);
+  },[client]);
+  const reload = useCallback(async()=>{
+    if (!client) return;
+    const scope=q=>activeHomeId?q.eq('home_id',activeHomeId):q.is('home_id',null);
+    const [b,u,t,p,r,sp,sm] = await Promise.all([
+      scope(client.from('bills').select('*')).order('due_date',{ascending:true}),
+      scope(client.from('utilities').select('*')).order('next_due_date',{ascending:true}),
+      scope(client.from('house_tasks').select('*')).order('due_date',{ascending:true}),
+      client.from('profiles').select('*').single(),
+      client.from('reminders').select('*,bills(id,title,supplier,due_date,amount,paid_at,home_id)').order('created_at',{ascending:false}).limit(30),
+      client.from('user_suppliers').select('*').order('created_at',{ascending:true}),
+      client.from('bill_summaries').select('*').order('summary_date',{ascending:false}).limit(12)
+    ]);
+    const err = [b,u,t,p,r,sp,sm].find(x=>x.error);
+    if (err) notify(`Errore caricamento: ${err.error.message}`);
+    setData({bills:b.data||[],utilities:u.data||[],tasks:t.data||[],suppliers:sp.data||[],summaries:sm.data||[],profile:p.data||null,
+      reminders:(r.data||[]).filter(item=>item.bills&&!item.bills.paid_at&&item.bills.home_id===activeHomeId)});
+  },[client,activeHomeId]);
+  useEffect(()=>{
+    if(!client||!activeHomeId){setHomeMembers([]);return;}
+    client.from('home_members').select('user_id,email,role').eq('home_id',activeHomeId).then(({data,error})=>{
+      if(error)notify(error.message);else setHomeMembers(data||[]);
+    });
+  },[client,activeHomeId,homes]);
+
+  useEffect(()=>{
+    if (demo) {
+      try { const saved=localStorage.getItem('casainordine-demo-v1');setData(saved?JSON.parse(saved):fakeData()); }
+      catch {setData(fakeData());}
+      return;
+    }
+    client.auth.getSession().then(({data:{session}})=>{setUser(session?.user||null);setInitializing(false);if(session){reload();reloadHomes();}});
+    const {data:{subscription}} = client.auth.onAuthStateChange((_event,session)=>{
+      setUser(session?.user||null); if(session) {setTimeout(()=>{reload();reloadHomes();},0);} else {setHomes([]);setActiveHomeId(null);setData({bills:[],utilities:[],tasks:[],suppliers:[],summaries:[],profile:null,reminders:[]});}
+    });
+    return ()=>subscription.unsubscribe();
+  },[demo,client,reload,reloadHomes]);
+
+  function writeDemo(next) {setData(next);localStorage.setItem('casainordine-demo-v1',JSON.stringify(next));}
+  function localUpdate(key,fn) {writeDemo({...data,[key]:fn(data[key])});}
+  async function updateRow(table,id,patch,key=table) {
+    if(!canWrite){notify('Il ruolo di lettura non consente modifiche.');return false;}
+    if (demo) {localUpdate(key,rows=>rows.map(x=>x.id===id?{...x,...patch}:x));return true;}
+    const {error} = await client.from(table).update(patch).eq('id',id);
+    if(error) {notify(error.message);return false;} await reload();return true;
+  }
+  async function deleteRow(table,id,key=table) {
+    if(!canWrite){notify('Il ruolo di lettura non consente modifiche.');return;}
+    if (!window.confirm('Vuoi eliminare questo elemento?')) return;
+    if(demo){localUpdate(key,rows=>rows.filter(x=>x.id!==id));notify('Elemento eliminato.');return;}
+    const {error}=await client.from(table).delete().eq('id',id);
+    if(error)notify(error.message);else{await reload();notify('Elemento eliminato.');}
+  }
+  async function saveBill(e) {
+    e.preventDefault();if(!canWrite)return notify('Ruolo di sola lettura.');
+    if(form.source==='document'&&['ricevuta','sollecito'].includes(form.import_document_type)){
+      const label=form.import_document_type==='ricevuta'?'una ricevuta di pagamento':'un sollecito già potenzialmente registrato';
+      if(!window.confirm(`Questo file sembra ${label}. Vuoi davvero aggiungerlo come nuova bolletta da monitorare?`))return;
+    }
+    setBusy(true);
+    const amount=Number(form.amount);
+    if(!Number.isFinite(amount)||amount<0||!normalizeDate(form.due_date)){notify('Controlla importo e scadenza.');setBusy(false);return;}
+    const item={title:form.title.trim(),supplier:form.supplier.trim(),category:form.category,amount,due_date:form.due_date,paid_at:form.paid?new Date().toISOString():null,is_estimate:false,source:form.source==='document'?'document':'manual',...(form.source==='document'&&form.external_id?{external_id:form.external_id}:{})};
+    if(item.source==='document' && data.bills.some(b=>b.source==='document'&&b.external_id===item.external_id)){notify('Questa bolletta è già stata importata.');setBusy(false);return;}
+    let savedBillId=null;
+    if(demo)localUpdate('bills',x=>[...x,{...item,id:uuid()}]);
+    else {const {data:created,error}=await client.from('bills').insert({...item,user_id:user.id,home_id:activeHomeId}).select('id').single(); if(error){notify(error.code==='23505'?'Questa bolletta è già stata importata.':error.message);setBusy(false);return;}savedBillId=created.id;await reload();}
+    let postSaveWarning='';
+    // A detected Italian IBAN is hashed locally and never saved in full.
+    // The security check only queues a review; it does not authorize the payee or confirm payment.
+    if(savedBillId && form.ibanCandidate && !demo){
+      try{
+        const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(form.ibanCandidate));
+        const ibanHash=Array.from(new Uint8Array(digest)).map(x=>x.toString(16).padStart(2,'0')).join('');
+        const {data:past,error:pastErr}=await client.from('bill_security_reviews').select('bill_id,iban_fingerprint,review_status').eq('review_status','reviewed');
+        if(pastErr)throw pastErr;
+        const trusted=(past||[]).filter(x=>data.bills.some(b=>b.id===x.bill_id&&b.supplier===item.supplier)).map(x=>x.iban_fingerprint).filter(Boolean);
+        const flags=billFraudSignals({...item,id:savedBillId},data.bills,{sender:form.mailSender||'',senderAuth:form.mailSenderAuth||'unknown',ibanFingerprint:ibanHash,historicalIbanFingerprints:trusted}).flags;
+        const {error:riskError}=await client.from('bill_security_reviews').insert({user_id:user.id,home_id:activeHomeId,bill_id:savedBillId,iban_fingerprint:ibanHash,iban_suffix:form.ibanCandidate.slice(-4),sender:form.mailSender||'',sender_auth:form.mailSenderAuth||'unknown',risk_flags:flags,review_status:'pending'});
+        if(riskError)throw riskError;
+        if(flags.length)postSaveWarning='Bolletta salvata. Controlla gli avvisi nella sezione Antifrode.';
+      }catch(err){postSaveWarning='Bolletta salvata, ma la verifica IBAN non è stata registrata: '+err.message;}
+    }
+    if(form.mail_doc_id && !demo){
+      try {const {data:{session}}=await client.auth.getSession();const response=await fetch('/api/mail/documents',{method:'PATCH',headers:{Authorization:`Bearer ${session?.access_token||''}`,'Content-Type':'application/json'},body:JSON.stringify({id:form.mail_doc_id,action:'imported',bill_id:savedBillId})});const outcome=await response.json().catch(()=>({}));if(!response.ok)throw new Error(outcome.error||'Impossibile archiviare il documento importato');if(outcome.warning)postSaveWarning=[postSaveWarning,outcome.warning].filter(Boolean).join(' · ');setMailRefresh(x=>x+1);}catch(error){postSaveWarning=`Bolletta salvata; il documento email è ancora in attesa: ${error.message}`;}
+    }
+    setModal(null);setBusy(false);notify(postSaveWarning||'Bolletta salvata.');
+  }
+  async function saveUtility(e) {
+    e.preventDefault();if(!canWrite)return notify('Ruolo di sola lettura.');setBusy(true);
+    const estimated_amount=Number(form.estimated_amount);
+    if(!Number.isFinite(estimated_amount)||estimated_amount<0||!normalizeDate(form.next_due_date)){notify('Controlla importo e data.');setBusy(false);return;}
+    const billing_day=Number(form.next_due_date.split('-')[2]);
+    const item={supplier:form.supplier.trim(),category:form.category,account_reference:form.account_reference.trim(),estimated_amount,frequency:form.frequency,next_due_date:form.next_due_date,billing_day,active:true};
+    const initialBill={title:`${item.category} · ${item.supplier}`,supplier:item.supplier,category:item.category,amount:estimated_amount,due_date:item.next_due_date,is_estimate:true,paid_at:null,source:'recurring'};
+    const following=nextRecurringDue(item.next_due_date,item.frequency,billing_day);
+    if(demo){const id=uuid(); writeDemo({...data,utilities:[...data.utilities,{...item,id,next_due_date:following||item.next_due_date}],bills:[...data.bills,{...initialBill,id:uuid(),utility_id:id}]});}
+    else {
+      const {data:created,error}=await client.from('utilities').insert({...item,user_id:user.id,home_id:activeHomeId}).select('id').single();
+      if(error){notify(error.message);setBusy(false);return;}
+      const {error:billError}=await client.from('bills').insert({...initialBill,utility_id:created.id,user_id:user.id,home_id:activeHomeId});
+      if(billError){notify(`Utenza creata, ma la prima bolletta non è stata generata: ${billError.message}`);}
+      else if(following){await client.from('utilities').update({next_due_date:following}).eq('id',created.id);}
+      await reload();
+    }
+    setModal(null);setBusy(false);notify('Utenza aggiunta. La prima scadenza è stata creata come importo stimato.');
+  }
+  async function saveTask(e) {
+    e.preventDefault();if(!canWrite)return notify('Ruolo di sola lettura.');setBusy(true);
+    const item={title:form.title.trim(),due_date:form.due_date||null,done_at:null,...(activeHomeId?{assigned_to:form.assigned_to||null}:{})};
+    if(demo)localUpdate('tasks',x=>[...x,{...item,id:uuid()}]);
+    else {const {error}=await client.from('house_tasks').insert({...item,user_id:user.id,home_id:activeHomeId});if(error){notify(error.message);setBusy(false);return;}await reload();}
+    setModal(null);setBusy(false);notify('Attività aggiunta.');
+  }
+  async function addSupplier(e){
+    e.preventDefault();
+    const name=supplierForm.name.trim(), address=supplierForm.sender_email.trim().toLowerCase();
+    if(name.length<3||name.length>120){notify('Inserisci il nome del fornitore (minimo 3 caratteri).');return;}
+    if(address&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)){notify('Indirizzo mittente non valido.');return;}
+    if((data.suppliers||[]).some(s=>s.name.toLowerCase()===name.toLowerCase()&&s.category===supplierForm.category)){notify('Fornitore già presente.');return;}
+    const item={name,category:supplierForm.category,sender_email:address||null};
+    if(demo)localUpdate('suppliers',rows=>[...(rows||[]),{id:uuid(),...item}]);
+    else {const {error}=await client.from('user_suppliers').insert({...item,user_id:user.id});if(error){notify(error.message);return;}await reload();}
+    setSupplierForm({...supplierForm,name:'',sender_email:''});notify('Fornitore aggiunto ai suggerimenti per la ricerca email.');
+  }
+  function prepareRatePlan(text,source,partial=false){
+    const result=parseRatePlanText(text,{unitFilter:rateUnit});
+    if(!result.rows.length){notify('Nessuna rata riconosciuta. Puoi incollare il testo o caricare un documento con una data e un importo per riga.');return;}
+    setRatePlan({rows:result.rows,warnings:[...result.warnings,...(partial?['PDF lungo: oltre le prime 8 pagine non sono state lette.']:[])],source});
+    notify(`${result.rows.length} rate proposte: controlla tutti i dati prima di salvare.`);
+  }
+  async function importBillFromText(){
+    if(billPaste.trim().length<25){notify('Incolla almeno qualche riga del documento.');return;}
+    if(billPaste.length>60000){notify('Il testo è troppo lungo (massimo 60.000 caratteri).');return;}
+    const details=extractBillFields(billPaste);
+    const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(billPaste));
+    const fingerprint=Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    if(data.bills.some(b=>b.source==='document'&&b.external_id===fingerprint)){notify('Testo già importato.');return;}
+    setForm({...billDefault,title:details.title,supplier:details.supplier,category:details.category,amount:details.amount??'',due_date:details.due_date||'',paid:false,source:'document',external_id:fingerprint,import_file:'Testo incollato',import_document_type:details.documentType,import_warnings:details.warnings,ibanCandidate:details.ibanCandidate});
+    setModal('bill');notify('Verifica i dati proposti dal testo prima di salvare.');
+  }
+  async function rateFileImport(event){
+    const file=event.target.files?.[0];event.target.value='';if(!file)return;
+    setDocumentState({busy:true,message:'Lettura del piano rate…'});
+    try{const {readRatePlanDocument}=await import('../lib/document-reader.js');const result=await readRatePlanDocument(file,message=>setDocumentState({busy:true,message}));prepareRatePlan(result.text,file.name,result.partial);}
+    catch(e){notify(`Piano rate non leggibile: ${e.message}`);}
+    finally{setDocumentState({busy:false,message:''});}
+  }
+  async function saveRatePlan(){
+    if(!canWrite)return notify('Ruolo di sola lettura.');
+    const selected=ratePlan?.rows.filter(r=>r.selected)||[];
+    if(!selected.length){notify('Seleziona almeno una rata.');return;}
+    if(selected.length>120){notify('Massimo 120 rate per importazione.');return;}
+    const supplier=rateSupplier.trim()||'Condominio';
+    if(selected.some(r=>!r.title.trim()||!normalizeDate(r.due_date)||!Number.isFinite(Number(r.amount))||Number(r.amount)<=0)){notify('Correggi titolo, data e importo di tutte le rate selezionate.');return;}
+    const unique=new Set(selected.map(r=>`${r.due_date}:${Number(r.amount)}`));
+    if(unique.size!==selected.length){notify('Ci sono rate duplicate nella selezione: verifica date e importi.');return;}
+    // Same imported rate is identified by source + date + amount; repeat uploads are idempotent.
+    const items=selected.map(r=>({title:r.title.trim(),supplier,category:'Condominio',amount:Number(r.amount),due_date:r.due_date,paid_at:null,source:'document',is_estimate:false,
+      external_id:`rate:${supplier.toLowerCase().slice(0,60)}:${r.due_date}:${Number(r.amount).toFixed(2)}`}));
+    setBusy(true);
+    try{
+      const existing=new Set((data.bills||[]).filter(b=>b.source==='document'&&b.external_id?.startsWith('rate:')).map(b=>b.external_id));
+      const todo=items.filter(b=>!existing.has(b.external_id));
+      if(!todo.length){notify('Tutte le rate selezionate sono già state importate.');return;}
+      if(demo)localUpdate('bills',rows=>[...rows,...todo.map(row=>({...row,id:uuid()}))]);
+      else {const {error}=await client.from('bills').upsert(todo.map(item=>({...item,user_id:user.id,home_id:activeHomeId})),{onConflict:'user_id,source,external_id',ignoreDuplicates:true});if(error)throw error;await reload();}
+      setRatePlan(null);notify(`Importate fino a ${todo.length} nuove scadenze condominiali.`);
+    }catch(e){notify(`Importazione rate non riuscita: ${e.message}`);}
+    finally{setBusy(false);}
+  }
+  async function updateSummaryPrefs(patch){
+    if(demo){writeDemo({...data,profile:{...data.profile,...patch}});return;}
+    const {error}=await client.from('profiles').update(patch).eq('id',user.id);
+    if(error)notify(error.message);else await reload();
+  }
+  async function pay(bill) {const ok=await updateRow('bills',bill.id,{paid_at:bill.paid_at?null:new Date().toISOString()});if(ok)notify(bill.paid_at?'Riaperta come da pagare.':'Pagamento registrato.');}
+  async function toggleTask(t) {await updateRow('house_tasks',t.id,{done_at:t.done_at?null:new Date().toISOString()},'tasks');}
+  async function csvImport(event) {
+    if(!canWrite)return notify('Ruolo di sola lettura.');
+    const file=event.target.files?.[0];if(!file)return;
+    try {
+      const text=await file.text(),{bills,errors}=parseBillsCsv(text);
+      if(!bills.length) throw new Error(errors.slice(0,3).join(' · ') || 'Nessuna riga valida');
+      if(!window.confirm(`Importare ${bills.length} bollette${errors.length?` (${errors.length} righe escluse)`:''}?`))return;
+      if(demo)localUpdate('bills',x=>[...x,...bills.map(b=>({...b,id:uuid()}))]);
+      else {const {error}=await client.from('bills').insert(bills.map(b=>({...b,user_id:user.id,home_id:activeHomeId})));if(error)throw error;await reload();}
+      notify(`Importate ${bills.length} bollette.${errors.length?` ${errors.length} righe ignorate.`:''}`);
+    } catch(e){notify(`Importazione non riuscita: ${e.message}`);}
+    finally{event.target.value='';}
+  }
+  async function documentImport(event) {
+    if(!canWrite)return notify('Ruolo di sola lettura.');
+    const file=event.target.files?.[0];
+    event.target.value='';
+    if(!file||documentState.busy)return;
+    if(file.size>15*1024*1024){notify('Il documento deve essere più piccolo di 15 MB.');return;}
+    setDocumentState({busy:true,message:'Preparazione del documento…'});
+    try{
+      const {readBillDocument,documentFingerprint}=await import('../lib/document-reader.js');
+      const fingerprint=await documentFingerprint(file);
+      const already=data.bills.some(b=>b.source==='document'&&b.external_id===fingerprint);
+      if(already){notify('Questo documento è già presente tra le tue bollette.');return;}
+      if(!demo){
+        const {data:existing,error}=await client.from('bills').select('id').eq('source','document').eq('external_id',fingerprint).maybeSingle();
+        if(error)throw new Error(error.message);
+        if(existing){notify('Questo documento è già presente tra le tue bollette.');return;}
+      }
+      const extracted=await readBillDocument(file,message=>setDocumentState({busy:true,message}));
+      setForm({...billDefault,title:extracted.title,supplier:extracted.supplier,category:extracted.category,
+        amount:extracted.amount??'',due_date:extracted.due_date||'',paid:false,
+        source:'document',external_id:fingerprint,import_file:file.name,import_document_type:extracted.documentType,import_warnings:extracted.warnings,ibanCandidate:extracted.ibanCandidate});
+      setModal('bill');
+      notify('Ho preparato i dati rilevati. Controllali prima di salvare.');
+    }catch(error){notify(`Non riesco a leggere il documento: ${error.message}`);}
+    finally{setDocumentState({busy:false,message:''});}
+  }
+  async function reviewEmailDocument(document, file){
+    setDocumentState({busy:true,message:'Lettura della bolletta ricevuta via email…'});
+    try{
+      const {readBillDocument,documentFingerprint}=await import('../lib/document-reader.js');
+      const fingerprint=await documentFingerprint(file);
+      if(data.bills.some(b=>b.source==='document'&&b.external_id===fingerprint)){
+        notify('Questa bolletta è già stata salvata. Puoi scartare la copia in attesa.');return;
+      }
+      const {data:existing,error}=await client.from('bills').select('id').eq('source','document').eq('external_id',fingerprint).maybeSingle();
+      if(error)throw error;
+      if(existing){notify('Questa bolletta è già stata importata. Puoi scartare la copia in attesa.');return;}
+      const extracted=await readBillDocument(file,message=>setDocumentState({busy:true,message}));
+      const suggested=document.suggestion||{};
+      setForm({...billDefault,title:extracted.title||suggested.title||'',supplier:extracted.supplier||suggested.supplier||suggested.learned_supplier_hint||'',
+        category:extracted.category!=='Altro'?extracted.category:(suggested.category||'Altro'),
+        amount:extracted.amount??suggested.amount??'',due_date:extracted.due_date||suggested.due_date||'',
+        paid:false,source:'document',external_id:fingerprint,mail_doc_id:document.id,import_file:file.name,
+        import_document_type:extracted.documentType,ibanCandidate:extracted.ibanCandidate,mailSender:document.sender||'',mailSenderAuth:suggested.sender_auth==='reported_fail'?'fail':'unknown',import_warnings:[...(extracted.warnings||[]),...(suggested.learned_supplier_hint?[`Mittente associato in passato a ${suggested.learned_supplier_hint} (${suggested.sender_match==='exact'?'indirizzo esatto':'dominio'}). Controlla che sia lo stesso fornitore.`]:[]),...(suggested.sender_auth==='reported_fail'?['Attenzione: autenticazione del mittente non superata secondo gli header disponibili.']:[])]});
+      setModal('bill');notify('Controlla importo e scadenza prima del salvataggio.');
+    }catch(e){notify(`Documento email non leggibile: ${e.message}`);}
+    finally{setDocumentState({busy:false,message:''});}
+  }
+  async function authApi(method='GET') {
+    const {data:{session}}=await client.auth.getSession();
+    const response=await fetch('/api/integration-key',{method,headers:{Authorization:`Bearer ${session?.access_token||''}`}});
+    const payload=await response.json();if(!response.ok)throw new Error(payload.error||'Errore');return payload;
+  }
+  async function loadIntegration() {if(demo)return;try{setIntegration(await authApi());}catch(e){notify(e.message);}}
+  async function generateToken() {try{const p=await authApi('POST');setNewToken(p.token);await loadIntegration();notify('Chiave generata. Copiala ora, perché non sarà mostrata di nuovo.');}catch(e){notify(e.message);}}
+  async function revokeToken() {if(!window.confirm('Revocare la chiave di importazione automatica?'))return;try{await authApi('DELETE');setNewToken('');await loadIntegration();notify('Chiave revocata.');}catch(e){notify(e.message);}}
+  async function toggleEmails() {
+    const enabled=!data.profile?.reminders_enabled;
+    if(demo){writeDemo({...data,profile:{...data.profile,reminders_enabled:enabled}});return;}
+    const {error}=await client.from('profiles').update({reminders_enabled:enabled}).eq('id',user.id);
+    if(error)notify(error.message);else await reload();
+  }
+  async function toggleAutoPayment() {
+    const enabled=!data.profile?.auto_confirm_payments;
+    if(demo){writeDemo({...data,profile:{...data.profile,auto_confirm_payments:enabled}});return;}
+    const {error}=await client.from('profiles').update({auto_confirm_payments:enabled}).eq('id',user.id);
+    if(error)notify(error.message);else await reload();
+  }
+  useEffect(()=>{if(tab==='connect'&&!demo&&user)loadIntegration();},[tab,user?.id]);
+  useEffect(()=>{if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('/sw.js').catch(()=>{});},[]);
+  useEffect(()=>{if(new URLSearchParams(window.location.search).has('invite')||sessionStorage.getItem('pending_house_invite'))setTab('household');const mail=new URLSearchParams(window.location.search).get('mail');if(mail){setTab('connect');notify(mail==='connected'?'Gmail collegata! Ora puoi cercare le bollette.':mail==='denied'?'Autorizzazione Gmail annullata.':'Collegamento Gmail non riuscito: verifica le impostazioni OAuth.');window.history.replaceState({},'',window.location.pathname);}},[]);
+
+  const today=todayRome(), soon=addDaysISO(today,7);
+  const bills=data.bills||[], utilities=data.utilities||[],tasks=data.tasks||[],suppliers=data.suppliers||[];
+  const open=bills.filter(b=>!b.paid_at), urgent=open.filter(b=>b.due_date<=soon);
+  const currentMonth=today.slice(0,7), monthBills=bills.filter(b=>b.due_date.startsWith(currentMonth));
+  const spent=monthBills.filter(b=>b.paid_at).reduce((a,b)=>a+Number(b.amount),0);
+  const dueAmount=open.reduce((a,b)=>a+Number(b.amount),0);
+  const overdue=open.filter(b=>b.due_date<today);
+  const filteredBills=bills.filter(b=>{
+    const q=search.trim().toLowerCase();
+    if(q&&!`${b.title} ${b.supplier} ${b.category}`.toLowerCase().includes(q))return false;
+    if(billFilter==='unpaid'&&b.paid_at)return false;
+    if(billFilter==='paid'&&!b.paid_at)return false;
+    if(billFilter==='soon'&&!!b.paid_at)return false;
+    if(billFilter==='soon'&&b.due_date>soon)return false;
+    return true;
+  }).sort((a,b)=>a.due_date.localeCompare(b.due_date));
+  const recentMonths=Array.from({length:6},(_,i)=>{const d=new Date(`${today.slice(0,7)}-01T12:00:00Z`);d.setUTCMonth(d.getUTCMonth()-5+i);return d.toISOString().slice(0,7);});
+  const monthly=recentMonths.map(m=>({label:new Date(`${m}-01T12:00:00Z`).toLocaleDateString('it-IT',{month:'short',timeZone:'UTC'}), total:bills.filter(b=>b.due_date.startsWith(m)).reduce((sum,b)=>sum+Number(b.amount),0)}));
+  const maxMonthly=Math.max(...monthly.map(x=>x.total),1);
+  const displayName=(data.profile?.full_name||user?.email?.split('@')[0]||'').split(' ')[0];
+  function openModal(type){if(!canWrite){notify('Questa casa è in sola lettura.');return;}setForm({...({bill:billDefault,utility:utilityDefault,task:taskDefault}[type])});setModal(type);}
+  function changePage(id){setTab(id);setMobile(false);setBellOpen(false);}
+  function switchHome(id){setActiveHomeId(id||null);setTab(id?'dashboard':'household');setData(old=>({...old,bills:[],utilities:[],tasks:[],reminders:[]}));}
+  // QR codes contain only the asset UUID. Resolve its home via RLS after login.
+  // Never bypass the user's membership permissions or infer an inaccessible home.
+  useEffect(()=>{
+    if(!client||!user)return;
+    const ref=new URLSearchParams(window.location.search).get('asset');
+    if(!ref||!/^[0-9a-f-]{36}$/i.test(ref))return;
+    let current=true;
+    client.from('maintenance_assets').select('home_id').eq('id',ref).maybeSingle().then(({data:asset,error})=>{
+      if(!current||error||!asset)return;
+      if(asset.home_id&& !homes.some(h=>h.home_id===asset.home_id))return;
+      if((asset.home_id||null)!==(activeHomeId||null)){
+        setActiveHomeId(asset.home_id||null);
+        setData(old=>({...old,bills:[],utilities:[],tasks:[],reminders:[]}));
+      }
+      setTab('tags');
+    });
+    return()=>{current=false};
+  },[client,user?.id,homes,activeHomeId]);
+
+
+  if(initializing)return <div className="loading"><div className="brand-icon"><House size={26}/></div><p>Caricamento della tua casa…</p></div>;
+  if(!demo&&!user)return <Auth client={client}/>;
+  return <div className="shell">
+    {mobile&&<button className="mobile-backdrop" onClick={()=>setMobile(false)} aria-label="Chiudi menu"/>}
+    <aside className={`sidebar ${mobile?'sidebar-show':''}`}>
+      <div className="brand"><span className="brand-icon"><House size={22}/></span><b>Casa<span>inOrdine</span></b></div>
+      <div className="sidebar-label">{activeHomeId?homeMembership?.homes?.name||"CASA CONDIVISA":"SPAZIO PERSONALE"}</div><nav className="nav">{menu.map(({id,title,icon:Icon})=><button key={id} className={`nav-item ${tab===id?'active':''}`} onClick={()=>changePage(id)}><Icon size={19}/><span>{title}</span>{tab===id&&<span className="nav-active-indicator"/>}</button>)}</nav>
+      <div className="sidebar-spacer"/><div className="sidebar-info"><div className="sidebar-info-icon"><Bell size={18}/></div><b>Mai più una scadenza dimenticata.</b><p>Promemoria automatici 3 giorni prima, se non hai ancora pagato.</p></div>
+      <div className="sidebar-profile"><span className="avatar"><UserRound size={18}/></span><div className="profile-copy"><b>{demo?'Modalità demo':user?.email?.split('@')[0]}</b><small>{demo?'Dati salvati in locale':'Spazio personale e privato'}</small></div>{!demo&&<button title="Esci" className="icon-button" onClick={()=>client.auth.signOut()}><LogOut size={17}/></button>}</div>
+    </aside>
+    <main className="main">
+      <header className="topbar"><button className="icon-button burger" onClick={()=>setMobile(true)} aria-label="Apri menu"><Menu size={23}/></button><div className="crumb"><span>{activeHomeId?homeMembership?.homes?.name||"Casa condivisa":"Spazio personale"}</span><ChevronRight size={15}/><b>{menu.find(m=>m.id===tab)?.title}</b></div>
+        <div className="topbar-right"><select className="house-switch" aria-label="Seleziona spazio" value={activeHomeId||''} onChange={e=>switchHome(e.target.value||null)}><option value="">Privato</option>{homes.map(h=><option key={h.home_id} value={h.home_id}>{h.homes?.name||'Casa'}</option>)}</select><span className="today-label"><CalendarDays size={16}/> <DateText iso={today}/></span><div className="bell-parent"><button className="icon-button bell-button" onClick={()=>setBellOpen(!bellOpen)} aria-label="Promemoria"><Bell size={20}/>{data.reminders.length>0&&<span className="notification-dot"/>}</button>{bellOpen&&<div className="bell-popover"><b>Promemoria</b>{data.reminders.length?data.reminders.slice(0,6).map(r=><div className="bell-entry" key={r.id}><p><Bell size={14}/> <span><strong>Hai già effettuato il pagamento?</strong><span>{r.bills?.title||'Bolletta'} · scade il <DateText iso={r.bills?.due_date||r.reminder_date}/></span></span></p>{r.bills&&!r.bills.paid_at&&<button className="text-link" onClick={()=>{const b=bills.find(x=>x.id===r.bills.id);if(b)pay(b);setBellOpen(false);}}>Segna come pagata <Check size={13}/></button>}</div>):<p>Nessun promemoria ancora registrato.</p>}</div>}</div><span className="top-avatar"><UserRound size={18}/></span></div>
+      </header>
+      <div className="content">
+        {activeHomeId&&!canWrite&&<div className="informative"><ShieldCheck size={17}/><p>Hai accesso in sola lettura a questa casa. Le modifiche sono riservate al proprietario e agli editor.</p></div>}
+        {demo&&<div className="demo-banner"><Info size={17}/><div><b>Anteprima interattiva.</b> Puoi provare l'app e aggiungere dati: resteranno soltanto in questo browser. Per usarla con amici, attiva Supabase e pubblicala online.</div><button onClick={()=>{localStorage.removeItem('casainordine-demo-v1');setData(fakeData());notify('Demo ripristinata.');}}>Ripristina</button></div>}
+        {['insights','archive','properties','maintenance','contracts','payments','alerts'].includes(tab)&&<HomeExtra client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} bills={bills} utilities={utilities} tab={tab} onNotify={notify} onRefresh={reload}/>}
+        {['tags','sos','radar','simulator','passport','vacation','inventory','decisions','briefing'].includes(tab)&&<V21Hub client={client} user={user} homeId={activeHomeId} canWrite={canWrite} demo={demo} bills={bills} tasks={tasks} tab={tab} onNotify={notify}/>}
+        {['monitor','fraud','pagopa','history','moving','savings','offline'].includes(tab)&&<V20Hub client={client} user={user} homeId={activeHomeId} canWrite={canWrite} demo={demo} bills={bills} utilities={utilities} tab={tab} onNotify={notify} onRefresh={reload}/>}
+        {tab==='dashboard'&&<>
+          <div className="page-heading"><div><div className="eyebrow">IL TUO CENTRO DI CONTROLLO</div><h1>Buongiorno{displayName?`, ${displayName}`:''} <span className="wave">✳</span></h1><p>Una panoramica semplice di tutto quello che conta per la tua casa.</p></div><button className="btn btn-primary" onClick={()=>openModal('bill')}><Plus size={18}/> Nuova bolletta</button></div>
+          <div className="stat-grid"><div className="stat-card"><div className="stat-top"><span>Totale da pagare</span><span className="stat-icon coral"><Wallet size={20}/></span></div><strong>{euro(dueAmount)}</strong><small><span className="small-dot orange"/>{open.length} bollette aperte</small></div>
+            <div className="stat-card"><div className="stat-top"><span>In scadenza (7 giorni)</span><span className="stat-icon amber"><Clock size={20}/></span></div><strong>{urgent.length}</strong><small>{urgent.length?'Richiedono la tua attenzione':'Tutto sotto controllo'}</small></div>
+            <div className="stat-card"><div className="stat-top"><span>Pagato questo mese</span><span className="stat-icon green"><CheckCircle2 size={20}/></span></div><strong>{euro(spent)}</strong><small><span className="small-dot green"/> Spese già saldate</small></div>
+            <div className="stat-card"><div className="stat-top"><span>Utenze registrate</span><span className="stat-icon blue"><PlugZap size={20}/></span></div><strong>{utilities.length}</strong><small>{utilities.filter(u=>u.active).length} monitorate attivamente</small></div>
+          </div>
+          {!suppliers.length&&<section className="panel quick-panel setup-suppliers"><div className="quick-icon"><Mail size={21}/></div><div><b>Indica i tuoi fornitori</b><p>Inserisci luce, gas, acqua e internet: aiuterà la ricerca delle bollette nelle tue email, anche con oggetti generici.</p></div><button className="btn btn-soft" onClick={()=>changePage('utilities')}>Configura <ChevronRight size={16}/></button></section>}
+          {overdue.length>0&&<div className="overdue-notice"><AlertCircle size={19}/><p>Hai <b>{overdue.length} {overdue.length===1?'bolletta scaduta':'bollette scadute'}</b> ancora da segnare come pagate.</p><button onClick={()=>{setBillFilter('unpaid');changePage('bills');}}>Vedi bollette <ChevronRight size={15}/></button></div>}
+          <div className="dashboard-columns"><section className="panel"><div className="panel-header"><div><h2>Le prossime scadenze</h2><p>Tutto quello che devi ricordare</p></div><button className="text-link" onClick={()=>changePage('bills')}>Vedi tutte <ArrowUpRight size={16}/></button></div>
+            <div className="mini-bills">{open.length?open.slice().sort((a,b)=>a.due_date.localeCompare(b.due_date)).slice(0,5).map(b=><div className="mini-bill" key={b.id}><CategoryIcon value={b.category}/><div className="mini-bill-info"><b>{b.title}</b><small>{b.supplier||b.category} · <DateText iso={b.due_date}/></small></div><div className="mini-end"><b>{euro(b.amount)}</b><Status bill={b}/></div><button className="mini-pay" title="Segna come pagata" onClick={()=>pay(b)}><Check size={17}/></button></div>):<Empty icon={ReceiptText} title="Nessuna bolletta da pagare" body="Puoi aggiungerne una per iniziare." action={()=>openModal('bill')} button="Aggiungi bolletta"/>}</div>
+          </section><section className="panel chart-panel"><div className="panel-header"><div><h2>Andamento delle spese</h2><p>Ultimi 6 mesi · per scadenza</p></div><span className="chart-pill"><TrendingDown size={15}/> Spese casa</span></div><div className="chart-total">{euro(monthly.reduce((s,x)=>s+x.total,0))}<small>Totale nel periodo</small></div><div className="bars">{monthly.map((m,i)=><div className="bar-col" key={i}><div className="bar-track"><span className="bar-fill" style={{height:`${Math.max(m.total/maxMonthly*100,m.total?5:2)}%`}} title={euro(m.total)}/></div><small>{m.label}</small></div>)}</div></section></div>
+          {!!data.summaries?.length&&<section className="panel recap-home"><b><CalendarDays size={18}/> Ultimo riepilogo bollette</b><p><DateText iso={data.summaries[0].summary_date}/> · {data.summaries[0].bill_count} scadenze · {euro(data.summaries[0].total_amount)} ancora da pagare al momento del controllo.</p></section>}
+          <div className="home-bottom"><div className="quick-panel"><div className="quick-icon"><PlugZap size={21}/></div><div><b>Aggiungi un'utenza ricorrente</b><p>Le prossime bollette verranno create automaticamente come stime.</p></div><button className="btn btn-soft" onClick={()=>openModal('utility')}>Aggiungi <Plus size={16}/></button></div><div className="quick-panel"><div className="quick-icon lavender"><House size={21}/></div><div><b>Le cose da fare in casa</b><p>Organizza manutenzioni e piccoli impegni domestici.</p></div><button className="btn btn-soft" onClick={()=>changePage('tasks')}>Apri <ChevronRight size={16}/></button></div></div>
+        </>}
+        {tab==='bills'&&<><div className="page-heading"><div><div className="eyebrow">PAGAMENTI E SCADENZE</div><h1>Le tue bollette</h1><p>Controlla le scadenze e segna i pagamenti effettuati.</p></div><div className="heading-actions"><label className="btn btn-soft upload-label"><FileImage size={17}/> Carica PDF o foto<input type="file" accept=".pdf,application/pdf,.jpg,.jpeg,image/jpeg,.png,image/png,.webp,image/webp" onChange={documentImport} disabled={documentState.busy} hidden/></label><button className="btn btn-primary" onClick={()=>openModal('bill')}><Plus size={18}/> Aggiungi bolletta</button></div></div>
+          <section className="panel padded"><div className="table-controls"><div className="searchbox"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cerca fornitore o bolletta…"/></div><div className="filter-tabs">{[['all','Tutte'],['unpaid','Da pagare'],['soon','In scadenza'],['paid','Pagate']].map(([k,label])=><button key={k} onClick={()=>setBillFilter(k)} className={billFilter===k?'selected':''}>{label}</button>)}</div></div>
+            {filteredBills.length?<div className="table-scroll"><table className="bills-table"><thead><tr><th>Bolletta</th><th>Scadenza</th><th>Importo</th><th>Stato</th><th>Azioni</th></tr></thead><tbody>{filteredBills.map(b=><tr key={b.id}><td><div className="table-identity"><CategoryIcon value={b.category}/><div><b>{b.title}</b><small>{b.supplier||b.category} {b.is_estimate?' · Importo stimato':''}</small></div></div></td><td><DateText iso={b.due_date}/></td><td className="amount-cell">{euro(b.amount)}</td><td><Status bill={b}/></td><td><div className="actions"><button className={`action-btn ${b.paid_at?'muted-action':'pay-action'}`} title={b.paid_at?'Segna non pagata':'Segna pagata'} onClick={()=>pay(b)}>{b.paid_at?<RefreshCcw size={16}/>:<Check size={17}/>}</button><button className="action-btn muted-action" title="Elimina" onClick={()=>deleteRow('bills',b.id)}><Trash2 size={16}/></button></div></td></tr>)}</tbody></table></div>:<Empty icon={Filter} title="Nessuna bolletta trovata" body="Modifica i filtri o aggiungi una nuova bolletta." action={()=>openModal('bill')} button="Nuova bolletta"/>}</section>
+        </>}
+        {tab==='utilities'&&<><div className="page-heading"><div><div className="eyebrow">SERVIZI DELLA TUA CASA</div><h1>Le mie utenze</h1><p>Una scheda per ogni fornitore, con scadenze ricorrenti generate automaticamente.</p></div><button className="btn btn-primary" onClick={()=>openModal('utility')}><Plus size={18}/> Nuova utenza</button></div>
+          <section className="panel supplier-panel"><div className="panel-header"><div><h2>Chi ti manda le bollette?</h2><p>Aggiungi i fornitori per migliorare il controllo automatico della posta. Ogni account ha i suoi.</p></div></div>
+            <form className="supplier-form" onSubmit={addSupplier}><label>Fornitore<input required maxLength={120} placeholder="Es. Enel Energia" value={supplierForm.name} onChange={e=>setSupplierForm({...supplierForm,name:e.target.value})}/></label>
+            <label>Servizio<select value={supplierForm.category} onChange={e=>setSupplierForm({...supplierForm,category:e.target.value})}>{categories.map(cat=><option key={cat}>{cat}</option>)}</select></label>
+            <label>Mittente email (opzionale)<input type="email" placeholder="bollette@esempio.it" value={supplierForm.sender_email} onChange={e=>setSupplierForm({...supplierForm,sender_email:e.target.value})}/></label><button className="btn btn-primary" type="submit"><Plus size={17}/> Aggiungi</button></form>
+            <div className="supplier-list">{suppliers.map(sp=><div className="supplier-row" key={sp.id}><span><b>{sp.name}</b><small>{sp.category}{sp.sender_email?` · ${sp.sender_email}`:''}</small></span><button className="icon-button danger" title="Elimina fornitore" onClick={()=>deleteRow('user_suppliers',sp.id,'suppliers')}><Trash2 size={16}/></button></div>)}{!suppliers.length&&<p className="muted" style={{padding:'0 20px 16px'}}>Non hai ancora indicato fornitori. Questo passaggio è facoltativo.</p>}</div>
+            <p className="helper-text" style={{padding:'0 20px 18px'}}>Il nome del fornitore è solo un indizio di ricerca. Le bollette trovate devono sempre essere verificate; nessun mittente viene autorizzato automaticamente ai pagamenti.</p>
+          </section>
+          {utilities.length?<div className="utility-grid">{utilities.map(u=><div className="utility-card" key={u.id}><div className="utility-card-head"><CategoryIcon value={u.category}/><span><Tag tone={u.active?'green':'neutral'}>{u.active?'Attiva':'In pausa'}</Tag></span></div><h3>{u.supplier}</h3><p>{u.category} {u.account_reference&&`· ${u.account_reference}`}</p><div className="utility-detail"><span>Importo stimato</span><strong>{euro(u.estimated_amount)}</strong></div><div className="utility-detail"><span>Frequenza</span><strong>{frequencies.find(x=>x.value===u.frequency)?.label||'—'}</strong></div><div className="utility-detail"><span>Prossima generazione</span><strong><DateText iso={u.next_due_date}/></strong></div><div className="utility-footer"><button className="btn btn-soft" onClick={()=>updateRow('utilities',u.id,{active:!u.active})}>{u.active?'Metti in pausa':'Riattiva'}</button><button className="icon-button danger" title="Elimina utenza" onClick={()=>deleteRow('utilities',u.id)}><Trash2 size={17}/></button></div></div>)}</div>:<div className="panel"><Empty icon={PlugZap} title="Aggiungi la prima utenza" body="Per esempio luce, gas o internet. Puoi scegliere ogni quanto viene generata una bolletta stimata." action={()=>openModal('utility')} button="Aggiungi utenza"/></div>}
+          <div className="informative"><Info size={19}/><p>Gli importi ricorrenti sono <b>stime</b>: verifica ogni bolletta reale prima di pagare. La generazione automatica funziona con il servizio giornaliero configurato online.</p></div>
+        </>}
+        {tab==='tasks'&&<><div className="page-heading"><div><div className="eyebrow">PICCOLE COSE, GRANDE TRANQUILLITÀ</div><h1>Attività di casa</h1><p>Manutenzioni, controlli e promemoria per la gestione quotidiana.</p></div><button className="btn btn-primary" onClick={()=>openModal('task')}><Plus size={18}/> Nuova attività</button></div><section className="panel tasks-panel">{tasks.length?tasks.slice().sort((a,b)=>(a.done_at?1:0)-(b.done_at?1:0)).map(t=><div className="task-row" key={t.id}><button className={`task-check ${t.done_at?'done':''}`} onClick={()=>toggleTask(t)} aria-label="Segna attività completata">{t.done_at&&<Check size={16}/>}</button><div className={`task-title ${t.done_at?'completed':''}`}><b>{t.title}</b><small>{t.due_date?<>Da fare entro il <DateText iso={t.due_date}/></>:'Nessuna scadenza'}{t.assigned_to?` · Assegnata a ${homeMembers.find(m=>m.user_id===t.assigned_to)?.email||'membro'}`:''}</small></div>{t.done_at?<Tag tone="green">Completata</Tag>:t.due_date<today?<Tag tone="red">In ritardo</Tag>:<Tag>Da fare</Tag>}<button className="icon-button danger" onClick={()=>deleteRow('house_tasks',t.id,'tasks')} title="Elimina"><Trash2 size={17}/></button></div>):<Empty icon={House} title="Tutto in ordine!" body="Aggiungi attività come controllare la caldaia o verificare l'assicurazione." action={()=>openModal('task')} button="Aggiungi attività"/>}</section></>}
+        {tab==='connect'&&<><div className="page-heading"><div><div className="eyebrow">DATI AL POSTO GIUSTO</div><h1>Importa e collega</h1><p>Inserisci le bollette più velocemente, senza condividere password dei fornitori.</p></div></div>
+          {!demo?<MailImporter client={client} notify={notify} onReview={reviewEmailDocument} onPaymentsChanged={reload} bills={bills} refresh={mailRefresh}/>:<section className="panel mail-panel"><h2>Collega le tue caselle email</h2><p>Per collegare Gmail, Outlook o un provider IMAP, configura Supabase e le integrazioni email sul server.</p></section>}
+          <div className="connect-grid"><section className="panel connect-card document-card"><span className="connect-icon"><FileImage size={25}/></span><Tag tone="green">Consigliato</Tag><h2>Carica una bolletta PDF o foto</h2><p>Importa PDF, JPG, PNG e WEBP, anche fotografie o screenshot. Estraiamo fornitore, importo, categoria e scadenza con OCR e regole locali, senza servizi AI: controlla e correggi prima di salvare.</p><label className="btn btn-primary upload-label"><UploadCloud size={17}/> {documentState.busy?'Analisi in corso…':'Seleziona PDF o immagine'}<input type="file" accept=".pdf,application/pdf,.jpg,.jpeg,image/jpeg,.png,image/png,.webp,image/webp" onChange={documentImport} disabled={documentState.busy} hidden/></label>{documentState.busy&&<div className="import-progress" role="status"><RefreshCcw size={15} className="spin"/>{documentState.message}</div>}<p className="document-privacy"><ShieldCheck size={16}/> Elaborazione nel tuo browser: il documento non viene caricato o archiviato sui nostri server. Max 15 MB.</p></section>
+          <section className="panel connect-card"><span className="connect-icon lilac"><RefreshCcw size={24}/></span><Tag tone="green">Pronto con pianificazione</Tag><h2>Utenze ricorrenti</h2><p>Registra fornitore, importo indicativo e frequenza. Il sistema crea automaticamente le scadenze future.</p><button className="btn btn-soft" onClick={()=>openModal('utility')}><Plus size={17}/> Configura un'utenza</button></section></div>
+          <details className="csv-secondary"><summary><FileText size={18}/> Incolla il testo di una bolletta</summary><p>Dal sito o dall’app del fornitore puoi copiare il testo della fattura: i dati vengono letti nel browser, senza AI.</p><textarea className="bill-paste" rows={5} value={billPaste} onChange={e=>setBillPaste(e.target.value)} placeholder="Incolla qui il testo della bolletta…"/><button className="btn btn-soft" onClick={importBillFromText}>Riconosci importo e scadenza</button></details>
+          <section className="panel rate-import-panel"><div className="panel-header"><div><h2>Importa il piano rate del condominio</h2><p>Carica PDF o foto della ripartizione, oppure incolla il testo. Una scadenza per ogni rata, da verificare prima del salvataggio.</p></div></div>
+            <div className="rate-import-controls"><label>Nome del condominio o amministratore<input maxLength={120} value={rateSupplier} onChange={e=>setRateSupplier(e.target.value)} placeholder="Condominio"/></label><label>Nome o interno presente su ogni riga (facoltativo)<input value={rateUnit} onChange={e=>setRateUnit(e.target.value)} placeholder="Es. interno 5"/></label></div>
+            <div className="rate-import-controls"><label className="btn btn-primary upload-label"><FileImage size={16}/> Carica piano rate<input hidden type="file" accept=".pdf,application/pdf,.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" onChange={rateFileImport} disabled={documentState.busy}/></label><span>Il PDF o la foto vengono letti nel browser, senza API AI.</span></div>
+            <details className="rate-paste"><summary>Oppure incolla il testo del piano rate</summary><textarea rows={4} value={ratePaste} onChange={e=>setRatePaste(e.target.value)} placeholder="Rata 1 - 10/12/2026 - € 125,00\nRata 2 - 10/03/2027 - € 125,00"/><button className="btn btn-soft" onClick={()=>prepareRatePlan(ratePaste,'Testo incollato')}>Riconosci le rate</button></details>
+            {documentState.busy&&<p className="import-progress">{documentState.message}</p>}
+          </section>
+          <details className="csv-secondary"><summary><FileText size={18}/> Importazione alternativa da CSV</summary><p>Se hai già un elenco di bollette, puoi caricarlo in formato CSV.</p><div className="csv-actions"><label className="btn btn-soft upload-label"><UploadCloud size={16}/> Seleziona file CSV<input type="file" accept=".csv,text/csv" onChange={csvImport} hidden/></label><button className="text-link" onClick={()=>{const csv='fornitore;importo;scadenza;categoria;descrizione;stato\nEsempio Energia;75,50;25/11/2026;Luce;Bolletta luce;da pagare\n';const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='esempio-bollette.csv';a.click();URL.revokeObjectURL(url);}}><Download size={16}/> Scarica un esempio</button></div></details>
+          <section className="panel api-panel"><div className="api-head"><div className="connect-icon turquoise"><Link2 size={23}/></div><div><h2>Collega un'automazione personale</h2><p>Ogni utente può generare una propria chiave per inviare bollette all'app da strumenti come n8n o Make, collegati ai propri servizi.</p></div><Tag tone={integration?.connected?'green':'neutral'}>{integration?.connected?'Chiave attiva':'Opzionale'}</Tag></div>
+          {demo?<div className="api-muted"><LockKeyhole size={17}/> Le chiavi personali sono disponibili quando l'app è collegata a Supabase.</div>:<><div className="api-buttons"><button className="btn btn-primary" onClick={generateToken}>{integration?.connected?'Rigenera chiave':'Genera chiave personale'}</button>{integration?.connected&&<button className="btn btn-soft danger-text" onClick={revokeToken}>Revoca chiave</button>}</div>
+            {newToken&&<div className="token-box"><label>La tua chiave (visibile solo ora)</label><code>{newToken}</code><button className="btn btn-soft" onClick={()=>{navigator.clipboard.writeText(newToken);notify('Chiave copiata.');}}>Copia chiave</button></div>}
+            <div className="endpoint-box"><small>Endpoint per l'automazione</small><code>{typeof window!=='undefined'?window.location.origin:''}/api/ingest</code><small>Metodo POST · Authorization: Bearer LA_TUA_CHIAVE</small></div><details className="api-example"><summary>Mostra un esempio di dati da inviare</summary><pre>{JSON.stringify({external_id:'fattura-2026-001',title:'Bolletta luce',supplier:'Mio fornitore',category:'Luce',amount:89.50,due_date:'2026-11-25',paid:false},null,2)}</pre></details>
+          </>}
+          <div className="api-footnote"><ShieldCheck size={18}/> La chiave non può essere recuperata dopo la creazione. Se la perdi, rigenerala: la precedente verrà invalidata.</div></section>
+          <div className="informative"><Info size={19}/><p>Gmail richiede configurazione OAuth e, per la distribuzione pubblica, possibili verifiche Google. Il collegamento alle aree clienti dei singoli fornitori non è incluso. Le bollette email sono sempre da confermare.</p></div>
+        </>}
+        {['household','budget','shopping','vehicles'].includes(tab)&&<><div className="page-heading"><div><div className="eyebrow">COLLABORAZIONE FAMILIARE</div><h1>{menu.find(m=>m.id===tab)?.title}</h1><p>{activeHomeId?`${homeMembership?.homes?.name||'Casa'} · ${homeMembership?.role||'membro'}`:'Crea o seleziona una casa per condividere informazioni con chi vive con te.'}</p></div></div>
+          <HouseholdHub client={client} demo={demo} user={user} homes={homes} homeId={activeHomeId} role={homeMembership?.role} onChangeHome={switchHome} onHomesReload={async()=>{await reloadHomes();await reload();}} onNotify={notify} section={tab} bills={bills}/></>}
+        {tab==='settings'&&<><div className="page-heading"><div><div className="eyebrow">PERSONALIZZA L'ESPERIENZA</div><h1>Impostazioni</h1><p>Decidi quando ricevere avvisi e gestisci il tuo spazio privato.</p></div></div><div className="settings-grid"><section className="panel settings-panel"><div className="settings-heading"><span className="settings-icon"><Bell size={20}/></span><div><h2>Promemoria di pagamento</h2><p>Ricevi un avviso 3 giorni prima della scadenza delle bollette non pagate.</p></div></div><div className="setting-row"><div><b>Promemoria attivi</b><small>Notifica interna e, se configurata dal gestore, anche via email</small></div><button className={`toggle ${data.profile?.reminders_enabled?'on':''}`} onClick={toggleEmails} aria-label="Attiva o disattiva promemoria" aria-pressed={!!data.profile?.reminders_enabled}><span/></button></div><div className="setting-row"><div><b>Anticipo promemoria</b><small>Per ogni bolletta con pagamento non registrato</small></div><Tag tone="green">3 giorni</Tag></div><div className="summary-settings"><h3>Riepilogo delle scadenze del mese</h3><p>Il controllo delle email resta giornaliero e silenzioso. Separatamente scegli quando ricevere l’elenco delle bollette non pagate da oggi a fine mese.</p>
+            <label>Frequenza del riepilogo<select value={data.profile?.summary_frequency||'off'} onChange={e=>updateSummaryPrefs({summary_frequency:e.target.value})}>{[['off','Disattivato'],['daily','Ogni giorno'],['weekly','Ogni settimana'],['biweekly','Ogni 2 settimane'],['monthly','Ogni mese']].map(([v,n])=><option value={v} key={v}>{n}</option>)}</select></label>
+            {['weekly','biweekly'].includes(data.profile?.summary_frequency)&&<label>Giorno della settimana<select value={data.profile?.summary_weekday??1} onChange={e=>updateSummaryPrefs({summary_weekday:Number(e.target.value)})}>{['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'].map((n,i)=><option key={i} value={i}>{n}</option>)}</select></label>}
+            {data.profile?.summary_frequency==='monthly'&&<label>Giorno del mese (1–28)<input type="number" min="1" max="28" value={data.profile?.summary_month_day??1} onChange={e=>{const d=Number(e.target.value);if(d>=1&&d<=28)updateSummaryPrefs({summary_month_day:d});}}/></label>}
+            <small>Il riepilogo è distinto dall’avviso fisso 3 giorni prima. Le notifiche interne sono visibili nell’app; per l’email serve configurare Resend.</small></div>
+            {!demo&&<><PushSettings client={client} onNotify={notify}/><CalendarFeed client={client} onNotify={notify}/></>}<div className="summary-settings"><h3>Calendario del telefono</h3><p>Scarica un file .ics con le scadenze non pagate e l'avviso 3 giorni prima. È un'esportazione: non si aggiorna da sola dopo l'importazione nel calendario.</p><button className="btn btn-soft" onClick={()=>downloadCalendar(bills.filter(b=>!b.paid_at),activeHomeId?'scadenze-casa':'scadenze-personali')}><CalendarDays size={16}/> Esporta calendario (.ics)</button></div><div className="setting-row"><div><b>Conferma automatica dei pagamenti</b><small>Disattivata per sicurezza. Funziona solo dopo aver approvato un mittente, se importo, fornitore e scadenza corrispondono a un’unica bolletta. Le email non provano il movimento bancario.</small></div><button className={`toggle ${data.profile?.auto_confirm_payments?'on':''}`} onClick={toggleAutoPayment} aria-label="Attiva o disattiva conferma automatica dei pagamenti" aria-pressed={!!data.profile?.auto_confirm_payments}><span/></button></div></section>
+          <section className="panel settings-panel"><div className="settings-heading"><span className="settings-icon"><LockKeyhole size={20}/></span><div><h2>Account e privacy</h2><p>I dati di ogni persona sono separati e protetti.</p></div></div><div className="setting-row"><div><b>Account</b><small>{demo?'Anteprima locale':user?.email||'Account personale'}</small></div><ShieldCheck size={20} className="subtle-green"/></div><div className="setting-row"><div><b>Condivisione</b><small>Gli amici creano la propria casa; familiari e coinquilini possono essere invitati</small></div><button className="btn btn-soft" onClick={()=>changePage('household')}>Gestisci case</button></div>{!demo&&<button className="btn btn-soft" onClick={()=>client.auth.signOut()}><LogOut size={17}/> Esci dall'account</button>}</section></div></>}
+      </div>
+    </main>
+    {ratePlan&&<div className="modal-overlay"><div className="modal rate-modal"><div className="modal-head"><div><div className="eyebrow">PIANO RATE DA VERIFICARE</div><h2>{ratePlan.rows.length} rate individuate</h2></div><button className="icon-button" onClick={()=>setRatePlan(null)} aria-label="Chiudi"><X size={20}/></button></div>
+      <div className="rate-modal-body"><p>Fonte: {ratePlan.source}. Ogni rata è una proposta: verifica date, importi e che appartenga alla tua unità.</p>{ratePlan.warnings.map((w,i)=><p className="rate-warning" key={i}><AlertCircle size={15}/> {w}</p>)}
+      <div className="table-scroll"><table className="bills-table"><thead><tr><th>Usa</th><th>Descrizione</th><th>Scadenza</th><th>Importo €</th></tr></thead><tbody>{ratePlan.rows.map((r,i)=><tr key={i}><td><input type="checkbox" checked={r.selected} onChange={e=>setRatePlan({...ratePlan,rows:ratePlan.rows.map((x,j)=>j===i?{...x,selected:e.target.checked}:x)})}/></td><td><input aria-label={`Descrizione rata ${i+1}`} value={r.title} onChange={e=>setRatePlan({...ratePlan,rows:ratePlan.rows.map((x,j)=>j===i?{...x,title:e.target.value}:x)})}/></td><td><input type="date" aria-label={`Data rata ${i+1}`} value={r.due_date} onChange={e=>setRatePlan({...ratePlan,rows:ratePlan.rows.map((x,j)=>j===i?{...x,due_date:e.target.value}:x)})}/></td><td><input type="number" min="0.01" step="0.01" aria-label={`Importo rata ${i+1}`} value={r.amount} onChange={e=>setRatePlan({...ratePlan,rows:ratePlan.rows.map((x,j)=>j===i?{...x,amount:e.target.value}:x)})}/></td></tr>)}</tbody></table></div>
+      <div className="modal-actions"><button className="btn btn-soft" onClick={()=>setRatePlan(null)}>Annulla</button><button className="btn btn-primary" disabled={busy} onClick={saveRatePlan}>{busy?'Salvataggio…':'Salva rate selezionate'} <Check size={16}/></button></div></div></div></div>}
+    {modal&&<div className="modal-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)setModal(null);}}><div className="modal"><div className="modal-head"><div><div className="eyebrow">{modal==='bill'?(form.source==='document'?'BOLLETTA DA DOCUMENTO':'NUOVO PAGAMENTO'):modal==='utility'?'NUOVA UTENZA':'NUOVA ATTIVITÀ'}</div><h2>{modal==='bill'?(form.source==='document'?'Controlla la bolletta':'Aggiungi bolletta'):modal==='utility'?"Collega un’utenza":'Aggiungi attività di casa'}</h2></div><button className="icon-button" onClick={()=>setModal(null)}><X size={21}/></button></div>
+      <form onSubmit={modal==='bill'?saveBill:modal==='utility'?saveUtility:saveTask} className="modal-form">
+        {modal==='bill'&&<>{form.source==='document'&&<div className="document-review"><div className="document-review-head"><FileText size={19}/><div><b>Documento letto: {form.import_file}</b><small>Analisi locale con OCR e regole, senza AI esterna. Conferma i dati proposti.</small></div></div>{form.import_warnings?.length>0&&<ul>{form.import_warnings.map((warning,index)=><li key={index}>{warning}</li>)}</ul>}</div>}<label>Descrizione <input required maxLength={180} autoFocus value={form.title||''} onChange={e=>setForm({...form,title:e.target.value})} placeholder="Es. Bolletta elettricità"/></label><label>Fornitore <input maxLength={120} value={form.supplier||''} onChange={e=>setForm({...form,supplier:e.target.value})} placeholder="Es. Fornitore energia"/></label><div className="form-row"><label>Categoria <select value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>{categories.map(c=><option key={c}>{c}</option>)}</select></label><label>Importo € <input required type="number" min="0" step="0.01" value={form.amount} onChange={e=>setForm({...form,amount:e.target.value})} placeholder="0,00"/></label></div><label>Data scadenza <input type="date" required value={form.due_date} onChange={e=>setForm({...form,due_date:e.target.value})}/></label><label className="checkbox-label"><input type="checkbox" checked={!!form.paid} onChange={e=>setForm({...form,paid:e.target.checked})}/> Pagamento già effettuato</label></>}
+        {modal==='utility'&&<><label>Nome del fornitore <input autoFocus required maxLength={120} value={form.supplier||''} onChange={e=>setForm({...form,supplier:e.target.value})} placeholder="Es. Internet casa"/></label><div className="form-row"><label>Categoria<select value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>{categories.map(c=><option key={c}>{c}</option>)}</select></label><label>Importo stimato €<input required type="number" step="0.01" min="0" value={form.estimated_amount} onChange={e=>setForm({...form,estimated_amount:e.target.value})} placeholder="0,00"/></label></div><label>Codice cliente (facoltativo)<input maxLength={120} value={form.account_reference||''} onChange={e=>setForm({...form,account_reference:e.target.value})} placeholder="Non inserire password"/></label><div className="form-row"><label>Frequenza<select value={form.frequency} onChange={e=>setForm({...form,frequency:e.target.value})}>{frequencies.map(f=><option key={f.value} value={f.value}>{f.label}</option>)}</select></label><label>Prima scadenza<input type="date" required value={form.next_due_date} onChange={e=>setForm({...form,next_due_date:e.target.value})}/></label></div><p className="helper-text"><Info size={15}/> Verrà creata la prima bolletta con importo stimato. Le successive saranno generate dal servizio giornaliero.</p></>}
+        {modal==='task'&&<><label>Attività<input autoFocus required maxLength={180} value={form.title||''} onChange={e=>setForm({...form,title:e.target.value})} placeholder="Es. Controllare la caldaia"/></label><label>Data entro cui farla<input type="date" value={form.due_date||''} onChange={e=>setForm({...form,due_date:e.target.value})}/></label>{activeHomeId&&<label>Assegna a (facoltativo)<select value={form.assigned_to||''} onChange={e=>setForm({...form,assigned_to:e.target.value})}><option value="">Nessuna assegnazione</option>{homeMembers.map(m=><option key={m.user_id} value={m.user_id}>{m.email}</option>)}</select></label>}</>}
+        <div className="modal-actions"><button type="button" className="btn btn-soft" onClick={()=>setModal(null)}>Annulla</button><button className="btn btn-primary" type="submit" disabled={busy}>{busy?'Salvataggio…':modal==='bill'?'Conferma e salva':modal==='utility'?'Aggiungi utenza':'Salva attività'}<Check size={17}/></button></div>
+      </form></div></div>}
+    <Toast message={toast} onClose={()=>setToast('')}/>
+  </div>;
+}

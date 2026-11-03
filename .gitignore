@@ -1,0 +1,27 @@
+# Node / Next.js
+node_modules/
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Credentials and personal configuration
+.env
+.env.*
+!.env.example
+.vercel/
+*.pem
+*.p12
+*.pfx
+*.key
+credentials.json
+
+# Local files and temporary exports
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+coverage/
+.tmp/
+tmp/

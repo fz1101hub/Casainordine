@@ -1,0 +1,14 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {parseLocalNumber,extractConsumption,extractMeterCandidates,monthlyConsumption,consumptionAnomalies,expenseForecast,canConfirmReceipt,serializeCsv,safeBackup,dateWithinDays} from '../lib/home-insights.mjs';
+test('importi italiani e separatori',()=>{assert.equal(parseLocalNumber('1.234,56'),1234.56);assert.equal(parseLocalNumber('1,230'),1.23);assert.equal(parseLocalNumber('2.345'),2345);assert.equal(parseLocalNumber('non numero'),null)});
+test('consumi energia gas acqua',()=>{assert.deepEqual(extractConsumption('Consumo totale 234,5 kWh').candidates.map(x=>x.unit),['kWh']);assert.equal(extractConsumption('Consumo gas 118 Smc').value,118);assert.equal(extractConsumption('Acqua fatturata 49 m³').unit,'m³')});
+test('consumo ambiguo mai accettato implicitamente',()=>{const r=extractConsumption('Consumo 30 kWh\nConsumo 40 kWh');assert.equal(r.ambiguous,true);assert.equal(r.value,null)});
+test('contatore OCR necessita revisione',()=>assert.deepEqual(extractMeterCandidates('lettura attuale: 001234\nlettura attuale 001234'),[1234]));
+test('anomalie rispetto allo storico per unità',()=>{const series=[{month:'2026-01',unit:'kWh',value:100},{month:'2026-02',unit:'kWh',value:120},{month:'2026-03',unit:'kWh',value:180}];assert.equal(consumptionAnomalies(series).length,1)});
+test('previsioni distinguono importi noti da stime',()=>{const bills=[{id:'a',supplier:'Gas',category:'Gas',due_date:'2026-09-15',amount:40},{id:'b',supplier:'Gas',category:'Gas',due_date:'2026-10-15',amount:50},{id:'c',supplier:'Gas',category:'Gas',due_date:'2026-11-15',amount:60}];const r=expenseForecast(bills,{anchor:'2026-11-01',months:2});assert.equal(r.months[0].total,60);assert.equal(r.months[1].total,45)});
+test('solo importo corrispondente e bolletta aperta',()=>{const b={id:'b',amount:100,paid_at:null};const r={bill_id:'b',amount:99,status:'pending'};assert.equal(canConfirmReceipt(b,r),false);assert.equal(canConfirmReceipt(b,{...r,amount:100}),true)});
+test('CSV neutro da iniezioni di formule',()=>assert.match(serializeCsv([{name:'=IMPORTXML("x")'}],[{key:'name',label:'Nome'}]),/"'=IMPORTXML/));
+test('backup rimuove posizione privata di storage',()=>{const out=safeBackup({documents:[{name:'a',storage_path:'user/secret',id:'x'}]});assert.equal(out.documents[0].storage_path,undefined)});
+test('finestre scadenze deterministiche',()=>{assert.equal(dateWithinDays('2026-11-05','2026-11-02',3),true);assert.equal(dateWithinDays('2026-11-06','2026-11-02',3),false)});
+
+test('stima bimestrale non viene imputata ogni mese',()=>{const bills=[{supplier:'Acqua',category:'Acqua',due_date:'2026-06-20',amount:22},{supplier:'Acqua',category:'Acqua',due_date:'2026-08-20',amount:26},{supplier:'Acqua',category:'Acqua',due_date:'2026-10-20',amount:24}];const f=expenseForecast(bills,{months:3,anchor:'2026-11-01'});assert.equal(f.months[0].estimated,0);assert.equal(f.months[1].estimated,24)});
