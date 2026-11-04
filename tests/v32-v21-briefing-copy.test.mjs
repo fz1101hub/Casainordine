@@ -7,7 +7,7 @@ test('V21 briefing text and privacy copy exist in six languages',()=>{
  const langs=['it','en','es','fr','de','pt'];
  const copies=langs.map(v21BriefingCopy);
  const keys=Object.keys(copies[0]);
- assert.equal(keys.length,198);
+ assert.equal(keys.length,207);
  for(const copy of copies){assert.deepEqual(Object.keys(copy),keys);for(const value of Object.values(copy))assert.ok(value.trim());}
  for(const key of keys)assert.ok(source.includes('briefingCopy.'+key),key);
  assert.deepEqual(v21BriefingCopy('unknown'),v21BriefingCopy('it'));
@@ -69,4 +69,10 @@ test('vacation checklist renders translations without rewriting canonical saved 
  for(const key of ['checkDoors','checkPayments','checkContacts','checkShutoffs','checkMailPets','checkReturn'])assert.ok(source.includes('briefingCopy.'+key));
  assert.match(source,/checklistCopy\[c\.title\]\|\|c\.title/);
  assert.match(source,/VACATION_CHECKLIST\.map\(title=>\(\{title,done:false\}\)\)/);
+});
+
+test('five-minute briefing labels are translated and refreshed when language changes',()=>{
+ for(const key of ['briefingOverdueBill','briefingPaymentDue','briefingMaintenance','briefingContractRenewal','briefingTask','briefingDecision','briefingToReview','briefingProofOfPurchase','briefingNoReceipt'])assert.ok(Object.hasOwn(v21BriefingCopy('en'),key));
+ assert.match(source,/copy:briefingCopy/);
+ assert.match(source,/rows\.inventory,language\]/);
 });
