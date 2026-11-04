@@ -24,9 +24,9 @@ test('replaces named placeholders without executing user content',()=>{
  assert.equal(translate('en','home.greeting',{who:', Alice'}),'Hello, Alice!');
 });
 test('currency remains EUR; number formatting adapts to locale',()=>{
- assert.match(formatMoney(1234.5,'it'),/1.234,50/);
- assert.match(formatMoney(1234.5,'en'),/1,234.50/);
- assert.match(formatMoney(1234.5,'de'),/1.234,50/);
+ assert.match(formatMoney(12345.5,'it'),/12.345,50/);
+ assert.match(formatMoney(12345.5,'en'),/12,345.50/);
+ assert.match(formatMoney(12345.5,'de'),/12.345,50/);
  assert.equal(localeFor('es'),'es-ES');
 });
 test('date formatting adapts; invalid inputs do not crash',()=>{
