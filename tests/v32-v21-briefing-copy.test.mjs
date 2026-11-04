@@ -7,7 +7,7 @@ test('V21 briefing text and privacy copy exist in six languages',()=>{
  const langs=['it','en','es','fr','de','pt'];
  const copies=langs.map(v21BriefingCopy);
  const keys=Object.keys(copies[0]);
- assert.equal(keys.length,89);
+ assert.equal(keys.length,109);
  for(const copy of copies){assert.deepEqual(Object.keys(copy),keys);for(const value of Object.values(copy))assert.ok(value.trim());}
  for(const key of keys)assert.ok(source.includes('briefingCopy.'+key),key);
  assert.deepEqual(v21BriefingCopy('unknown'),v21BriefingCopy('it'));
@@ -36,4 +36,11 @@ test('family voting does not authorize payments and follows selected language',(
  for(const key of ['decisionsSharedOnly','proposeDecision','proposalPublished','titleLabel','decisionReason','proposedBudget','voteDeadline','publishProposal','proposalsAndVotes','budgetLabel','voteOpen','voteClosed','deadline','votesYes','votesNo','votesAbstain','voteYes','voteNo','voteAbstain','votingClosedFeedback','closeVoting','voteNotPayment']){
   assert.ok(source.includes('briefingCopy.'+key),key);
  }
+});
+
+test('SOS privacy, offline encryption and deletion confirmations are localized',()=>{
+ for(const key of ['emergencyInstructions','emergencyDisclaimer','valvesLocation','procedures','contactLabel','phoneLabel','updateCard','saveCard','cancelEditing','savedOfflineSos','sosEncryptionNotice','devicePassphrase','editLabel','saveEncryptedOffline','openOfflineDrafts','encryptedCopyExists','noOfflineCopy','confirmDeleteSos','localCopyDeleted','deleteLocalCopy']){
+  assert.ok(source.includes('briefingCopy.'+key),key);
+ }
+ assert.match(source,/confirm\(briefingCopy\.confirmDeleteSos\)/);
 });
