@@ -26,3 +26,11 @@ test('push bill names cannot inject line breaks or invisible controls',()=>{
  assert.doesNotMatch(copy.body,/[\\r\\n\\t\\u200b]/);
  assert.throws(()=>billDuePushCopy({name:'\\u200b\\u0000'}),TypeError);
 });
+
+test('push names are limited without changing stored bill names',()=>{
+ const name='A'.repeat(200);
+ const copy=billDuePushCopy({language:'it',name});
+ assert.equal(name.length,200);
+ assert.match(copy.body,/A{160}/);
+ assert.doesNotMatch(copy.body,/A{161}/);
+});
