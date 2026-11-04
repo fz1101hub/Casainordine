@@ -21,10 +21,10 @@ test('invalid inputs fail closed and unsupported language falls back to Italian'
 });
 
 test('push bill names cannot inject line breaks or invisible controls',()=>{
- const copy=billDuePushCopy({language:'en',name:'  Water\\n\\tBill\\u200b  '});
+ const copy=billDuePushCopy({language:'en',name:'  Water\n\tBill\u200b  '});
  assert.match(copy.body,/Water Bill/);
- assert.doesNotMatch(copy.body,/[\\r\\n\\t\\u200b]/);
- assert.throws(()=>billDuePushCopy({name:'\\u200b\\u0000'}),TypeError);
+ assert.doesNotMatch(copy.body,/[\r\n\t\u200b]/);
+ assert.throws(()=>billDuePushCopy({name:'\u200b\u0000'}),TypeError);
 });
 
 test('push names are limited without changing stored bill names',()=>{
