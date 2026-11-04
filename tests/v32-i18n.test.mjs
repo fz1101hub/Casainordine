@@ -1,0 +1,35 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {LANGUAGES,DEFAULT_LANGUAGE,MESSAGE_KEYS,TRANSLATIONS,browserLanguage,normalizeLanguage,translate,localeFor,formatDate,formatMoney} from '../lib/i18n.mjs';
+test('six selectable languages and Italian default',()=>{
+ assert.deepEqual(LANGUAGES.map(x=>x.code),['it','en','es','fr','de','pt']);
+ assert.equal(DEFAULT_LANGUAGE,'it');
+});
+test('accepts regional browser locales and safe fallback',()=>{
+ assert.equal(browserLanguage('pt-BR'),'pt');
+ assert.equal(browserLanguage('en-US'),'en');
+ assert.equal(browserLanguage('fr-CH'),'fr');
+ assert.equal(browserLanguage('ar'),'it');
+ assert.equal(normalizeLanguage('ES_es'),'es');
+});
+test('all translations cover the same keys with nonempty text',()=>{
+ for(const lang of LANGUAGES){
+  assert.deepEqual(Object.keys(TRANSLATIONS[lang.code]).sort(),[...MESSAGE_KEYS].sort());
+  for(const key of MESSAGE_KEYS)assert.ok(TRANSLATIONS[lang.code][key]?.trim(),lang.code+':'+key);
+ }
+});
+test('replaces named placeholders without executing user content',()=>{
+ assert.equal(translate('en','home.widget.tasks.count',{count:3}),'3 open tasks');
+ assert.equal(translate('it','home.widget.tasks.count',{count:5}),'5 attività aperte');
+ assert.equal(translate('en','home.greeting',{who:', Alice'}),'Hello, Alice!');
+});
+test('currency remains EUR; number formatting adapts to locale',()=>{
+ assert.match(formatMoney(1234.5,'it'),/1.234,50/);
+ assert.match(formatMoney(1234.5,'en'),/1,234.50/);
+ assert.match(formatMoney(1234.5,'de'),/1.234,50/);
+ assert.equal(localeFor('es'),'es-ES');
+});
+test('date formatting adapts; invalid inputs do not crash',()=>{
+ assert.match(formatDate('2026-11-04','en'),/Nov/);
+ assert.equal(formatDate('invalid','fr'),'—');
+});
