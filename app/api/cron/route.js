@@ -6,6 +6,7 @@ import { processExtraAlerts, pushAllowed } from '../../../lib/extra-alerts.mjs';
 import { processV20Alerts } from '../../../lib/v20-alerts.mjs';
 import { billReminderCopy } from '../../../lib/notification-copy.mjs';
 import { billSummaryCopy } from '../../../lib/notification-summary.mjs';
+import { billDuePushCopy, billSummaryPushCopy } from '../../../lib/notification-push-copy.mjs';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
@@ -65,10 +66,13 @@ async function notifyPushForBill(admin,bill,today,counts){
       const {data:old}=await admin.from('push_delivery_log').select('sent_at').eq('bill_id',bill.id).eq('user_id',userId).eq('reminder_date',today).maybeSingle();
       if(old?.sent_at)continue;
     }
+    const {data:languagePreference,error:languageError}=await admin.from('user_language_preferences').select('language').eq('user_id',userId).maybeSingle();
+    if(languageError){counts.errors.push(`Lingua push ${userId}: ${languageError.message}`);continue;}
+    const pushCopy=billDuePushCopy({language:languagePreference?.language||'it',name:bill.title});
     let successful=false;
     for(const device of devices){
       try{
-        await sendPush(device,{title:'Casa in Ordine · scadenza vicina',body:`${bill.title} scade tra 3 giorni. Hai già pagato?`});
+        await sendPush(device,pushCopy);
         counts.push_sent++;successful=true;
       }catch(e){
         if(e.statusCode===404||e.statusCode===410)await admin.from('push_subscriptions').delete().eq('id',device.id).eq('user_id',userId);
@@ -169,10 +173,16 @@ export async function GET(request) {
       const {data:digestPreferences}=await admin.from('user_alert_preferences').select('*').eq('user_id',profile.id).maybeSingle();
       if(configuredPush()&&pushAllowed(digestPreferences||{},'digest')){
         const {data:devices}=await admin.from('push_subscriptions').select('id,endpoint,p256dh,auth_secret').eq('user_id',profile.id).limit(10);
+        let pushCopy=null;
+        if(devices?.length){
+          const {data:languagePreference,error:languageError}=await admin.from('user_language_preferences').select('language').eq('user_id',profile.id).maybeSingle();
+          if(languageError)counts.errors.push(`Lingua push riepilogo ${profile.id}: ${languageError.message}`);
+          else pushCopy=billSummaryPushCopy({language:languagePreference?.language||'it',count:items.length,total});
+        }
         let sent=false;
-        for(const device of devices||[]){
+        for(const device of pushCopy?(devices||[]):[]){
           try{
-            await sendPush(device,{title:'Casa in Ordine · riepilogo del mese',body:`${items.length} scadenze ancora aperte, totale ${euro(total)}.`});
+            await sendPush(device,pushCopy);
             counts.summary_push_sent++;sent=true;
           }catch(e){
             if(e.statusCode===404||e.statusCode===410)await admin.from('push_subscriptions').delete().eq('id',device.id).eq('user_id',profile.id);
