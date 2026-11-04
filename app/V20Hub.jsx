@@ -70,11 +70,11 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   }
   const output=await readRatePlanDocument(file,progress=>setNoticeMessage(progress));setRawNotice(output.text.slice(0,4000));await parseNoticeText(output.text);
  }catch(e){setNoticeMessage('Scansione non riuscita: inserisci il codice manualmente. '+e.message)}}
- async function saveNotice(e){e.preventDefault();const code=notice.notice_code.replace(/\D/g,'');if(![15,18].includes(code.length))return onNotify('Il codice avviso deve avere 15 o 18 cifre');
-  if(createBill&&(!notice.due_on||notice.amount===''))return onNotify('Per creare il promemoria servono importo e data.');
-  if(createBill&&!window.confirm('Hai verificato l’avviso originale? Verrà creata una bolletta non pagata con promemoria T-3.'))return;
+ async function saveNotice(e){e.preventDefault();const code=notice.notice_code.replace(/\D/g,'');if(![15,18].includes(code.length))return onNotify(ui.noticeCodeInvalid);
+  if(createBill&&(!notice.due_on||notice.amount===''))return onNotify(ui.noticeReminderRequiresDetails);
+  if(createBill&&!window.confirm(ui.confirmNoticeOriginal))return;
   setWorking(true);try{const {error}=await client.rpc('v20_register_pagopa',{p_home_id:homeId||null,p_notice_code:code,p_creditor_code:notice.creditor_code||null,p_creditor_name:notice.creditor_name,p_amount:notice.amount===''?null:Number(notice.amount),p_due_on:notice.due_on||null,p_create_bill:createBill});if(error)throw error;
-   onNotify(createBill?'Avviso e scadenza creati; nessun pagamento eseguito.':'Avviso registrato.');setNotice({notice_code:'',creditor_code:'',creditor_name:'',amount:'',due_on:''});setRawNotice('');await load();onRefresh();}
+   onNotify(createBill?ui.noticeAndReminderSaved:ui.noticeSaved);setNotice({notice_code:'',creditor_code:'',creditor_name:'',amount:'',due_on:''});setRawNotice('');await load();onRefresh();}
   catch(e){onNotify(e.message)}finally{setWorking(false)}}
  async function refreshDrafts(){try{setDrafts(await listDrafts());setOfflineError('')}catch(e){setOfflineError(e.message)}}
  async function importDraft(d){if(!client||!user)return onNotify('Accedi prima di importare');if(d.type==='document')return;
