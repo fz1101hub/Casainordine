@@ -7,12 +7,11 @@ import {missingBillCandidates,billFraudSignals,parsePagoPA,moveChecklist,savings
 import {readRatePlanDocument} from '../lib/document-reader.js';
 import {listDrafts,removeDraft} from '../lib/offline-queue.js';
 const today=todayRome;
-const formatDate=s=>s?new Date(s+'T12:00:00Z').toLocaleDateString('it-IT',{timeZone:'UTC',day:'2-digit',month:'short',year:'numeric'}):'—';
 function Field({label,children}){return <label className="extra-field">{label}{children}</label>}
 function Item({children,action}){return <div className="extra-item"><div>{children}</div>{action}</div>}
 const key=()=>crypto.randomUUID();
 export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilities=[],tab,onNotify=()=>{},onRefresh=()=>{}}){
- const {money}=useLanguage();
+ const {money,date:formatDate}=useLanguage();
  const [loading,setLoading]=useState(true),[working,setWorking]=useState(false),[rows,setRows]=useState({goals:[],moves:[],steps:[],notices:[],risk:[],audit:[],recycle:[],alerts:[],connections:[],preferences:null});
  const [goal,setGoal]=useState({label:'',target_amount:'',current_amount:'0',deadline:today()});
  const [move,setMove]=useState({title:'',move_on:today(),notes:''});
