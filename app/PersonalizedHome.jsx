@@ -27,7 +27,7 @@ function HomeWidget({title,icon:Icon,count,actionLabel,onAction,children}){
 
 export default function PersonalizedHome({
  client,demo,user,homeId,canWrite,bills=[],tasks=[],displayName='',
- onNavigate,onNewBill,onNewTask,onPay,onToggleTask,onRefresh,onNotify=()=>{}
+ sampleExtras=null,onSampleShoppingChange=()=>{},onNavigate,onNewBill,onNewTask,onPay,onToggleTask,onRefresh,onNotify=()=>{}
 }){
  const [prefs,setPrefs]=useState(()=>normalizeHomePreferences(DEFAULT_HOME_PREFERENCES));
  const [savedPrefs,setSavedPrefs]=useState(()=>normalizeHomePreferences(DEFAULT_HOME_PREFERENCES));
@@ -69,7 +69,7 @@ export default function PersonalizedHome({
  },[client,demo,user?.id]);
 
  useEffect(()=>{let active=true;const run=async()=>{
-  if(demo||!client){if(active){setExtras(blankExtras());setExtraLoading(false);}return;}
+  if(demo||!client){if(active){setExtras(demo&&sampleExtras?sampleExtras:blankExtras());setExtraError('');setExtraLoading(false);}return;}
   setExtraLoading(true);setExtraError('');
   const scope=q=>homeId?q.eq('home_id',homeId):q.is('home_id',null);
   const work=[
@@ -85,7 +85,7 @@ export default function PersonalizedHome({
   setExtraLoading(false);
   const first=results.find(r=>r.error);
   if(first)setExtraError('Alcuni dati non sono disponibili: '+first.error.message);
- };run();return()=>{active=false};},[client,demo,homeId,refreshKey]);
+ };run();return()=>{active=false};},[client,demo,homeId,refreshKey,sampleExtras]);
  const openBills=useMemo(()=>bills.filter(b=>!b.paid_at).slice().sort((a,b)=>(a.due_date||'9999').localeCompare(b.due_date||'9999')),[bills]);
  const openTasks=useMemo(()=>tasks.filter(t=>!t.done_at).slice().sort((a,b)=>(a.due_date||'9999').localeCompare(b.due_date||'9999')),[tasks]);
  const uncheckedShopping=extras.shopping.filter(x=>!x.checked);
@@ -118,7 +118,9 @@ export default function PersonalizedHome({
  };
  const refresh=()=>{setRefreshKey(x=>x+1);onRefresh?.();};
  const markShopping=async item=>{
-  if(!client||!homeId||!canWrite||shoppingBusy)return;
+  if(!canWrite||shoppingBusy)return;
+  if(demo){onSampleShoppingChange(item.id);return;}
+  if(!client||!homeId)return;
   setShoppingBusy(true);
   try{
    const {error:updateError}=await client.from('home_shopping').update({checked:!item.checked}).eq('id',item.id).eq('home_id',homeId);
