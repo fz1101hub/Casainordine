@@ -7,7 +7,7 @@ test('V21 briefing text and privacy copy exist in six languages',()=>{
  const langs=['it','en','es','fr','de','pt'];
  const copies=langs.map(v21BriefingCopy);
  const keys=Object.keys(copies[0]);
- assert.equal(keys.length,159);
+ assert.equal(keys.length,193);
  for(const copy of copies){assert.deepEqual(Object.keys(copy),keys);for(const value of Object.values(copy))assert.ok(value.trim());}
  for(const key of keys)assert.ok(source.includes('briefingCopy.'+key),key);
  assert.deepEqual(v21BriefingCopy('unknown'),v21BriefingCopy('it'));
@@ -55,4 +55,12 @@ test('insured inventory forms, document links and estimate caveat use localized 
  for(const key of ['registerInsuredItem','itemRegistered','objectLabel','estimatedValue','propertyLabel','notSpecified','choosePhoto','archivePhoto','noneMasculine','relatedAsset','notesLabel','saveInventory','inventoryDocumentation','itemsCount','estimatedValueSuffix','linkedDocumentsCount','exportList','documentButton','roomNotSpecified','documentLinked','addReceiptPhoto','inventoryDisclaimer']){
   assert.ok(source.includes('briefingCopy.'+key),key);
  }
+});
+
+test('V21 navigation and dynamic feedback use account language',()=>{
+ for(const key of ['sosUpdated','sosSaved','sosEncrypted','vacationCreated','chooseSharePlan','confirmShareLink','shareLinkCreated','photoTypeLimit','itemPhotoName','inventoryPhotoNotes','photoSaved','photoUploadFailed','voteSaved','tabTags','tabSos','tabRadar','tabSimulator','tabPassport','tabVacation','tabInventory','tabDecisions','tabBriefing','eyebrow','sharedHomeInfo','personalInfo','permissionNotice','loadingData','demoMode','enableDatabase','readOnlyHome','confirmDeletePermanent','itemDeleted','operationFailed','migrationRequired']){
+  assert.ok(source.includes('briefingCopy.'+key),key);
+ }
+ assert.match(source,/confirm\(briefingCopy\.confirmDeletePermanent\)/);
+ assert.match(source,/confirm\(briefingCopy\.confirmShareLink\)/);
 });
