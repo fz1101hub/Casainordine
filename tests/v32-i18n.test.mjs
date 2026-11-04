@@ -34,6 +34,10 @@ test('currency remains EUR; number formatting adapts to locale',()=>{
 test('date formatting adapts; invalid inputs do not crash',()=>{
  assert.match(formatDate('2026-11-04','en'),/Nov/);
  assert.equal(formatDate('invalid','fr'),'—');
+ assert.equal(formatDate('2026-02-30','en'),'—');
+ assert.equal(formatDate('2025-02-29','it'),'—');
+ assert.notEqual(formatDate('2024-02-29','de'),'—');
+ assert.equal(formatDate('2026-13-01','pt'),'—');
 });
 
 test('account language preferences are scoped independently; guest setting is separate',()=>{
