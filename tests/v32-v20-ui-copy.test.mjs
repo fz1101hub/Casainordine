@@ -8,7 +8,7 @@ test('V20 monitoring and fraud screen copy exists in all six languages',()=>{
  const langs=['it','en','es','fr','de','pt'];
  const copies=langs.map(v20UiCopy);
  const keys=Object.keys(copies[0]);
- assert.equal(keys.length,114);
+ assert.equal(keys.length,126);
  for(const copy of copies){assert.deepEqual(Object.keys(copy),keys);for(const value of Object.values(copy))assert.ok(value.trim().length>0);}
  // Shared terms (for example Code and Elemento) are valid across languages.
  // Validate each language has distinct meaningful prose, without demanding unique words for every label.
@@ -82,4 +82,8 @@ test('audit history and recoverable trash warnings use localized copy',()=>{
  for(const key of ['transparencyRecovery','recentActivity','userLabel','automaticProcess','noAuditEvents','recoverableTrash','restoreLabel','itemLabel','deletedOn','trashEmpty','trashRetentionNotice']){
   assert.ok(source.includes('ui.'+key));
  }
+});
+
+test('moving plan UI and provider action disclaimer use translated copy',()=>{
+ for(const key of ['movingUtilities','newMovePlan','moveName','movePlaceholder','moveDate','notesLabel','createMoveChecklist','moveProviderDisclaimer','myChecklists','checklistUpdated','deleteMovePlan','noScheduledMoves'])assert.ok(source.includes('ui.'+key));
 });
