@@ -48,7 +48,7 @@ test('account language preferences are scoped independently; guest setting is se
 });
 
 test('all translated UI modules reference existing messages',()=>{
- const components=['page.jsx','PersonalizedHome.jsx','TestDrive.jsx','MailImporter.jsx','CalendarFeed.jsx','PushSettings.jsx','SampleAccountSetup.jsx','HouseholdHub.jsx'];
+ const components=['page.jsx','PersonalizedHome.jsx','TestDrive.jsx','MailImporter.jsx','CalendarFeed.jsx','PushSettings.jsx','SampleAccountSetup.jsx','HouseholdHub.jsx','HomeExtra.jsx'];
  for(const component of components){
   const filename=fileURLToPath(new URL('../app/'+component,import.meta.url));
   const code=readFileSync(filename,'utf8');
@@ -72,5 +72,28 @@ test('every household category and vehicle type has a translation in every langu
  for(const lang of LANGUAGES){
   for(const key of categories)assert.ok(translate(lang.code,'family.cat.'+key).length>1);
   for(const key of types)assert.ok(translate(lang.code,'family.vehicle.'+key).length>1);
+ }
+});
+
+test('all advanced home section, property and document keys resolve in six languages',()=>{
+ const tabs=['insights','archive','properties','maintenance','contracts','payments','alerts'];
+ const propertyTypes=['main','second','rental','other'];
+ const documentTypes=['bill','contract','receipt','warranty','manual','condominium','other'];
+ const assetTypes=['plant','appliance','safety','furniture','other'];
+ const paymentMethods=['transfer','card','cash','debit','other'];
+ const notificationTypes=['bills','contracts','maintenance','digest'];
+ const keys=[
+  ...tabs.map(v=>'extra.tab.'+v),
+  ...propertyTypes.map(v=>'extra.propertyType.'+v),
+  ...documentTypes.map(v=>'extra.documentType.'+v),
+  ...assetTypes.map(v=>'extra.maint.category.'+v),
+  ...paymentMethods.map(v=>'extra.payments.method.'+v),
+  ...notificationTypes.map(v=>'extra.alerts.'+v)
+ ];
+ for(const lang of LANGUAGES){
+  for(const key of keys){
+   const translated=translate(lang.code,key);
+   assert.ok(translated&&translated!==key,lang.code+': '+key);
+  }
  }
 });
