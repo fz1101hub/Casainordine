@@ -1,5 +1,5 @@
 'use client';
-import {useCallback,useEffect,useMemo,useState} from 'react';
+import {useEffect,useMemo,useState} from 'react';
 import {
   ArrowDown,ArrowUp,Bell,Check,CheckCircle2,ChevronRight,Clock,ClipboardCheck,
   ListChecks,Plus,ReceiptText,RotateCcw,Save,Settings2,ShoppingBasket,Wallet
@@ -68,23 +68,6 @@ export default function PersonalizedHome({
   return()=>{active=false;};
  },[client,demo,user?.id]);
 
- const loadExtras=useCallback(async()=>{
-  if(demo||!client){setExtras(blankExtras());setExtraError('');setExtraLoading(false);return;}
-  setExtraLoading(true);setExtraError('');
-  const scope=q=>homeId?q.eq('home_id',homeId):q.is('home_id',null);
-  const work=[
-   homeId?client.from('home_shopping').select('id,title,quantity,checked').eq('home_id',homeId).order('checked').order('created_at',{ascending:false}).limit(100):Promise.resolve({data:[],error:null}),
-   scope(client.from('maintenance_assets').select('id,name,next_service_on')).order('created_at',{ascending:false}).limit(150),
-   scope(client.from('home_contracts').select('id,supplier,renewal_on')).order('created_at',{ascending:false}).limit(150),
-   scope(client.from('home_decisions').select('id,title,status,closes_on')).order('created_at',{ascending:false}).limit(150),
-   scope(client.from('home_inventory_items').select('id,name,document_id,estimated_value')).order('created_at',{ascending:false}).limit(150)
-  ];
-  const results=await Promise.all(work);
-  const errors=results.filter(r=>r.error);
-  setExtras({shopping:results[0].data||[],assets:results[1].data||[],contracts:results[2].data||[],decisions:results[3].data||[],inventory:results[4].data||[]});
-  setExtraLoading(false);
-  if(errors.length)setExtraError('Alcuni dati della Home non sono disponibili: '+errors[0].error.message);
- },[client,demo,homeId]);
  useEffect(()=>{let active=true;const run=async()=>{
   if(demo||!client){if(active){setExtras(blankExtras());setExtraLoading(false);}return;}
   setExtraLoading(true);setExtraError('');
