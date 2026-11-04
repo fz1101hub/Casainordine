@@ -44,7 +44,7 @@ test('account language preferences are scoped independently; guest setting is se
 });
 
 test('all translated UI modules reference existing messages',()=>{
- const components=['page.jsx','PersonalizedHome.jsx','TestDrive.jsx','MailImporter.jsx','CalendarFeed.jsx','PushSettings.jsx','SampleAccountSetup.jsx'];
+ const components=['page.jsx','PersonalizedHome.jsx','TestDrive.jsx','MailImporter.jsx','CalendarFeed.jsx','PushSettings.jsx','SampleAccountSetup.jsx','HouseholdHub.jsx'];
  for(const component of components){
   const filename=fileURLToPath(new URL('../app/'+component,import.meta.url));
   const code=readFileSync(filename,'utf8');
@@ -59,5 +59,14 @@ test('translation placeholders match across all six languages',()=>{
  for(const key of MESSAGE_KEYS){
   const italian=placeholders(TRANSLATIONS.it[key]);
   for(const lang of LANGUAGES)assert.deepEqual(placeholders(TRANSLATIONS[lang.code][key]),italian,lang.code+':'+key);
+ }
+});
+
+test('every household category and vehicle type has a translation in every language',()=>{
+ const categories=['groceries','home','transport','condominium','taxes','insurance','health','leisure','other'];
+ const types=['tax','insurance','inspection','service','other'];
+ for(const lang of LANGUAGES){
+  for(const key of categories)assert.ok(translate(lang.code,'family.cat.'+key).length>1);
+  for(const key of types)assert.ok(translate(lang.code,'family.vehicle.'+key).length>1);
  }
 });
