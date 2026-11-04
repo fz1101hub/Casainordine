@@ -15,6 +15,13 @@ test('invalid dates and amounts fail closed',()=>{
  }
  assert.throws(()=>billSummaryCopy({today:'2026-11-04',bills:[]}),TypeError);
 });
+test('amount validation rejects missing, empty, non-numeric and overflowing totals',()=>{
+ for(const amount of [null,undefined,'','   ',false,{},'Infinity',-0.01]){
+  assert.throws(()=>billSummaryCopy({today:'2026-11-04',bills:[{...bills[0],amount}]}),TypeError);
+ }
+ assert.throws(()=>billSummaryCopy({today:'2026-11-04',bills:[{...bills[0],amount:1e308},{...bills[0],amount:1e308}]}),TypeError);
+ assert.equal(billSummaryCopy({today:'2026-11-04',bills:[{...bills[0],amount:'1234.50'}]}).rows[0].amount,billSummaryCopy({today:'2026-11-04',bills}).rows[0].amount);
+});
 test('unsupported language falls back to Italian',()=>{
  assert.deepEqual(billSummaryCopy({language:'xx',today:'2026-11-04',bills}),billSummaryCopy({language:'it',today:'2026-11-04',bills}));
 });
