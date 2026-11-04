@@ -4,20 +4,22 @@ import { shouldSendSummary, monthEndISO, upcomingSummaryBills } from '../../../l
 import { sendPush, configuredPush } from '../../../lib/push.mjs';
 import { processExtraAlerts, pushAllowed } from '../../../lib/extra-alerts.mjs';
 import { processV20Alerts } from '../../../lib/v20-alerts.mjs';
+import { billReminderCopy } from '../../../lib/notification-copy.mjs';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const htmlEscape = text => String(text || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-async function emailReminder(recipient, bill) {
+async function emailReminder(recipient, bill, language='it') {
   const apiKey = process.env.RESEND_API_KEY, from = process.env.RESEND_FROM;
   if (!apiKey || !from) return {skipped:true};
   const appUrl = process.env.APP_URL?.startsWith('https://') ? process.env.APP_URL : 'http://localhost:3000';
+  const copy = billReminderCopy({language,name:bill.title,dueDate:bill.due_date});
   const response = await fetch('https://api.resend.com/emails', {
     method:'POST', headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},
     body:JSON.stringify({from,to:recipient,
-      subject:`Casa in Ordine · ${htmlEscape(bill.title)} scade tra 3 giorni`,
-      html:`<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#24323a"><h2>Hai già effettuato il pagamento?</h2><p>La scadenza <b>${htmlEscape(bill.title)}</b> (${htmlEscape(bill.supplier)}) è il <b>${htmlEscape(bill.due_date)}</b>, tra 3 giorni.</p><p>Importo: <b>${htmlEscape(euro(bill.amount))}</b>.</p><p>Se hai già pagato, entra nell'app e contrassegna la bolletta come pagata. In caso contrario, puoi organizzare il pagamento prima della scadenza.</p><p><a href="${htmlEscape(appUrl)}" style="display:inline-block;background:#156e65;color:white;padding:12px 18px;border-radius:9px;text-decoration:none">Apri Casa in Ordine</a></p><small>Puoi disattivare questi promemoria nelle Impostazioni.</small></div>`
+      subject:`Casa in Ordine · ${copy.subject}`,
+      html:`<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#24323a"><p style="white-space:pre-line">${htmlEscape(copy.text)}</p><p><a href="${htmlEscape(appUrl)}" style="display:inline-block;background:#156e65;color:white;padding:12px 18px;border-radius:9px;text-decoration:none">Casa in Ordine</a></p></div>`
     })
   });
   const result = await response.json().catch(()=>({}));
@@ -123,7 +125,10 @@ export async function GET(request) {
       counts.notifications_created++;
       if (profile.email) {
         try {
-          const res = await emailReminder(profile.email,bill);
+          // Language is personal; a shared home's language must never override it.
+          const {data:languagePreference,error:languageError}=await admin.from('user_language_preferences').select('language').eq('user_id',bill.user_id).maybeSingle();
+          if(languageError)throw languageError; // fail closed rather than silently send the wrong language
+          const res = await emailReminder(profile.email,bill,languagePreference?.language||'it');
           if (res.sent) {
             await admin.from('reminders').update({email_sent_at:new Date().toISOString(),email_error:null}).eq('id',reminder.id);
             counts.emails_sent++;
