@@ -58,9 +58,9 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   const res=await save('bill_security_reviews',{bill_id:activeBill.id,sender:sender.slice(0,240),sender_auth:auth,iban_fingerprint:riskPreview.iban_fingerprint,iban_suffix:riskPreview.iban_suffix,risk_flags:riskPreview.flags,review_status:'pending'},ui.reviewSaved);
   if(res){setIban('');setRiskPreview(null)}
  }
- async function createMove(e){e.preventDefault();const plan=await save('home_move_plans',move,'Piano trasloco creato.');if(!plan)return;
+ async function createMove(e){e.preventDefault();const plan=await save('home_move_plans',move,ui.movePlanCreated);if(!plan)return;
   const steps=moveChecklist(move.move_on).map(s=>({...common,plan_id:plan.id,title:s.title,due_on:s.due_on,done_at:null}));
-  const {error}=await client.from('home_move_steps').insert(steps);if(error)onNotify('Piano creato, ma alcune attività non sono state aggiunte: '+error.message);else onNotify('Piano trasloco e 7 attività creati.');await load();setMove({title:'',move_on:today(),notes:''});}
+  const {error}=await client.from('home_move_steps').insert(steps);if(error)onNotify(ui.moveStepsPartial+error.message);else onNotify(ui.movePlanAndStepsCreated);await load();setMove({title:'',move_on:today(),notes:''});}
  async function parseNoticeText(value){const guess=parsePagoPA(value);setNotice(o=>({...o,notice_code:guess.noticeCode||o.notice_code,creditor_code:guess.creditorCode||o.creditor_code}));
   setNoticeMessage(guess.ambiguous?ui.multipleNoticeCodes:guess.noticeCode?ui.suggestedNoticeCode:ui.unrecognizedNoticeCode);}
  async function captureNotice(file){if(!file)return;if(file.size>10485760||!['application/pdf','image/jpeg','image/png','image/webp'].includes(file.type))return setNoticeMessage(ui.noticeFileTypes);setNoticeMessage(ui.noticeReadingLocal);try{if(file.type.startsWith('image/')&&typeof BarcodeDetector!=='undefined'){
@@ -77,12 +77,12 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
    onNotify(createBill?ui.noticeAndReminderSaved:ui.noticeSaved);setNotice({notice_code:'',creditor_code:'',creditor_name:'',amount:'',due_on:''});setRawNotice('');await load();onRefresh();}
   catch(e){onNotify(e.message)}finally{setWorking(false)}}
  async function refreshDrafts(){try{setDrafts(await listDrafts());setOfflineError('')}catch(e){setOfflineError(e.message)}}
- async function importDraft(d){if(!client||!user)return onNotify('Accedi prima di importare');if(d.type==='document')return;
-  if(d.type==='shopping'&&(!homeId||!canWrite))return onNotify('Seleziona una casa condivisa dove puoi modificare la lista.');
-  if(d.type==='shopping'&&!window.confirm('Aggiungere questo articolo alla lista della casa attiva?'))return;
+ async function importDraft(d){if(!client||!user)return onNotify(ui.signInToImport);if(d.type==='document')return;
+  if(d.type==='shopping'&&(!homeId||!canWrite))return onNotify(ui.selectWritableHome);
+  if(d.type==='shopping'&&!window.confirm(ui.confirmAddShopping))return;
   setWorking(true);try{const {error}=d.type==='shopping'?await client.rpc('v20_apply_offline_shopping',{p_client_id:d.id,p_title:d.title,p_home_id:homeId}):await client.rpc('v20_apply_offline_task',{p_client_id:d.id,title_text:d.title,due_on:d.date||null});if(error)throw error;
-   await removeDraft(d.id);await refreshDrafts();onRefresh();onNotify(d.type==='shopping'?'Articolo aggiunto alla casa selezionata.':'Attività personale sincronizzata (senza duplicati).');
-  }catch(e){onNotify('Sincronizzazione non riuscita: '+e.message)}finally{setWorking(false)}}
+   await removeDraft(d.id);await refreshDrafts();onRefresh();onNotify(d.type==='shopping'?ui.shoppingAdded:ui.taskSynced);
+  }catch(e){onNotify(ui.syncFailed+e.message)}finally{setWorking(false)}}
  function downloadDraft(d){const url=URL.createObjectURL(d.file);const a=document.createElement('a');a.href=url;a.download=d.title||'documento';a.click();setTimeout(()=>URL.revokeObjectURL(url),6000)}
  if(demo)return <section className="panel extra-panel"><h2>Casa in Ordine 2.0</h2><p>Queste funzioni utilizzano account personali, database e controllo programmato. Per provarle configura prima Supabase.</p></section>;
  return <div className="extra-hub v20-hub">
