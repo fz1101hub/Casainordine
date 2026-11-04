@@ -5,7 +5,7 @@ import {formatDate} from '../lib/i18n.mjs';
 
 const source=readFileSync(new URL('../app/V20Hub.jsx',import.meta.url),'utf8');
 test('V20 uses account locale for date and timestamp rendering',()=>{
- assert.match(source,/date:formatDate,locale\}=useLanguage\(\)/);
+ assert.match(source,/date:formatDate,locale(?:,language)?\}=useLanguage\(\)/);
  assert.doesNotMatch(source,/toLocale(?:Date)?String\('it-IT'/);
  assert.match(source,/toLocaleString\(locale\)/);
  assert.match(source,/toLocaleDateString\(locale\)/);
