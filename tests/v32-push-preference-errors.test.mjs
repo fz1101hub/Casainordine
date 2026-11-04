@@ -10,3 +10,12 @@ for(const file of ['v20-alerts.mjs','extra-alerts.mjs']){
   assert.match(source,/prefError\.message\);continue;/);
  });
 }
+
+for(const file of ['v20-alerts.mjs','extra-alerts.mjs']){
+ test(file+' records subscription query errors',()=>{
+  const source=readFileSync(new URL('../lib/'+file,import.meta.url),'utf8');
+  assert.match(source,/error:deviceError/);
+  assert.match(source,/if\(deviceError\)\{counts\.errors\.push\(/);
+  assert.match(source,/deviceError\.message\);continue;/);
+ });
+}
