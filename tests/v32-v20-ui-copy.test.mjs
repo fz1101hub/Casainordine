@@ -8,7 +8,7 @@ test('V20 monitoring and fraud screen copy exists in all six languages',()=>{
  const langs=['it','en','es','fr','de','pt'];
  const copies=langs.map(v20UiCopy);
  const keys=Object.keys(copies[0]);
- assert.equal(keys.length,74);
+ assert.equal(keys.length,82);
  for(const copy of copies){assert.deepEqual(Object.keys(copy),keys);for(const value of Object.values(copy))assert.ok(value.trim().length>0);}
  for(const key of keys)assert.ok(new Set(copies.map(copy=>copy[key])).size>=5,`Missing language variation for ${key}`);
  assert.deepEqual(v20UiCopy('unknown'),v20UiCopy('it'));
@@ -53,6 +53,12 @@ test('monitoring caveats and notification controls use selected language',()=>{
 
 test('fraud review form and IBAN privacy explanation are localized',()=>{
  for(const key of ['fraudPrivacyDescription','billLabel','select','senderLabel','emailAuthLabel','authUnknown','authPassed','authFailed','ibanLabel','ibanPlaceholder','analyze','saveReview']){
+  assert.ok(source.includes('ui.'+key));
+ }
+});
+
+test('fraud result warnings and review actions use localized copy',()=>{
+ for(const key of ['reviewRequired','noWarningSigns','fraudCheckDisclaimer','manuallyReviewed','reviewedLabel','markedSuspicious','suspiciousLabel','noAnomalies']){
   assert.ok(source.includes('ui.'+key));
  }
 });
