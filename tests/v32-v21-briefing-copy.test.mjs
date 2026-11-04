@@ -7,7 +7,7 @@ test('V21 briefing text and privacy copy exist in six languages',()=>{
  const langs=['it','en','es','fr','de','pt'];
  const copies=langs.map(v21BriefingCopy);
  const keys=Object.keys(copies[0]);
- assert.equal(keys.length,67);
+ assert.equal(keys.length,89);
  for(const copy of copies){assert.deepEqual(Object.keys(copy),keys);for(const value of Object.values(copy))assert.ok(value.trim());}
  for(const key of keys)assert.ok(source.includes('briefingCopy.'+key),key);
  assert.deepEqual(v21BriefingCopy('unknown'),v21BriefingCopy('it'));
@@ -28,6 +28,12 @@ test('V21 QR passport privacy and protected fields use account language',()=>{
 
 test('V21 selective property dossier and export privacy are localized',()=>{
  for(const key of ['propertyDossier','dossierPrivacy','propertyLabel','includeAddress','includeSerials','exportDossier','printPdf','dossierPreview','equipmentLabel','contractsLabel','documentsLabel','maintenanceEvents','maintenancePrefix','informationalDocument','registerPropertyFirst']){
+  assert.ok(source.includes('briefingCopy.'+key),key);
+ }
+});
+
+test('family voting does not authorize payments and follows selected language',()=>{
+ for(const key of ['decisionsSharedOnly','proposeDecision','proposalPublished','titleLabel','decisionReason','proposedBudget','voteDeadline','publishProposal','proposalsAndVotes','budgetLabel','voteOpen','voteClosed','deadline','votesYes','votesNo','votesAbstain','voteYes','voteNo','voteAbstain','votingClosedFeedback','closeVoting','voteNotPayment']){
   assert.ok(source.includes('briefingCopy.'+key),key);
  }
 });
