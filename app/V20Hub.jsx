@@ -39,23 +39,23 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
  useEffect(()=>{load();},[load]);
  useEffect(()=>{if(tab==='offline'){listDrafts().then(setDrafts).catch(e=>setOfflineError(e.message));}},[tab]);
  const common={user_id:user?.id,home_id:homeId||null};
- async function save(table,content,message,options={}){if(!client||!canWrite)return onNotify('Serve un account con permesso di modifica.');setWorking(true);try{
+ async function save(table,content,message,options={}){if(!client||!canWrite)return onNotify(ui.editPermissionRequired);setWorking(true);try{
   const {data,error}=await client.from(table).insert({...common,...content}).select('*').single();if(error)throw error;onNotify(message);await load();if(options.parent)onRefresh();return data;
- }catch(e){onNotify(e.message||'Operazione non riuscita');return null;}finally{setWorking(false)}}
+ }catch(e){onNotify(e.message||ui.operationFailed);return null;}finally{setWorking(false)}}
  async function change(table,id,patch,message){if(!client||!canWrite)return;setWorking(true);try{const {error}=await client.from(table).update(patch).eq('id',id);if(error)throw error;onNotify(message);await load();}catch(e){onNotify(e.message)}finally{setWorking(false)}}
  async function erase(table,id){if(!canWrite||!window.confirm(ui.confirmDelete))return;setWorking(true);try{const {error}=await client.from(table).delete().eq('id',id);if(error)throw error;onNotify(ui.deleted);await load();}catch(e){onNotify(e.message)}finally{setWorking(false)}}
  const missing=useMemo(()=>missingBillCandidates(utilities,bills,today()),[utilities,bills]);
  const activeBill=bills.find(x=>x.id===selectedBill);
  const knownIban=rows.risk.filter(r=>r.review_status==='reviewed'&&bills.some(b=>b.id===r.bill_id&&b.supplier===activeBill?.supplier)).map(r=>r.iban_fingerprint).filter(Boolean);
- async function previewFraud(){if(!activeBill)return onNotify('Seleziona la bolletta');setRiskPreview(null);
-  const cleaned=iban.toUpperCase().replace(/[\s-]/g,'');if(cleaned&&!/^[A-Z]{2}[0-9A-Z]{13,32}$/.test(cleaned))return onNotify('Formato IBAN non valido: ricontrollalo.');
+ async function previewFraud(){if(!activeBill)return onNotify(ui.selectBill);setRiskPreview(null);
+  const cleaned=iban.toUpperCase().replace(/[\s-]/g,'');if(cleaned&&!/^[A-Z]{2}[0-9A-Z]{13,32}$/.test(cleaned))return onNotify(ui.invalidIban);
   const hashed=cleaned?Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(cleaned)))).map(x=>x.toString(16).padStart(2,'0')).join(''):'';
   const result=billFraudSignals(activeBill,bills,{sender,senderAuth:auth,ibanFingerprint:hashed,historicalIbanFingerprints:knownIban});
   setRiskPreview({...result,iban_fingerprint:hashed||null,iban_suffix:cleaned?cleaned.slice(-4):null});
  }
  async function saveFraud(){if(!activeBill||!riskPreview)return;
-  if(rows.risk.some(x=>x.bill_id===activeBill.id))return onNotify('Esiste già una verifica per questa bolletta: aggiorna lo stato di revisione.');
-  const res=await save('bill_security_reviews',{bill_id:activeBill.id,sender:sender.slice(0,240),sender_auth:auth,iban_fingerprint:riskPreview.iban_fingerprint,iban_suffix:riskPreview.iban_suffix,risk_flags:riskPreview.flags,review_status:'pending'},'Segnali conservati, da verificare.');
+  if(rows.risk.some(x=>x.bill_id===activeBill.id))return onNotify(ui.reviewExists);
+  const res=await save('bill_security_reviews',{bill_id:activeBill.id,sender:sender.slice(0,240),sender_auth:auth,iban_fingerprint:riskPreview.iban_fingerprint,iban_suffix:riskPreview.iban_suffix,risk_flags:riskPreview.flags,review_status:'pending'},ui.reviewSaved);
   if(res){setIban('');setRiskPreview(null)}
  }
  async function createMove(e){e.preventDefault();const plan=await save('home_move_plans',move,'Piano trasloco creato.');if(!plan)return;
