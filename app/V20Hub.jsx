@@ -31,7 +31,7 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
     client.from('mail_connections').select('id,provider,email_address,status,last_sync_at,last_error').eq('user_id',user.id).limit(100),
     client.from('user_alert_preferences').select('user_id,push_monitor').eq('user_id',user.id).maybeSingle()
   ]);
-  const error=res.find(r=>r.error);if(error)onNotify('Le funzioni 2.0 richiedono migrate_v20.sql: '+error.error.message);
+  const error=res.find(r=>r.error);if(error)onNotify(ui.migrationRequired+error.error.message);
   const next={};for(let i=0;i<specs.length;i++)next[specs[i][0]]=res[i].data||[];
   next.alerts=res[specs.length].data||[];next.connections=res[specs.length+1].data||[];next.preferences=res[specs.length+2].data||null;
   setRows(next);setLoading(false);
@@ -84,15 +84,15 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
    await removeDraft(d.id);await refreshDrafts();onRefresh();onNotify(d.type==='shopping'?ui.shoppingAdded:ui.taskSynced);
   }catch(e){onNotify(ui.syncFailed+e.message)}finally{setWorking(false)}}
  function downloadDraft(d){const url=URL.createObjectURL(d.file);const a=document.createElement('a');a.href=url;a.download=d.title||'documento';a.click();setTimeout(()=>URL.revokeObjectURL(url),6000)}
- if(demo)return <section className="panel extra-panel"><h2>Casa in Ordine 2.0</h2><p>Queste funzioni utilizzano account personali, database e controllo programmato. Per provarle configura prima Supabase.</p></section>;
+ if(demo)return <section className="panel extra-panel"><h2>{ui.v20Name}</h2><p>{ui.demoSetupNotice}</p></section>;
  return <div className="extra-hub v20-hub">
  {tab==='monitor'&&<><header className="page-heading"><div><div className="eyebrow">{ui.dailyCheck}</div><h1>{ui.monitorTitle}</h1><p>{ui.monitorDescription}</p></div></header>
  <div className="extra-layout"><section className="panel extra-panel"><h2><MailWarning size={19}/> {ui.missingBills}</h2><p>{ui.missingBillsCaveat}</p>
- {missing.map(m=><Item key={m.utility_id+'-'+m.expected_on}><b>{m.supplier}</b><small>Attesa intorno al {formatDate(m.expected_on)} · {m.days_late} giorni di ritardo</small></Item>)}
+ {missing.map(m=><Item key={m.utility_id+'-'+m.expected_on}><b>{m.supplier}</b><small>{ui.expectedAround}{formatDate(m.expected_on)} · {m.days_late}{ui.daysOverdue}</small></Item>)}
  {!missing.length&&<p className="muted">{ui.noMissingBills}</p>}
  </section><section className="panel extra-panel"><h2><RefreshCw size={19}/> {ui.mailConnections}</h2><p>{ui.mailHealthDescription}</p>
  <label className="extra-toggle"><input type="checkbox" checked={rows.preferences?.push_monitor!==false} onChange={async e=>{const {error}=await client.from('user_alert_preferences').upsert({user_id:user.id,push_monitor:e.target.checked},{onConflict:'user_id'});if(error)onNotify(error.message);else{onNotify(ui.pushMonitorSaved);await load()}}}/> {ui.pushMonitorLabel}</label>
- {rows.connections.map(c=>{const h=mailHealth(c);return <Item key={c.id}><b>{c.email_address}</b><small>{c.provider} · Ultimo controllo: {c.last_sync_at?new Date(c.last_sync_at).toLocaleString(locale):ui.never}</small><small style={{color:h.level==='ok'?'#167d64':'#a34526'}}>{h.message}</small></Item>})}
+ {rows.connections.map(c=>{const h=mailHealth(c);return <Item key={c.id}><b>{c.email_address}</b><small>{c.provider} · {ui.lastChecked}{c.last_sync_at?new Date(c.last_sync_at).toLocaleString(locale):ui.never}</small><small style={{color:h.level==='ok'?'#167d64':'#a34526'}}>{h.message}</small></Item>})}
  {!rows.connections.length&&<p className="muted">{ui.noMailConnections}</p>}
  </section><section className="panel extra-panel"><h2>{ui.automaticAlerts}</h2>{rows.alerts.filter(a=>['missing_bill','mail_sync','fraud'].includes(a.kind)).map(a=><Item key={a.id} action={a.read_at?null:<button className="btn btn-soft" onClick={async()=>{const {error}=await client.from('user_alerts').update({read_at:new Date().toISOString()}).eq('id',a.id);if(error)onNotify(error.message);else await load()}}>{ui.markRead}</button>}><b>{a.title}</b><small>{a.body}{a.read_at?' · '+ui.read:''}</small></Item>)}{!rows.alerts.some(a=>['missing_bill','mail_sync','fraud'].includes(a.kind))&&<p className="muted">{ui.noAlerts}</p>}</section></div></>}
  {tab==='fraud'&&<><header className="page-heading"><div><div className="eyebrow">{ui.fraudCheck}</div><h1>{ui.fraudTitle}</h1><p>{ui.fraudDescription}</p></div></header>
