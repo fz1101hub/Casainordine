@@ -221,3 +221,59 @@
  .home3-editor-actions .btn:first-child{flex-basis:100%}
 }
 @media(prefers-reduced-motion:reduce){.home3 *{scroll-behavior:auto!important;transition:none!important}}
+
+/* Isolated sample-user test drive: synthetic data, localStorage only. */
+.testdrive{min-height:100vh;background:var(--bg);color:var(--text)}
+.testdrive-top{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:17px max(20px,calc((100vw - 1140px)/2));background:var(--surface);border-bottom:1px solid var(--line)}
+.testdrive-brand{display:flex;align-items:center;gap:11px}
+.testdrive-brand b,.testdrive-brand small{display:block}
+.testdrive-brand b{color:var(--ink);font-family:'Plus Jakarta Sans',sans-serif;font-size:16px}
+.testdrive-brand small{color:var(--muted);font-size:11px;margin-top:4px}
+.testdrive-logo{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:var(--green);color:#fff}
+.testdrive-top-actions{display:flex;gap:8px;align-items:center}
+.testdrive-top-actions .btn{text-decoration:none;white-space:nowrap;min-height:40px}
+.testdrive-banner{max-width:1140px;margin:19px auto 12px;padding:15px 17px;border:1px solid #badfca;background:#ecf8f1;border-radius:13px;display:flex;align-items:flex-start;gap:12px;color:#244a40;font-size:13px;line-height:1.6}
+.testdrive-banner>svg{flex-shrink:0;margin-top:2px}
+.testdrive-navigation{max-width:1140px;margin:0 auto 14px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:thin;padding:8px 1px}
+.testdrive-navigation button{display:flex;gap:7px;align-items:center;justify-content:center;white-space:nowrap;border:1px solid var(--line);color:var(--text);background:var(--surface);padding:10px 15px;border-radius:11px;font-size:12px;font-weight:700;min-height:42px}
+.testdrive-navigation button.active{color:#fff;border-color:var(--green);background:var(--green)}
+.testdrive-main{max-width:1140px;margin:0 auto;padding:11px 0 70px}
+.testdrive-notice{max-width:1140px;margin:10px auto;display:flex;align-items:center;gap:9px;color:var(--green-dark);background:var(--green-tint);border-radius:10px;padding:12px}
+.testdrive-notice span{flex:1;font-size:13px}.testdrive-notice button{border:0;background:transparent;padding:7px}
+.testdrive-view{display:flex;flex-direction:column;gap:16px}.testdrive-view .page-heading{margin:0}
+.testdrive-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.testdrive-stats>.panel{display:flex;flex-direction:column;gap:8px;padding:21px}
+.testdrive-stats small{font-size:12px;color:var(--muted)}.testdrive-stats strong{font-size:31px;color:var(--ink)}
+.testdrive-stats span{font-size:12px;color:var(--text)}
+.testdrive-help{padding:20px}.testdrive-help h2{margin:0 0 10px;font-size:19px}
+.testdrive-help p{font-size:13px;color:var(--muted);line-height:1.7}.testdrive-help .btn{display:inline-flex;align-items:center;gap:7px}
+.testdrive-list{padding:8px 20px}.testdrive-line{display:flex;gap:15px;align-items:center;padding:15px 0;border-bottom:1px solid var(--line);min-width:0}
+.testdrive-line:last-child{border-bottom:0}
+.testdrive-line-text{flex:1;min-width:0}.testdrive-line-text b{display:block;overflow-wrap:anywhere;line-height:1.4;font-size:14px}
+.testdrive-line-text small{display:block;margin-top:4px;color:var(--muted);font-size:12px;line-height:1.4}
+.testdrive-line>strong{font-size:14px;white-space:nowrap}.testdrive-line .btn{flex-shrink:0;min-height:38px}
+.testdrive-status,.testdrive-rank{flex-shrink:0;width:37px;height:37px;border-radius:10px;background:var(--green-tint);color:var(--green-dark);display:flex;align-items:center;justify-content:center}
+.testdrive-status.done{background:#eff2ef;color:var(--muted)}
+.testdrive-rank{font-weight:800}
+.testdrive-checkline{cursor:pointer}.testdrive-checkline input{accent-color:var(--green);width:21px;height:21px;flex-shrink:0}
+.testdrive-checkline>span:last-child{font-size:12px;color:var(--muted)}
+.testdrive-crossed{text-decoration:line-through;color:var(--muted)}
+.testdrive-footer{max-width:1140px;margin:0 auto;color:var(--muted);font-size:11px;padding:18px 0 30px;text-align:center;border-top:1px solid var(--line)}
+@media(max-width:1190px){.testdrive-top,.testdrive-banner,.testdrive-navigation,.testdrive-main,.testdrive-notice,.testdrive-footer{margin-left:18px;margin-right:18px}}
+@media(max-width:750px){.testdrive-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.testdrive-top{flex-wrap:wrap;padding:14px}.testdrive-banner{margin-top:10px}}
+@media(max-width:520px){.testdrive-stats{grid-template-columns:1fr 1fr;gap:9px}
+.testdrive-stats>.panel{padding:13px}.testdrive-stats strong{font-size:25px}
+.testdrive-navigation{padding-bottom:10px}.testdrive-navigation button{font-size:11px;padding:9px 11px}
+.testdrive-line{flex-wrap:wrap;gap:10px}.testdrive-line .btn{margin-left:auto}
+.testdrive-list{padding:5px 12px}.testdrive-top-actions{width:100%}.testdrive-top-actions .btn{flex:1;justify-content:center;font-size:12px}
+.testdrive-main,.testdrive-banner,.testdrive-navigation,.testdrive-footer,.testdrive-notice{margin-left:12px;margin-right:12px}}
+
+.testdrive-seed{display:flex;align-items:flex-start;gap:15px;padding:20px;margin-bottom:17px;flex-wrap:wrap}
+.testdrive-seed-icon{display:flex;align-items:center;justify-content:center;width:45px;height:45px;flex-shrink:0;border-radius:12px;color:var(--green-dark);background:var(--green-tint)}
+.testdrive-seed-content{flex:1;min-width:220px}
+.testdrive-seed-content h2{margin:0 0 8px;font-size:17px}
+.testdrive-seed-content p{color:var(--text);line-height:1.6;font-size:13px;margin:0 0 10px}
+.testdrive-seed-content small{display:flex;align-items:center;gap:6px;color:var(--muted);line-height:1.5;font-size:11px}
+.testdrive-seed>.btn{align-self:center;white-space:nowrap}
+.testdrive-seed-content .testdrive-seed-message{padding:9px 12px;border-radius:9px;color:var(--green-dark);background:var(--green-tint);margin-top:9px}
+@media(max-width:650px){.testdrive-seed{padding:14px}.testdrive-seed>.btn{width:100%;justify-content:center}}
