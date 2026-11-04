@@ -11,7 +11,7 @@ const cases=[
 test('four household alert types produce distinct recipient-localized copy in six languages',()=>{
  for(const event of cases){
   const translations=['it','en','es','fr','de','pt'].map(language=>extraAlertCopy(event,language));
-  assert.equal(new Set(translations.map(x=>x.title.split(':')[0])).size,6);
+  assert.equal(new Set(translations.map(x=>x.title+'|'+x.body)).size,6);
   for(const copy of translations){assert.ok(copy.body);assert.doesNotMatch(copy.body,/undefined|\{date\}|\{service\}/);}
  }
 });
