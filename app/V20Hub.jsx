@@ -62,14 +62,14 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   const steps=moveChecklist(move.move_on).map(s=>({...common,plan_id:plan.id,title:s.title,due_on:s.due_on,done_at:null}));
   const {error}=await client.from('home_move_steps').insert(steps);if(error)onNotify('Piano creato, ma alcune attività non sono state aggiunte: '+error.message);else onNotify('Piano trasloco e 7 attività creati.');await load();setMove({title:'',move_on:today(),notes:''});}
  async function parseNoticeText(value){const guess=parsePagoPA(value);setNotice(o=>({...o,notice_code:guess.noticeCode||o.notice_code,creditor_code:guess.creditorCode||o.creditor_code}));
-  setNoticeMessage(guess.ambiguous?'Più codici avviso: inserisci manualmente quello corretto.':guess.noticeCode?'Codice suggerito: verifica il documento ufficiale.':'Codice non riconosciuto: puoi digitarlo manualmente.');}
- async function captureNotice(file){if(!file)return;if(file.size>10485760||!['application/pdf','image/jpeg','image/png','image/webp'].includes(file.type))return setNoticeMessage('Seleziona PDF/JPG/PNG/WEBP fino a 10 MB.');setNoticeMessage('Lettura locale in corso…');try{if(file.type.startsWith('image/')&&typeof BarcodeDetector!=='undefined'){
+  setNoticeMessage(guess.ambiguous?ui.multipleNoticeCodes:guess.noticeCode?ui.suggestedNoticeCode:ui.unrecognizedNoticeCode);}
+ async function captureNotice(file){if(!file)return;if(file.size>10485760||!['application/pdf','image/jpeg','image/png','image/webp'].includes(file.type))return setNoticeMessage(ui.noticeFileTypes);setNoticeMessage(ui.noticeReadingLocal);try{if(file.type.startsWith('image/')&&typeof BarcodeDetector!=='undefined'){
    try{const detector=new BarcodeDetector({formats:['qr_code']});const bit=await createImageBitmap(file);
    const barcodes=await detector.detect(bit);bit.close?.();const data=barcodes.map(b=>b.rawValue).filter(Boolean).join('\n');
    if(data){setRawNotice(data);await parseNoticeText(data);return;}}catch{/* Riprova con OCR se il lettore QR non è disponibile. */}
   }
   const output=await readRatePlanDocument(file,progress=>setNoticeMessage(progress));setRawNotice(output.text.slice(0,4000));await parseNoticeText(output.text);
- }catch(e){setNoticeMessage('Scansione non riuscita: inserisci il codice manualmente. '+e.message)}}
+ }catch(e){setNoticeMessage(ui.noticeScanFailed+' '+e.message)}}
  async function saveNotice(e){e.preventDefault();const code=notice.notice_code.replace(/\D/g,'');if(![15,18].includes(code.length))return onNotify(ui.noticeCodeInvalid);
   if(createBill&&(!notice.due_on||notice.amount===''))return onNotify(ui.noticeReminderRequiresDetails);
   if(createBill&&!window.confirm(ui.confirmNoticeOriginal))return;
