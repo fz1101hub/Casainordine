@@ -8,9 +8,9 @@
 - [x] Selettore lingua, schermata accesso, navigazione, Home, panoramica, bollette e attività
 - [x] Demo, calendario, notifiche push, caricamento dati di prova e importazione email lato client
 - [x] Migrazione RLS per la lingua del singolo utente; formati numerici e valute senza conversione degli importi
-- [ ] Traduzione completa dei moduli famiglia, budget, spesa e veicoli
+- [x] Traduzione dei flussi principali dei moduli famiglia, budget, spesa e veicoli (verifica linguistica E2E ancora da fare)
 - [ ] Traduzione completa dei moduli avanzati HomeExtra, V20Hub, V21Hub
-- [ ] Tutti i form, modali, errori e stati vuoti della pagina principale
+- [ ] Tutti i form, modali, errori e stati vuoti della pagina principale (modali di bollette, utenze, attività, rate e Impostazioni già localizzati)
 - [ ] Messaggi API e notifiche/email dove opportuno, in lingua del destinatario
 - [ ] Coerenza, accessibilità, mobile, test e verifica con due utenti reali
 - [ ] CI e Vercel approvati; chiusura PR 3.2 e pubblicazione verificata
