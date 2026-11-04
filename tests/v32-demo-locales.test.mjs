@@ -27,5 +27,5 @@ test('test drive briefing is rebuilt with active language',()=>{
  const english=buildFiveMinuteBriefing({...fixture,copy:v21BriefingCopy('en')});
  assert.ok(italian.length>0);
  assert.deepEqual(italian.map(x=>x.id),english.map(x=>x.id));
- assert.notDeepEqual(italian.map(x=>x.detail),english.map(x=>x.detail));
+ assert.notDeepEqual(italian.map(x=>x.label),english.map(x=>x.label));
 });
