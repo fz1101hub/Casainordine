@@ -8,7 +8,7 @@ test('V20 monitoring and fraud screen copy exists in all six languages',()=>{
  const langs=['it','en','es','fr','de','pt'];
  const copies=langs.map(v20UiCopy);
  const keys=Object.keys(copies[0]);
- assert.equal(keys.length,34);
+ assert.equal(keys.length,39);
  for(const copy of copies){assert.deepEqual(Object.keys(copy),keys);for(const value of Object.values(copy))assert.ok(value.length>4);}
  for(const key of keys)assert.ok(new Set(copies.map(copy=>copy[key])).size>=5,`Missing language variation for ${key}`);
  assert.deepEqual(v20UiCopy('unknown'),v20UiCopy('it'));
@@ -23,4 +23,11 @@ test('V20 destructive actions use localized confirmation and feedback',()=>{
  assert.match(source,/window\.confirm\(ui\.confirmRestore\)/);
  assert.match(source,/onNotify\(ui\.deleted\)/);
  assert.match(source,/onNotify\(ui\.restored\)/);
+});
+
+test('pagoPA validation and payment warning follow the account language',()=>{
+ for(const key of ['noticeCodeInvalid','noticeReminderRequiresDetails','confirmNoticeOriginal','noticeAndReminderSaved','noticeSaved']){
+  assert.ok(source.includes('ui.'+key));
+ }
+ assert.match(source,/window\.confirm\(ui\.confirmNoticeOriginal\)/);
 });
