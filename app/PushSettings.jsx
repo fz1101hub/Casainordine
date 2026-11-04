@@ -2,15 +2,16 @@
 import {useEffect,useState} from 'react';
 import {BellRing} from 'lucide-react';
 import {useLanguage} from './LanguageProvider';
+import {localizeSettingsApiError} from '../lib/settings-api-errors.mjs';
 function toBytes(base64){const padding='='.repeat((4-base64.length%4)%4);const s=atob((base64+padding).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(s,x=>x.charCodeAt(0));}
 export default function PushSettings({client,onNotify}){
- const {t}=useLanguage();
+ const {t,language}=useLanguage();
  const [enabled,setEnabled]=useState(false),[busy,setBusy]=useState(false),[supported,setSupported]=useState(false);
  const key=process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
  useEffect(()=>{setSupported('serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window&&location.protocol==='https:');
    if('serviceWorker' in navigator)navigator.serviceWorker.ready.then(r=>r.pushManager.getSubscription()).then(s=>setEnabled(!!s)).catch(()=>{});
  },[]);
- async function api(method,body){const {data:{session}}=await client.auth.getSession();const r=await fetch('/api/push/subscribe',{method,headers:{'Authorization':`Bearer ${session?.access_token||''}`,'Content-Type':'application/json'},body:JSON.stringify(body)});const p=await r.json().catch(()=>({}));if(!r.ok)throw new Error(p.error||t('push.configError'));return p;}
+ async function api(method,body){const {data:{session}}=await client.auth.getSession();const r=await fetch('/api/push/subscribe',{method,headers:{'Authorization':`Bearer ${session?.access_token||''}`,'Content-Type':'application/json'},body:JSON.stringify(body)});const p=await r.json().catch(()=>({}));if(!r.ok)throw new Error(p.error?localizeSettingsApiError(p.error,language):t('push.configError'));return p;}
  async function toggle(){setBusy(true);try{
   const reg=await navigator.serviceWorker.ready;
   const existing=await reg.pushManager.getSubscription();
