@@ -1,3 +1,12 @@
+## Provare Casa in Ordine con dati di esempio
+
+**Prova immediata senza account**: apri `/prova` per una modalità completamente isolata dal database Supabase, con bollette, attività, lista della spesa, manutenzioni e dashboard personalizzabile. Le azioni sono simulazioni salvate solo nel browser e puoi ripristinare i dati quando vuoi. Nessuna autenticazione, pagamento, invio email o chiamata API al database viene eseguita in questo percorso.
+
+**Account di test reale**: registrati con un indirizzo email che controlli e, una volta entrato in un account nuovo e senza dati, vai in **Impostazioni → Carica dati di prova**. Il sistema crea una casa `Casa Demo (dati fittizi)` e inserisce 6 bollette, 5 attività e 6 articoli della spesa usando le regole RLS Supabase; non occorre alcuna chiave server. L'operazione è volontaria e rifiuta account con dati o case preesistenti. Questi dati sono scritti sul database di quell'account di prova, quindi è possibile eliminarli usando l'interfaccia delle case.
+
+**Sicurezza**: non creare account di prova inserendo record direttamente in `auth.users`; la registrazione avviene tramite Supabase Auth. La modalità `/prova` non crea utenti reali e non testa autenticazione, isolamento RLS fra utenti, OAuth o invio email.
+
+---
 # Casa in Ordine 3.0 — Home personale
 
 **Versione 3.0:** puoi decidere cosa vedere nella tua pagina iniziale. I moduli predefiniti, nell'ordine, sono **Bollette e scadenze**, **Lista della spesa**, **Attività da fare** e **La casa in 5 minuti**. Layout iniziale **Compatto**.
