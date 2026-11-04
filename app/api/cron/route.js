@@ -5,6 +5,7 @@ import { sendPush, configuredPush } from '../../../lib/push.mjs';
 import { processExtraAlerts, pushAllowed } from '../../../lib/extra-alerts.mjs';
 import { processV20Alerts } from '../../../lib/v20-alerts.mjs';
 import { billReminderCopy } from '../../../lib/notification-copy.mjs';
+import { billSummaryCopy } from '../../../lib/notification-summary.mjs';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
@@ -27,15 +28,15 @@ async function emailReminder(recipient, bill, language='it') {
   return {sent:true};
 }
 
-async function emailSummary(recipient, bills, today){
+async function emailSummary(recipient,bills,today,language='it'){
   const key=process.env.RESEND_API_KEY,from=process.env.RESEND_FROM;
   if(!key||!from)return {skipped:true};
   const appUrl=process.env.APP_URL?.startsWith('https://')?process.env.APP_URL:'http://localhost:3000';
-  const total=bills.reduce((n,b)=>n+Number(b.amount),0);
-  const rows=bills.map(b=>`<li>${htmlEscape(b.title)} (${htmlEscape(b.supplier)}) — ${htmlEscape(b.due_date)} — ${htmlEscape(euro(b.amount))}</li>`).join('');
+  const copy=billSummaryCopy({language,today,bills});
+  const rows=copy.rows.map(b=>`<li>${htmlEscape(b.title)} (${htmlEscape(b.supplier)}) — ${htmlEscape(b.date)} — ${htmlEscape(b.amount)}</li>`).join('');
   const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},
-    body:JSON.stringify({from,to:recipient,subject:`Casa in Ordine · Riepilogo bollette del mese (${today.slice(0,7)})`,
-      html:`<div style="font-family:Arial,sans-serif"><h2>Scadenze da oggi a fine mese</h2><p>${bills.length} bollette ancora da pagare per un totale di <strong>${htmlEscape(euro(total))}</strong>.</p><ul>${rows}</ul><p><a href="${htmlEscape(appUrl)}">Apri Casa in Ordine</a></p></div>`})});
+    body:JSON.stringify({from,to:recipient,subject:`Casa in Ordine · ${copy.subject}`,
+      html:`<div style="font-family:Arial,sans-serif"><h2>${htmlEscape(copy.heading)}</h2><p>${htmlEscape(copy.description)}</p><ul>${rows}</ul><p><a href="${htmlEscape(appUrl)}">${htmlEscape(copy.openLabel)}</a></p></div>`})});
   const body=await response.json().catch(()=>({}));
   if(!response.ok)throw new Error(String(body.message||`Email HTTP ${response.status}`).slice(0,160));
   return {sent:true};
@@ -182,7 +183,9 @@ export async function GET(request) {
       }
       if(profile.email){
         try{
-          const result=await emailSummary(profile.email,items,today);
+          const {data:languagePreference,error:languageError}=await admin.from('user_language_preferences').select('language').eq('user_id',profile.id).maybeSingle();
+          if(languageError)throw languageError;
+          const result=await emailSummary(profile.email,items,today,languagePreference?.language||'it');
           if(result.sent){await admin.from('bill_summaries').update({email_sent_at:new Date().toISOString(),email_error:null}).eq('id',recap.id);counts.summary_emails_sent++;}
         }catch(e){await admin.from('bill_summaries').update({email_error:String(e.message).slice(0,150)}).eq('id',recap.id);counts.errors.push(`Email riepilogo ${profile.id} non riuscita`);}
       }
