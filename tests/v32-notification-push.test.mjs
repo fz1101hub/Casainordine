@@ -19,3 +19,10 @@ test('invalid inputs fail closed and unsupported language falls back to Italian'
  assert.throws(()=>billSummaryPushCopy({count:0,total:1}),TypeError);
  assert.deepEqual(billDuePushCopy({language:'xx',name:'Test'}),billDuePushCopy({language:'it',name:'Test'}));
 });
+
+test('push bill names cannot inject line breaks or invisible controls',()=>{
+ const copy=billDuePushCopy({language:'en',name:'  Water\\n\\tBill\\u200b  '});
+ assert.match(copy.body,/Water Bill/);
+ assert.doesNotMatch(copy.body,/[\\r\\n\\t\\u200b]/);
+ assert.throws(()=>billDuePushCopy({name:'\\u200b\\u0000'}),TypeError);
+});
