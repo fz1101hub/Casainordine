@@ -2,10 +2,11 @@
 import {useEffect,useState} from 'react';
 import {CalendarDays,Copy,RotateCcw,Trash2} from 'lucide-react';
 import {useLanguage} from './LanguageProvider';
+import {localizeSettingsApiError} from '../lib/settings-api-errors.mjs';
 export default function CalendarFeed({client,onNotify}){
- const {t}=useLanguage();
+ const {t,language}=useLanguage();
  const [active,setActive]=useState(false),[url,setUrl]=useState(''),[busy,setBusy]=useState(false);
- async function request(method){const {data:{session}}=await client.auth.getSession();const res=await fetch('/api/calendar/feed',{method,headers:{Authorization:`Bearer ${session?.access_token||''}`}});const body=await res.json().catch(()=>({}));if(!res.ok)throw new Error(body.error||t('calendar.configError'));return body;}
+ async function request(method){const {data:{session}}=await client.auth.getSession();const res=await fetch('/api/calendar/feed',{method,headers:{Authorization:`Bearer ${session?.access_token||''}`}});const body=await res.json().catch(()=>({}));if(!res.ok)throw new Error(body.error?localizeSettingsApiError(body.error,language):t('calendar.configError'));return body;}
  useEffect(()=>{request('GET').then(v=>setActive(v.active)).catch(()=>{});},[client]);
  async function doAction(method){setBusy(true);try{if(method==='DELETE'&&!window.confirm(t('calendar.revokeConfirm')))return;
   const data=await request(method);setActive(method==='POST');setUrl(data.url||'');onNotify(t(method==='POST'?'calendar.created':'calendar.revoked'));
