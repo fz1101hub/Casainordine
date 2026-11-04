@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
 import {LANGUAGES,DEFAULT_LANGUAGE,MESSAGE_KEYS,TRANSLATIONS,browserLanguage,normalizeLanguage,translate,localeFor,formatDate,formatMoney,languageStorageKey} from '../lib/i18n.mjs';
 test('six selectable languages and Italian default',()=>{
  assert.deepEqual(LANGUAGES.map(x=>x.code),['it','en','es','fr','de','pt']);
@@ -39,4 +41,23 @@ test('account language preferences are scoped independently; guest setting is se
  assert.equal(languageStorageKey('user-a'),'casainordine-language-v32:user:user-a');
  assert.notEqual(languageStorageKey('user-a'),languageStorageKey('user-b'));
  assert.notEqual(languageStorageKey('user-a'),languageStorageKey());
+});
+
+test('all translated UI modules reference existing messages',()=>{
+ const components=['page.jsx','PersonalizedHome.jsx','TestDrive.jsx','MailImporter.jsx','CalendarFeed.jsx','PushSettings.jsx','SampleAccountSetup.jsx'];
+ for(const component of components){
+  const filename=fileURLToPath(new URL('../app/'+component,import.meta.url));
+  const code=readFileSync(filename,'utf8');
+  for(const match of code.matchAll(/\b(?:t|tr)\(\s*'([^']+)'\s*(?=[,)])/g)){
+   const key=match[1];
+   assert.ok(TRANSLATIONS.it[key],component+' references unknown translation: '+key);
+  }
+ }
+});
+test('translation placeholders match across all six languages',()=>{
+ const placeholders=s=>[...s.matchAll(/\{([A-Za-z][A-Za-z0-9]*)\}/g)].map(m=>m[1]).sort();
+ for(const key of MESSAGE_KEYS){
+  const italian=placeholders(TRANSLATIONS.it[key]);
+  for(const lang of LANGUAGES)assert.deepEqual(placeholders(TRANSLATIONS[lang.code][key]),italian,lang.code+':'+key);
+ }
 });
