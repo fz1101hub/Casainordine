@@ -1,3 +1,16 @@
+# Casa in Ordine 3.0 — Home personale
+
+**Versione 3.0:** puoi decidere cosa vedere nella tua pagina iniziale. I moduli predefiniti, nell'ordine, sono **Bollette e scadenze**, **Lista della spesa**, **Attività da fare** e **La casa in 5 minuti**. Layout iniziale **Compatto**.
+
+Apri **La mia Home → Personalizza** per mostrare/nascondere i quattro moduli, spostarli con le frecce, passare da Compatto a Dettagliato e salvare. L'ordine personale viene salvato su `user_home_preferences`, con RLS per utente; **gli altri membri della famiglia non vedono né modificano queste preferenze**.
+
+È sempre disponibile la vecchia dashboard completa, ora sotto **Panoramica completa**.
+
+**Database:** su un'installazione 2.1 esegui la migrazione `supabase/migrate_v30.sql` (additiva) prima di abilitare la personalizzazione agli utenti. Su una nuova installazione completa, installa prima `schema.sql`, poi le migrazioni v1.9, v2.0, v2.1 e v3.0. Verifica RLS con due utenti distinti e il build Next.js.
+
+**Nota:** la lista della spesa è condivisa in una casa e quindi si visualizza quando selezioni una casa; i widget personalizzati e le loro preferenze sono invece personali. In demo il layout viene memorizzato solo nel browser. La pagina “La casa in 5 minuti” mostra riepiloghi indicativi calcolati dai dati, non pagamenti automatici.
+
+---
 # Casa in Ordine 2.1 — progetto aggiornato
 
 **Stato:** codice preparato, non ancora pubblicato online né collaudato con account reali.
