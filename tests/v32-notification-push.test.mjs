@@ -34,3 +34,13 @@ test('push names are limited without changing stored bill names',()=>{
  assert.match(copy.body,/A{160}/);
  assert.doesNotMatch(copy.body,/A{161}/);
 });
+
+// Directionality controls can spoof the visible order of a bill name in notifications.
+test('push names remove bidi overrides and isolates without changing source',()=>{
+ const name='Invoice\\u202e321\\u202c\\u2067\\u2069\\u200e';
+ const copy=billDuePushCopy({language:'en',name});
+ assert.match(copy.body,/Invoice 321/);
+ assert.doesNotMatch(copy.body,/[\\u202a-\\u202e\\u2066-\\u2069\\u200e\\u200f]/);
+ assert.match(name,/\\u202e/);
+ assert.throws(()=>billDuePushCopy({name:'\\u202e\\u2067\\u2069'}),TypeError);
+});
