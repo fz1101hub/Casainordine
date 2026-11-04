@@ -8,7 +8,7 @@ test('V20 monitoring and fraud screen copy exists in all six languages',()=>{
  const langs=['it','en','es','fr','de','pt'];
  const copies=langs.map(v20UiCopy);
  const keys=Object.keys(copies[0]);
- assert.equal(keys.length,162);
+ assert.equal(keys.length,168);
  for(const copy of copies){assert.deepEqual(Object.keys(copy),keys);for(const value of Object.values(copy))assert.ok(value.trim().length>0);}
  // Shared terms (for example Code and Elemento) are valid across languages.
  // Validate each language has distinct meaningful prose, without demanding unique words for every label.
@@ -99,4 +99,15 @@ test('offline draft privacy and savings actions use localized strings',()=>{
   assert.ok(source.includes('ui.'+key));
  }
  assert.match(source,/window\.confirm\(ui\.confirmDiscardDraft\)/);
+});
+
+test('V20 monitor, migration and demo fallback texts use six-language copy',()=>{
+ for(const lang of ['it','en','es','fr','de','pt']){
+  const copy=v20UiCopy(lang);
+  for(const key of ['migrationRequired','demoSetupNotice','expectedAround','daysOverdue','lastChecked','v20Name'])assert.ok(copy[key]?.trim(),lang+':'+key);
+ }
+ assert.match(source,/onNotify\(ui\.migrationRequired\+error\.error\.message\)/);
+ assert.match(source,/\{ui\.expectedAround\}/);
+ assert.match(source,/\{ui\.lastChecked\}/);
+ assert.match(source,/\{ui\.demoSetupNotice\}/);
 });
