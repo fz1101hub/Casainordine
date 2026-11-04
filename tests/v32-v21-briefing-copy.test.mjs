@@ -7,7 +7,7 @@ test('V21 briefing text and privacy copy exist in six languages',()=>{
  const langs=['it','en','es','fr','de','pt'];
  const copies=langs.map(v21BriefingCopy);
  const keys=Object.keys(copies[0]);
- assert.equal(keys.length,137);
+ assert.equal(keys.length,159);
  for(const copy of copies){assert.deepEqual(Object.keys(copy),keys);for(const value of Object.values(copy))assert.ok(value.trim());}
  for(const key of keys)assert.ok(source.includes('briefingCopy.'+key),key);
  assert.deepEqual(v21BriefingCopy('unknown'),v21BriefingCopy('it'));
@@ -47,6 +47,12 @@ test('SOS privacy, offline encryption and deletion confirmations are localized',
 
 test('vacation links, expiry and restricted sharing copy are localized',()=>{
  for(const key of ['planAbsence','periodName','departure','returnDate','personalHomeNotes','createChecklist','checklistUpdated','deleteVacationPlan','limitedSharing','sharingPrivacy','planLabel','choosePlaceholder','specificInstructions','sharingPlaceholder','linkDuration','hours24','days3','days7','createTemporaryLink','copyNowWarning','linkCopied','copyManually','copyLabel','shareRevokedFeedback','revokeLabel','vacationLabel','revokedLabel','activeUntilExpiry']){
+  assert.ok(source.includes('briefingCopy.'+key),key);
+ }
+});
+
+test('insured inventory forms, document links and estimate caveat use localized copy',()=>{
+ for(const key of ['registerInsuredItem','itemRegistered','objectLabel','estimatedValue','propertyLabel','notSpecified','choosePhoto','archivePhoto','noneMasculine','relatedAsset','notesLabel','saveInventory','inventoryDocumentation','itemsCount','estimatedValueSuffix','linkedDocumentsCount','exportList','documentButton','roomNotSpecified','documentLinked','addReceiptPhoto','inventoryDisclaimer']){
   assert.ok(source.includes('briefingCopy.'+key),key);
  }
 });
