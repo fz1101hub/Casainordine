@@ -4,69 +4,70 @@ import { Mail, RefreshCcw, Link2, Trash2, FileText, Eye, ShieldCheck, Info, Aler
 import { IMAP_PROVIDERS, providerLabel } from '../lib/mail-providers.mjs';
 import {useLanguage} from './LanguageProvider';
 
-async function mailRequest(client,path,method='GET',payload){
+async function mailRequest(client,path,method='GET',payload,tr){
   const {data:{session}}=await client.auth.getSession();
-  if(!session?.access_token)throw new Error('Sessione scaduta: accedi nuovamente.');
+  if(!session?.access_token)throw new Error(tr('mail.sessionExpired'));
   const response=await fetch(`/api/mail/${path}`,{
     method,headers:{Authorization:`Bearer ${session.access_token}`,...(payload?{'Content-Type':'application/json'}:{})},
     ...(payload?{body:JSON.stringify(payload)}:{})
   });
   const result=await response.json().catch(()=>({}));
-  if(!response.ok)throw new Error(result.error||'Operazione non riuscita.');
+  if(!response.ok)throw new Error(result.error||tr('mail.operationFailed'));
   return result;
 }
 export default function MailImporter({client,onReview,notify,refresh=0,onPaymentsChanged,bills=[]}){
   const {t:tr,money,locale}=useLanguage();
+  const request=(path,method,payload)=>mailRequest(client,path,method,payload,tr);
   const date=value=>value?new Intl.DateTimeFormat(locale,{day:'2-digit',month:'short',year:'numeric'}).format(new Date(value)):tr('mail.never');
   const [connections,setConnections]=useState([]),[documents,setDocuments]=useState([]),[payments,setPayments]=useState([]),[trustedSenders,setTrustedSenders]=useState([]),[billSenders,setBillSenders]=useState([]),[choices,setChoices]=useState({}),[trusted,setTrusted]=useState({}),[busy,setBusy]=useState(''),[loading,setLoading]=useState(true);
   const [imapProvider,setImapProvider]=useState('icloud'),[imapEmail,setImapEmail]=useState(''),[imapLogin,setImapLogin]=useState(''),[imapPassword,setImapPassword]=useState(''),[imapOpen,setImapOpen]=useState(false);
   async function load(){
     if(!client)return;
     try{
-      const [c,d,p,s]=await Promise.all([mailRequest(client,'connections'),mailRequest(client,'documents'),mailRequest(client,'payments'),mailRequest(client,'senders')]);
+      const [c,d,p,s]=await Promise.all([request('connections'),request('documents'),request('payments'),request('senders')]);
       setConnections(c.connections||[]);setDocuments(d.documents||[]);setPayments(p.payments||[]);setTrustedSenders(p.trusted_senders||[]);setBillSenders(s.senders||[]);
     }catch(e){notify(e.message);}finally{setLoading(false);}
   }
   useEffect(()=>{load();},[client,refresh]);
   async function act(name,fn){setBusy(name);try{await fn();}catch(e){notify(e.message);}finally{setBusy('');}}
   const connect=provider=>act(`connect-${provider}`,async()=>{
-    const {url}=await mailRequest(client,'start','POST',{provider});
+    const {url}=await request('start','POST',{provider});
     window.location.assign(url);
   });
   const connectImap=event=>{event.preventDefault();act('imap',async()=>{
-    await mailRequest(client,'connections','POST',{provider:imapProvider,email:imapEmail,login:imapLogin,password:imapPassword});
+    await request('connections','POST',{provider:imapProvider,email:imapEmail,login:imapLogin,password:imapPassword});
     setImapPassword('');setImapEmail('');setImapLogin('');setImapOpen(false);
     notify(tr('mail.imapConnected'));await load();
   });};
   const sync=c=>act(c.id,async()=>{
-    const res=await mailRequest(client,'sync','POST',{id:c.id});
+    const res=await request('sync','POST',{id:c.id});
     notify(tr('mail.receipts',{docs:res.imported||0,candidates:res.payment_candidates||0,confirmed:res.payments_confirmed||0}));
     await load();
     await onPaymentsChanged?.();
   });
   const disconnect=c=>{
     if(!window.confirm(tr('mail.disconnectConfirm',{email:c.email_address})))return;
-    act(c.id,async()=>{const result=await mailRequest(client,'connections','DELETE',{id:c.id});await load();notify(result.notice||tr('mail.disconnectDone'));});
+    act(c.id,async()=>{const result=await request('connections','DELETE',{id:c.id});await load();notify(result.notice||tr('mail.disconnectDone'));});
   };
   const dismiss=d=>{
     if(!window.confirm(tr('mail.dismissConfirm')))return;
-    act(d.id,async()=>{await mailRequest(client,'documents','PATCH',{id:d.id,action:'dismissed'});await load();notify(tr('mail.dismissed'));});
+    act(d.id,async()=>{await request('documents','PATCH',{id:d.id,action:'dismissed'});await load();notify(tr('mail.dismissed'));});
   };
   const paymentAction=(p,action)=>act(`payment-${p.id}`,async()=>{
     const payload={id:p.id,action};
     if(action==='confirm'){payload.bill_id=choices[p.id]||p.bill_id;payload.trust_sender=!!trusted[p.id];}
-    const result=await mailRequest(client,'payments','PATCH',payload);
+    const result=await request('payments','PATCH',payload);
     await load();
     if(action==='confirm')await onPaymentsChanged?.();
     notify(result.warning||tr(action==='confirm'?'mail.confirmedPayment':'mail.rejectedPayment'));
   });
   const revokeSender=entry=>act(`revoke-${entry.id}`,async()=>{
-    await mailRequest(client,'payments','DELETE',{id:entry.id});
+    await request('payments','DELETE',{id:entry.id});
     await load();notify(tr('mail.senderRevoked'));
   });
   const forgetBillSender=entry=>{
     if(!window.confirm(tr('mail.senderForgetConfirm',{email:entry.sender_email})))return;
-    act(`forget-${entry.id}`,async()=>{await mailRequest(client,'senders','DELETE',{id:entry.id});await load();notify(tr('mail.senderForgotten'));});
+    act(`forget-${entry.id}`,async()=>{await request('senders','DELETE',{id:entry.id});await load();notify(tr('mail.senderForgotten'));});
   };
   const review=d=>act(d.id,async()=>{
     const {data,error}=await client.storage.from('mail-bills').download(d.storage_path);
