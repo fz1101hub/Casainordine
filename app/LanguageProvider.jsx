@@ -1,19 +1,17 @@
 'use client';
 import {createContext,useCallback,useContext,useEffect,useMemo,useRef,useState} from 'react';
 import {db} from '../lib/supabase-browser';
-import {browserLanguage,DEFAULT_LANGUAGE,formatDate,formatMoney,LANGUAGES,localeFor,normalizeLanguage,translate} from '../lib/i18n.mjs';
+import {browserLanguage,DEFAULT_LANGUAGE,formatDate,formatMoney,LANGUAGES,localeFor,normalizeLanguage,translate,languageStorageKey} from '../lib/i18n.mjs';
 
-const KEY='casainordine-language-v32';
-const accountLanguageKey=userId=>KEY+':user:'+userId;
 function accountLanguage(userId){
- try{const saved=localStorage.getItem(accountLanguageKey(userId));if(saved)return normalizeLanguage(saved);}catch{}
+ try{const saved=localStorage.getItem(languageStorageKey(userId));if(saved)return normalizeLanguage(saved);}catch{}
  return browserLanguage(typeof navigator!=='undefined'?(navigator.languages?.[0]||navigator.language):'it');
 }
 const LanguageContext=createContext(null);
 function deviceLanguage(){
  if(typeof window==='undefined')return DEFAULT_LANGUAGE;
  try{
-  const stored=localStorage.getItem(KEY);
+  const stored=localStorage.getItem(languageStorageKey());
   if(stored)return normalizeLanguage(stored);
  }catch{}
  return browserLanguage(navigator.languages?.[0]||navigator.language);
@@ -57,7 +55,7 @@ export function LanguageProvider({children}){
   const next=normalizeLanguage(code);
   selectionEpoch.current++;
   setLanguageState(next);setSaveError('');
-  try{localStorage.setItem(accountId?accountLanguageKey(accountId):KEY,next);}catch{}
+  try{localStorage.setItem(languageStorageKey(accountId),next);}catch{}
   if(!accountId)return true;
   const client=db();
   if(!client)return false;
