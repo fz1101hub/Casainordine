@@ -19,13 +19,15 @@ import CalendarFeed from './CalendarFeed';
 import HomeExtra from './HomeExtra';
 import V20Hub from './V20Hub';
 import V21Hub from './V21Hub';
+import PersonalizedHome from './PersonalizedHome';
 import { downloadCalendar } from '../lib/calendar.mjs';
 import { billFraudSignals } from '../lib/v20-core.mjs';
 
 const categories = ['Luce','Gas','Acqua','Internet','Telefono','Rifiuti','Condominio','Affitto / Mutuo','Assicurazione','Tasse','Auto','Altro'];
 const frequencies = [{value:'none',label:'Non ricorrente'},{value:'monthly',label:'Ogni mese'},{value:'bimonthly',label:'Ogni 2 mesi'},{value:'quarterly',label:'Ogni 3 mesi'},{value:'yearly',label:'Ogni anno'},{value:'biennial',label:'Ogni 2 anni'}];
 const menu = [
-  {id:'dashboard',title:'Panoramica',icon:LayoutDashboard},
+  {id:'dashboard',title:'La mia Home',icon:LayoutDashboard},
+  {id:'overview',title:'Panoramica completa',icon:BarChart3},
   {id:'bills',title:'Bollette',icon:ReceiptText},
   {id:'utilities',title:'Le mie utenze',icon:PlugZap},
   {id:'tasks',title:'Attività casa',icon:House},
@@ -471,7 +473,8 @@ export default function Page() {
         {['insights','archive','properties','maintenance','contracts','payments','alerts'].includes(tab)&&<HomeExtra client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} bills={bills} utilities={utilities} tab={tab} onNotify={notify} onRefresh={reload}/>}
         {['tags','sos','radar','simulator','passport','vacation','inventory','decisions','briefing'].includes(tab)&&<V21Hub client={client} user={user} homeId={activeHomeId} canWrite={canWrite} demo={demo} bills={bills} tasks={tasks} tab={tab} onNotify={notify}/>}
         {['monitor','fraud','pagopa','history','moving','savings','offline'].includes(tab)&&<V20Hub client={client} user={user} homeId={activeHomeId} canWrite={canWrite} demo={demo} bills={bills} utilities={utilities} tab={tab} onNotify={notify} onRefresh={reload}/>}
-        {tab==='dashboard'&&<>
+        {tab==='dashboard'&&<PersonalizedHome client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} bills={bills} tasks={tasks} displayName={displayName} onNavigate={changePage} onNewBill={()=>openModal('bill')} onNewTask={()=>openModal('task')} onPay={pay} onToggleTask={toggleTask} onRefresh={reload} onNotify={notify}/>}
+        {tab==='overview'&&<>
           <div className="page-heading"><div><div className="eyebrow">IL TUO CENTRO DI CONTROLLO</div><h1>Buongiorno{displayName?`, ${displayName}`:''} <span className="wave">✳</span></h1><p>Una panoramica semplice di tutto quello che conta per la tua casa.</p></div><button className="btn btn-primary" onClick={()=>openModal('bill')}><Plus size={18}/> Nuova bolletta</button></div>
           <div className="stat-grid"><div className="stat-card"><div className="stat-top"><span>Totale da pagare</span><span className="stat-icon coral"><Wallet size={20}/></span></div><strong>{euro(dueAmount)}</strong><small><span className="small-dot orange"/>{open.length} bollette aperte</small></div>
             <div className="stat-card"><div className="stat-top"><span>In scadenza (7 giorni)</span><span className="stat-icon amber"><Clock size={20}/></span></div><strong>{urgent.length}</strong><small>{urgent.length?'Richiedono la tua attenzione':'Tutto sotto controllo'}</small></div>
