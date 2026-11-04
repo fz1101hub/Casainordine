@@ -8,9 +8,9 @@ test('V21 briefing text and privacy copy exist in six languages',()=>{
  const langs=['it','en','es','fr','de','pt'];
  const copies=langs.map(v21BriefingCopy);
  const keys=Object.keys(copies[0]);
- assert.equal(keys.length,207);
+ assert.equal(keys.length,213);
  for(const copy of copies){assert.deepEqual(Object.keys(copy),keys);for(const value of Object.values(copy))assert.ok(value.trim());}
- for(const key of keys)assert.ok(source.includes('briefingCopy.'+key)||core.includes('copy?.'+key),key);
+ for(const key of keys)assert.ok(source.includes('briefingCopy.'+key)||source.includes('copy.'+key)||core.includes('copy?.'+key),key);
  assert.deepEqual(v21BriefingCopy('unknown'),v21BriefingCopy('it'));
  assert.match(source,/v21BriefingCopy\(language\)/);
 });
@@ -76,4 +76,9 @@ test('five-minute briefing labels are translated and refreshed when language cha
  for(const key of ['briefingOverdueBill','briefingPaymentDue','briefingMaintenance','briefingContractRenewal','briefingTask','briefingDecision','briefingToReview','briefingProofOfPurchase','briefingNoReceipt'])assert.ok(Object.hasOwn(v21BriefingCopy('en'),key));
  assert.match(source,/copy:briefingCopy/);
  assert.match(source,/rows\.inventory,language\]/);
+});
+
+test('QR preview uses translated privacy and HTTPS fallback notices',()=>{
+ for(const key of ['qrModuleUnavailable','qrHttpsRequired','printQr','qrAccessNotice','qrAltPrefix'])assert.ok(source.includes('copy.'+key),key);
+ assert.match(source,/<QrPreview asset=\{selection\} copy=\{briefingCopy\}\/>/);
 });
