@@ -8,7 +8,7 @@ test('V20 monitoring and fraud screen copy exists in all six languages',()=>{
  const langs=['it','en','es','fr','de','pt'];
  const copies=langs.map(v20UiCopy);
  const keys=Object.keys(copies[0]);
- assert.equal(keys.length,103);
+ assert.equal(keys.length,114);
  for(const copy of copies){assert.deepEqual(Object.keys(copy),keys);for(const value of Object.values(copy))assert.ok(value.trim().length>0);}
  for(const key of keys.filter(key=>!['codeLabel'].includes(key)))assert.ok(new Set(copies.map(copy=>copy[key])).size>=5,`Missing language variation for ${key}`);
  // Short technical terms such as Code/Código can legitimately be identical across languages.
@@ -76,4 +76,10 @@ test('pagoPA notice list and official payment caveat are localized',()=>{
   assert.ok(source.includes('ui.'+key));
  }
  assert.match(source,/https:\/\/www\.pagopa\.gov\.it\//);
+});
+
+test('audit history and recoverable trash warnings use localized copy',()=>{
+ for(const key of ['transparencyRecovery','recentActivity','userLabel','automaticProcess','noAuditEvents','recoverableTrash','restoreLabel','itemLabel','deletedOn','trashEmpty','trashRetentionNotice']){
+  assert.ok(source.includes('ui.'+key));
+ }
 });
