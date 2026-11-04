@@ -8,7 +8,7 @@ test('V20 monitoring and fraud screen copy exists in all six languages',()=>{
  const langs=['it','en','es','fr','de','pt'];
  const copies=langs.map(v20UiCopy);
  const keys=Object.keys(copies[0]);
- assert.equal(keys.length,139);
+ assert.equal(keys.length,162);
  for(const copy of copies){assert.deepEqual(Object.keys(copy),keys);for(const value of Object.values(copy))assert.ok(value.trim().length>0);}
  // Shared terms (for example Code and Elemento) are valid across languages.
  // Validate each language has distinct meaningful prose, without demanding unique words for every label.
@@ -92,4 +92,11 @@ test('savings goal form and monthly projection use localized copy',()=>{
  for(const key of ['plannedSavings','createSavingsGoal','savingsGoalCreated','savingFor','targetAmountLabel','savedAmountLabel','byDate','saveGoal','progressMonthly','reached','perMonthFor','monthsLabel','deadlineLabel']){
   assert.ok(source.includes('ui.'+key));
  }
+});
+
+test('offline draft privacy and savings actions use localized strings',()=>{
+ for(const key of ['savingsPrompt','invalidAmount','savingsUpdated','addSavings','noSavingsGoals','compareOffersIntro','offersPortal','noLiveComparison','localDrafts','deviceDrafts','refreshList','downloadForReview','importToHome','importPersonalTask','discardDraft','confirmDiscardDraft','taskLabel','shoppingLabel','documentLabel','savedInBrowser','noOfflineDrafts','offlinePrivacyNotice','loadingV20']){
+  assert.ok(source.includes('ui.'+key));
+ }
+ assert.match(source,/window\.confirm\(ui\.confirmDiscardDraft\)/);
 });
