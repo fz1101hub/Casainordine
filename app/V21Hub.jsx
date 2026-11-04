@@ -51,7 +51,7 @@ export default function V21Hub({client,user,homeId,canWrite,demo,bills=[],tasks=
  const add=(table,item,msg)=>canWrite?act(()=>client.from(table).insert({...common,...item}),msg):onNotify(briefingCopy.readOnlyHome);
  const edit=(table,id,patch,msg)=>canWrite?act(()=>client.from(table).update(patch).eq('id',id),msg):onNotify(briefingCopy.readOnlyHome);
  async function remove(table,id){if(!canWrite||!confirm(briefingCopy.confirmDeletePermanent))return;await act(()=>client.from(table).delete().eq('id',id),briefingCopy.itemDeleted);}
- const suspicious=useMemo(()=>detectBillingInconsistencies({bills,contracts:rows.contracts,refunds:rows.refunds}),[bills,rows.contracts,rows.refunds]);
+ const suspicious=useMemo(()=>detectBillingInconsistencies({bills,contracts:rows.contracts,refunds:rows.refunds,copy:briefingCopy}),[bills,rows.contracts,rows.refunds,language]);
  const result=useMemo(()=>simulateScenario(scenario),[scenario]);
  const inventoryTotal=useMemo(()=>inventorySummary(rows.inventory),[rows.inventory]);
  const property=rows.properties.find(p=>p.id===propertyId)||rows.properties[0];
