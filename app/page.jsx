@@ -84,7 +84,7 @@ function fakeData() {
 function Tag({children,tone='neutral'}) { return <span className={`tag tag-${tone}`}>{children}</span>; }
 function Status({bill}) {
   const {t}=useLanguage();
-  if (bill.paid_at) return <Tag tone="green"><Check size={12}/> {t('general.saved')}</Tag>;
+  if (bill.paid_at) return <Tag tone="green"><Check size={12}/> {t('bill.paid')}</Tag>;
   const today = todayRome();
   if (bill.due_date < today) return <Tag tone="red">{t('bill.overdue')}</Tag>;
   if (bill.due_date <= addDaysISO(today,7)) return <Tag tone="amber">{t('bill.dueSoon')}</Tag>;
