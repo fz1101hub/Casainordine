@@ -3,8 +3,9 @@ import { useEffect, useState } from 'react';
 import { Mail, RefreshCcw, Link2, Trash2, FileText, Eye, ShieldCheck, Info, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { IMAP_PROVIDERS, providerLabel } from '../lib/mail-providers.mjs';
 import {useLanguage} from './LanguageProvider';
+import {localizeMailApiMessage} from '../lib/mail-api-errors.mjs';
 
-async function mailRequest(client,path,method='GET',payload,tr){
+async function mailRequest(client,path,method='GET',payload,tr,language){
   const {data:{session}}=await client.auth.getSession();
   if(!session?.access_token)throw new Error(tr('mail.sessionExpired'));
   const response=await fetch(`/api/mail/${path}`,{
@@ -12,12 +13,12 @@ async function mailRequest(client,path,method='GET',payload,tr){
     ...(payload?{body:JSON.stringify(payload)}:{})
   });
   const result=await response.json().catch(()=>({}));
-  if(!response.ok)throw new Error(result.error||tr('mail.operationFailed'));
+  if(!response.ok)throw new Error(localizeMailApiMessage(result.error,language)||tr('mail.operationFailed'));
   return result;
 }
 export default function MailImporter({client,onReview,notify,refresh=0,onPaymentsChanged,bills=[]}){
-  const {t:tr,money,locale}=useLanguage();
-  const request=(path,method,payload)=>mailRequest(client,path,method,payload,tr);
+  const {t:tr,money,locale,language}=useLanguage();
+  const request=(path,method,payload)=>mailRequest(client,path,method,payload,tr,language);
   const date=value=>value?new Intl.DateTimeFormat(locale,{day:'2-digit',month:'short',year:'numeric'}).format(new Date(value)):tr('mail.never');
   const [connections,setConnections]=useState([]),[documents,setDocuments]=useState([]),[payments,setPayments]=useState([]),[trustedSenders,setTrustedSenders]=useState([]),[billSenders,setBillSenders]=useState([]),[choices,setChoices]=useState({}),[trusted,setTrusted]=useState({}),[busy,setBusy]=useState(''),[loading,setLoading]=useState(true);
   const [imapProvider,setImapProvider]=useState('icloud'),[imapEmail,setImapEmail]=useState(''),[imapLogin,setImapLogin]=useState(''),[imapPassword,setImapPassword]=useState(''),[imapOpen,setImapOpen]=useState(false);
