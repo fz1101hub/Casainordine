@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {LANGUAGES,DEFAULT_LANGUAGE,MESSAGE_KEYS,TRANSLATIONS,browserLanguage,normalizeLanguage,translate,localeFor,formatDate,formatMoney} from '../lib/i18n.mjs';
+import {LANGUAGES,DEFAULT_LANGUAGE,MESSAGE_KEYS,TRANSLATIONS,browserLanguage,normalizeLanguage,translate,localeFor,formatDate,formatMoney,languageStorageKey} from '../lib/i18n.mjs';
 test('six selectable languages and Italian default',()=>{
  assert.deepEqual(LANGUAGES.map(x=>x.code),['it','en','es','fr','de','pt']);
  assert.equal(DEFAULT_LANGUAGE,'it');
@@ -32,4 +32,11 @@ test('currency remains EUR; number formatting adapts to locale',()=>{
 test('date formatting adapts; invalid inputs do not crash',()=>{
  assert.match(formatDate('2026-11-04','en'),/Nov/);
  assert.equal(formatDate('invalid','fr'),'—');
+});
+
+test('account language preferences are scoped independently; guest setting is separate',()=>{
+ assert.equal(languageStorageKey(),'casainordine-language-v32');
+ assert.equal(languageStorageKey('user-a'),'casainordine-language-v32:user:user-a');
+ assert.notEqual(languageStorageKey('user-a'),languageStorageKey('user-b'));
+ assert.notEqual(languageStorageKey('user-a'),languageStorageKey());
 });
