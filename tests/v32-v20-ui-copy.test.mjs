@@ -8,7 +8,7 @@ test('V20 monitoring and fraud screen copy exists in all six languages',()=>{
  const langs=['it','en','es','fr','de','pt'];
  const copies=langs.map(v20UiCopy);
  const keys=Object.keys(copies[0]);
- assert.equal(keys.length,94);
+ assert.equal(keys.length,103);
  for(const copy of copies){assert.deepEqual(Object.keys(copy),keys);for(const value of Object.values(copy))assert.ok(value.trim().length>0);}
  for(const key of keys)assert.ok(new Set(copies.map(copy=>copy[key])).size>=5,`Missing language variation for ${key}`);
  assert.deepEqual(v20UiCopy('unknown'),v20UiCopy('it'));
@@ -67,4 +67,11 @@ test('pagoPA form labels and opt-in reminder consent are localized',()=>{
  for(const key of ['publicNotices','readNotice','fileOrScreenshot','copiedText','pasteNotice','findCodeInText','noticeCodeLabel','creditorCodeLabel','authorityLabel','createBillReminderLabel','registerNotice','registeredNotices']){
   assert.ok(source.includes('ui.'+key));
  }
+});
+
+test('pagoPA notice list and official payment caveat are localized',()=>{
+ for(const key of ['deleteLabel','pagopaNotice','codeLabel','amountNeedsReview','noNotices','pagopaDebtWarning','officialPagopa','amountLabel','dueDateLabel']){
+  assert.ok(source.includes('ui.'+key));
+ }
+ assert.match(source,/https:\/\/www\.pagopa\.gov\.it\//);
 });
