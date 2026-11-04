@@ -15,3 +15,7 @@ test('date formats are distinct across six supported locales',()=>{
  assert.ok(new Set(values).size>=3);
  for(const value of values)assert.notEqual(value,'—');
 });
+
+test('V20 alert inbox is explicitly restricted to the authenticated recipient',()=>{
+ assert.match(source,/from\('user_alerts'\)\.select\('\*'\)\.eq\('user_id',user\.id\)/);
+});
