@@ -56,7 +56,7 @@ export default function V21Hub({client,user,homeId,canWrite,demo,bills=[],tasks=
  const inventoryTotal=useMemo(()=>inventorySummary(rows.inventory),[rows.inventory]);
  const property=rows.properties.find(p=>p.id===propertyId)||rows.properties[0];
  const passport=useMemo(()=>safePropertyPassport({property,assets:rows.assets,contracts:rows.contracts,events:rows.events,documents:rows.docs,includeAddress:address,includeSerials:serials}),[property,rows.assets,rows.contracts,rows.events,rows.docs,address,serials]);
- const briefing=useMemo(()=>buildFiveMinuteBriefing({bills,tasks,assets:rows.assets,contracts:rows.contracts,decisions:rows.decisions,inventory:rows.inventory,today:todayRome()}),[bills,tasks,rows.assets,rows.contracts,rows.decisions,rows.inventory]);
+ const briefing=useMemo(()=>buildFiveMinuteBriefing({bills,tasks,assets:rows.assets,contracts:rows.contracts,decisions:rows.decisions,inventory:rows.inventory,today:todayRome(),copy:briefingCopy}),[bills,tasks,rows.assets,rows.contracts,rows.decisions,rows.inventory,language]);
  const selection=rows.assets.find(a=>a.id===(selectedAsset||assetId));
  const checklistCopy=Object.fromEntries(VACATION_CHECKLIST.map((item,index)=>[item,[briefingCopy.checkDoors,briefingCopy.checkPayments,briefingCopy.checkContacts,briefingCopy.checkShutoffs,briefingCopy.checkMailPets,briefingCopy.checkReturn][index]]));
  const readonly=(!canWrite||demo||busy);
