@@ -43,14 +43,14 @@ export default function V21Hub({client,user,homeId,canWrite,demo,bills=[],tasks=
   if(decisionIds.length){const v=await client.from('home_decision_votes').select('decision_id,user_id,choice,created_at').in('decision_id',decisionIds.slice(0,500)).limit(2000);newRows.votes=v.data||[];if(v.error)errors.push(v);}
   if(planIds.length){const s=await client.from('home_vacation_shares').select('id,plan_id,expires_at,revoked_at,created_at').in('plan_id',planIds.slice(0,500)).order('created_at',{ascending:false}).limit(100);newRows.shares=s.data||[];if(s.error)errors.push(s);}
   setRows(newRows);setLoading(false);
-  if(errors.length)onNotify('Per usare le novità 2.1, applica la migrazione SQL: '+errors[0].error.message);
+  if(errors.length)onNotify(briefingCopy.migrationRequired+errors[0].error.message);
  },[client,homeId,user?.id]);
  useEffect(()=>{load()},[load]);
  const common={user_id:user?.id,home_id:homeId||null};
- async function act(operation,success){if(!client||demo)return onNotify('Attiva il database per salvare i dati.');setBusy(true);try{const result=await operation();if(result?.error)throw result.error;onNotify(success);await load();return result?.data||true;}catch(e){onNotify(e.message||'Impossibile completare l’operazione');return null;}finally{setBusy(false)}}
- const add=(table,item,msg)=>canWrite?act(()=>client.from(table).insert({...common,...item}),msg):onNotify('Questa casa è in sola lettura');
+ async function act(operation,success){if(!client||demo)return onNotify(briefingCopy.enableDatabase);setBusy(true);try{const result=await operation();if(result?.error)throw result.error;onNotify(success);await load();return result?.data||true;}catch(e){onNotify(e.message||briefingCopy.operationFailed);return null;}finally{setBusy(false)}}
+ const add=(table,item,msg)=>canWrite?act(()=>client.from(table).insert({...common,...item}),msg):onNotify(briefingCopy.readOnlyHome);
  const edit=(table,id,patch,msg)=>canWrite?act(()=>client.from(table).update(patch).eq('id',id),msg):onNotify('Questa casa è in sola lettura');
- async function remove(table,id){if(!canWrite||!confirm('Eliminare definitivamente?'))return;await act(()=>client.from(table).delete().eq('id',id),'Elemento eliminato');}
+ async function remove(table,id){if(!canWrite||!confirm(briefingCopy.confirmDeletePermanent))return;await act(()=>client.from(table).delete().eq('id',id),briefingCopy.itemDeleted);}
  const suspicious=useMemo(()=>detectBillingInconsistencies({bills,contracts:rows.contracts,refunds:rows.refunds}),[bills,rows.contracts,rows.refunds]);
  const result=useMemo(()=>simulateScenario(scenario),[scenario]);
  const inventoryTotal=useMemo(()=>inventorySummary(rows.inventory),[rows.inventory]);
@@ -59,19 +59,19 @@ export default function V21Hub({client,user,homeId,canWrite,demo,bills=[],tasks=
  const briefing=useMemo(()=>buildFiveMinuteBriefing({bills,tasks,assets:rows.assets,contracts:rows.contracts,decisions:rows.decisions,inventory:rows.inventory,today:todayRome()}),[bills,tasks,rows.assets,rows.contracts,rows.decisions,rows.inventory]);
  const selection=rows.assets.find(a=>a.id===(selectedAsset||assetId));
  const readonly=(!canWrite||demo||busy);
- async function saveSos(e){e.preventDefault();if(!canWrite)return;const res=sosEditing?await edit('home_emergency_cards',sosEditing,sos,'Scheda SOS aggiornata; rigenera la copia offline se necessario.'):await add('home_emergency_cards',sos,'Scheda SOS salvata. Puoi conservarne una copia cifrata offline.');if(res)setSosEditing(null);}
- async function offlineSos(card){try{await sealSos(card,passphrase);setPassphrase('');onNotify('SOS cifrato su questo dispositivo. Conserva la frase segreta: non possiamo recuperarla.')}catch(e){onNotify(e.message)}}
- async function createVacation(e){e.preventDefault();await add('home_vacation_plans',{...vacation,checklist:VACATION_CHECKLIST.map(title=>({title,done:false}))},'Checklist vacanza creata');setVacation({title:'',starts_on:todayRome(),ends_on:todayRome(),notes:''});}
- async function createShare(){if(!sharePlan||!shareText.trim())return onNotify('Scegli il piano e scrivi esclusivamente le istruzioni che vuoi condividere.');
-  if(!confirm('Chiunque abbia il link potrà leggere il testo selezionato fino alla scadenza. Continuare?'))return;
-  const response=await act(()=>client.rpc('v21_create_vacation_share',{plan:sharePlan,text_to_share:shareText,hours_valid:Number(shareDuration)}),'Link temporaneo creato, copia e conservalo ora.');
+ async function saveSos(e){e.preventDefault();if(!canWrite)return;const res=sosEditing?await edit('home_emergency_cards',sosEditing,sos,briefingCopy.sosUpdated):await add('home_emergency_cards',sos,briefingCopy.sosSaved);if(res)setSosEditing(null);}
+ async function offlineSos(card){try{await sealSos(card,passphrase);setPassphrase('');onNotify(briefingCopy.sosEncrypted)}catch(e){onNotify(e.message)}}
+ async function createVacation(e){e.preventDefault();await add('home_vacation_plans',{...vacation,checklist:VACATION_CHECKLIST.map(title=>({title,done:false}))},briefingCopy.vacationCreated);setVacation({title:'',starts_on:todayRome(),ends_on:todayRome(),notes:''});}
+ async function createShare(){if(!sharePlan||!shareText.trim())return onNotify(briefingCopy.chooseSharePlan);
+  if(!confirm(briefingCopy.confirmShareLink))return;
+  const response=await act(()=>client.rpc('v21_create_vacation_share',{plan:sharePlan,text_to_share:shareText,hours_valid:Number(shareDuration)}),briefingCopy.shareLinkCreated);
   if(typeof response==='string'){setShareLink(`${location.origin}/vacanza/${response}`);setShareText('');}
  }
  async function openAttachment(id){const document=rows.docs.find(d=>d.id===id);if(!document)return;
   const {data,error}=await client.storage.from('house-documents').createSignedUrl(document.storage_path,60);if(error)return onNotify(error.message);window.open(data.signedUrl,'_blank','noopener,noreferrer');}
  async function uploadInventoryPhoto(file){
   if(!file||!client||!canWrite||!user)return;
-  if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size<1||file.size>10485760)return onNotify('Foto JPG/PNG/WEBP fino a 10 MB.');
+  if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size<1||file.size>10485760)return onNotify(briefingCopy.photoTypeLimit);
   const ext=file.type==='image/jpeg'?'jpg':file.type==='image/png'?'png':'webp';
   const path=`${user.id}/${uuid()}.${ext}`;
   setBusy(true);
@@ -80,18 +80,18 @@ export default function V21Hub({client,user,homeId,canWrite,demo,bills=[],tasks=
     const sha=Array.from(new Uint8Array(hash)).map(x=>x.toString(16).padStart(2,'0')).join('');
     const {error:uploadError}=await client.storage.from('house-documents').upload(path,file,{contentType:file.type,upsert:false});
     if(uploadError)throw uploadError;
-    const {data,error}=await client.from('home_documents').insert({...common,property_id:inventory.property_id||null,name:file.name.slice(0,200)||'Foto bene',doc_type:'altro',mime_type:file.type,storage_path:path,file_size:file.size,sha256:sha,notes:'Fotografia inventario assicurativo'}).select('id').single();
+    const {data,error}=await client.from('home_documents').insert({...common,property_id:inventory.property_id||null,name:file.name.slice(0,200)||briefingCopy.itemPhotoName,doc_type:'altro',mime_type:file.type,storage_path:path,file_size:file.size,sha256:sha,notes:briefingCopy.inventoryPhotoNotes}).select('id').single();
     if(error){await client.storage.from('house-documents').remove([path]);throw error;}
-    setInventory(s=>({...s,document_id:data.id}));onNotify('Foto salvata nell’archivio privato e collegata al nuovo bene.');await load();
-  }catch(e){onNotify('Impossibile caricare la foto: '+e.message)}finally{setBusy(false)}
+    setInventory(s=>({...s,document_id:data.id}));onNotify(briefingCopy.photoSaved);await load();
+  }catch(e){onNotify(briefingCopy.photoUploadFailed+e.message)}finally{setBusy(false)}
  }
- async function vote(decisionId,choice){if(!user||!homeId)return;await act(()=>client.from('home_decision_votes').upsert({decision_id:decisionId,user_id:user.id,choice},{onConflict:'decision_id,user_id'}),'Voto registrato');}
- const title={tags:'QR sugli oggetti',sos:'SOS Casa',radar:'Radar incongruenze',simulator:'Simulatore economico',passport:'Passaporto immobile',vacation:'Modalità vacanza',inventory:'Inventario assicurativo',decisions:'Decisioni familiari',briefing:'La casa in 5 minuti'}[tab];
+ async function vote(decisionId,choice){if(!user||!homeId)return;await act(()=>client.from('home_decision_votes').upsert({decision_id:decisionId,user_id:user.id,choice},{onConflict:'decision_id,user_id'}),briefingCopy.voteSaved);}
+ const title={tags:briefingCopy.tabTags,sos:briefingCopy.tabSos,radar:briefingCopy.tabRadar,simulator:briefingCopy.tabSimulator,passport:briefingCopy.tabPassport,vacation:briefingCopy.tabVacation,inventory:briefingCopy.tabInventory,decisions:briefingCopy.tabDecisions,briefing:briefingCopy.tabBriefing}[tab];
  const asDate=d=>formatDate(d);
  return <div className="extra-main">
-  <div className="page-heading"><div><div className="eyebrow">CASA IN ORDINE 2.1 · SENZA AI</div><h1>{title}</h1><p>{homeId?'Informazioni della casa condivisa':'Informazioni personali'} · I dati vengono mostrati solo a chi dispone dei permessi.</p></div></div>
-  {loading&&<p>Caricamento dei dati…</p>}
-  {!client&&<div className="extra-alert">Modalità dimostrativa: per usare queste funzioni con più utenti devi configurare e collaudare Supabase e la migrazione 2.1.</div>}
+  <div className="page-heading"><div><div className="eyebrow">{briefingCopy.eyebrow}</div><h1>{title}</h1><p>{homeId?briefingCopy.sharedHomeInfo:briefingCopy.personalInfo} · {briefingCopy.permissionNotice}</p></div></div>
+  {loading&&<p>{briefingCopy.loadingData}</p>}
+  {!client&&<div className="extra-alert">{briefingCopy.demoMode}</div>}
   {tab==='tags'&&<div className="extra-layout">
    <Card title={briefingCopy.qrPassport}><p>{briefingCopy.qrPrivacy}</p><Field label={briefingCopy.chooseMaintenanceAsset}><select value={selectedAsset||assetId} onChange={e=>{setSelectedAsset(e.target.value);setAssetId(e.target.value)}}><option value="">{briefingCopy.selectPlaceholder}</option>{rows.assets.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></Field>{selection?<QrPreview asset={selection}/>:<p className="muted">{briefingCopy.addMaintenanceFirst}</p>}</Card>
    <Card title={briefingCopy.protectedAsset}>{selection?<><p><b>{selection.name}</b> · {selection.category}</p><p>{selection.notes||briefingCopy.noNotes}</p><p><b>{briefingCopy.warrantyLabel}</b> {asDate(selection.warranty_until)}</p><p><b>{briefingCopy.nextMaintenance}</b> {asDate(selection.next_service_on)}</p><p><b>{briefingCopy.modelLabel}</b> {selection.model||'—'}</p><p><b>{briefingCopy.serialNumber}</b> {selection.serial_number||'—'}</p><p><b>{briefingCopy.roomLabel}</b> {selection.room||'—'}</p><div className="extra-list">{rows.inventory.filter(i=>i.asset_id===selection.id&&i.document_id).map(i=><Item key={i.id} actions={<button className="btn btn-soft" onClick={()=>openAttachment(i.document_id)}>{briefingCopy.openAttachment}</button>}><b>{briefingCopy.documentPrefix} {i.name}</b></Item>)}{rows.events.filter(e=>e.asset_id===selection.id).map(e=><Item key={e.id}><b>{e.description}</b><small>{asDate(e.done_on)} · {money(e.cost)}</small></Item>)}</div></>:<p>{briefingCopy.scanOrSelect}</p>}</Card>
