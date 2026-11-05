@@ -44,7 +44,7 @@ export default function V21Hub({client,user,homeId,canWrite,demo,bills=[],tasks=
   if(planIds.length){const s=await client.from('home_vacation_shares').select('id,plan_id,expires_at,revoked_at,created_at').in('plan_id',planIds.slice(0,500)).order('created_at',{ascending:false}).limit(100);newRows.shares=s.data||[];if(s.error)errors.push(s);}
   setRows(newRows);setLoading(false);
   if(errors.length)onNotify(briefingCopy.migrationRequired+errors[0].error.message);
- },[client,homeId,user?.id]);
+ },[client,homeId,user?.id,language]);
  useEffect(()=>{load()},[load]);
  const common={user_id:user?.id,home_id:homeId||null};
  async function act(operation,success){if(!client||demo)return onNotify(briefingCopy.enableDatabase);setBusy(true);try{const result=await operation();if(result?.error)throw result.error;onNotify(success);await load();return result?.data||true;}catch(e){onNotify(e.message||briefingCopy.operationFailed);return null;}finally{setBusy(false)}}
