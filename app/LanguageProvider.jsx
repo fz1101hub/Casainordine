@@ -38,7 +38,7 @@ export function LanguageProvider({children}){
    const {data,error}=await client.from('user_language_preferences')
     .select('language').eq('user_id',user.id).maybeSingle();
    if(!active||request!==authRequest.current)return;
-   if(error){setSaveError(translate(accountLanguage(user.id),'settings.language.error'));return;}
+   if(error){if(selectionEpoch.current===epoch&&currentAccount.current===user.id)setSaveError(translate(accountLanguage(user.id),'settings.language.error'));return;}
    if(selectionEpoch.current!==epoch)return; // A deliberate selection wins over an older network read.
    if(data?.language)setLanguageState(normalizeLanguage(data.language));
    else setLanguageState(accountLanguage(user.id));
@@ -62,11 +62,16 @@ export function LanguageProvider({children}){
   if(!selectedAccount)return true;
   const client=db();
   if(!client){if(selectionEpoch.current===epoch&&currentAccount.current===selectedAccount)setSaveError(translate(next,'settings.language.error'));return false;}
-  const {error}=await client.from('user_language_preferences').upsert({
-   user_id:selectedAccount,language:next,updated_at:new Date().toISOString()
-  },{onConflict:'user_id'});
-  if(error){if(selectionEpoch.current===epoch&&currentAccount.current===selectedAccount)setSaveError(translate(next,'settings.language.error'));return false;}
-  return true;
+  try{
+   const {error}=await client.from('user_language_preferences').upsert({
+    user_id:selectedAccount,language:next,updated_at:new Date().toISOString()
+   },{onConflict:'user_id'});
+   if(error)throw error;
+   return true;
+  }catch{
+   if(selectionEpoch.current===epoch&&currentAccount.current===selectedAccount)setSaveError(translate(next,'settings.language.error'));
+   return false;
+  }
  },[accountId]);
  const value=useMemo(()=>({
   language,locale:localeFor(language),languages:LANGUAGES,
