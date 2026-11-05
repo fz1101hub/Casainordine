@@ -4,11 +4,13 @@ import {readFileSync} from 'node:fs';
 
 const source=readFileSync(new URL('../app/V21Hub.jsx',import.meta.url),'utf8');
 
-test('V21 JSON export requires a localized accessible label',()=>{
+test('V21 JSON exports require localized button labels',()=>{
  assert.match(source,/function DownloadJson\\(\\{name,object,label\\}\\)/);
  assert.doesNotMatch(source,/label\\s*=\\s*['\"]Esporta JSON['\"]/);
- const calls=source.match(/<DownloadJson\\b/g)||[];
- const labels=source.match(/<DownloadJson\\b[^>]*\\blabel=\\{briefingCopy\\.(?:exportDossier|exportList|exportSummary)\\}/gs)||[];
+ const calls=source.split('<DownloadJson ').slice(1);
  assert.equal(calls.length,3);
- assert.equal(labels.length,calls.length);
+ for(const call of calls){
+  const element=call.split('/>')[0];
+  assert.match(element,/\\blabel=\\{briefingCopy\\.(?:exportDossier|exportList|exportSummary)\\}/);
+ }
 });
