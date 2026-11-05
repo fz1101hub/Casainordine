@@ -18,4 +18,7 @@ test('stored category and frequency codes have six localized display labels',()=
 test('supplier and bill forms render translated labels without changing persisted codes',()=>{
  assert.ok(page.includes("value={cat}>{tr('billCategory.'+cat)}"));
  assert.ok(page.includes("value={f.value}>{tr('billFrequency.'+f.value)}"));
+ assert.equal(page.split("categories.map(c=><option key={c} value={c}>{tr('billCategory.'+c)}</option>)").length-1,2,'both bill and utility dialogs must localize categories');
+ assert.ok(!page.includes('categories.map(c=><option key={c}>{c}</option>)'));
+
 });
