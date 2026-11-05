@@ -30,6 +30,12 @@ test('currency remains EUR; number formatting adapts to locale',()=>{
  assert.match(formatMoney(12345.5,'en'),/12,345.50/);
  assert.match(formatMoney(12345.5,'de'),/12.345,50/);
  assert.equal(localeFor('es'),'es-ES');
+ for(const lang of LANGUAGES.map(x=>x.code)){
+  for(const missing of [null,undefined,'','  ','not-a-number',Infinity,NaN])assert.equal(formatMoney(missing,lang),'—',lang+': '+String(missing));
+  assert.notEqual(formatMoney(0,lang),'—',lang+' zero is a real value');
+  assert.notEqual(formatMoney('0',lang),'—',lang+' numeric string zero');
+  assert.notEqual(formatMoney('12.50',lang),'—',lang+' numeric amount');
+ }
 });
 test('date formatting adapts; invalid inputs do not crash',()=>{
  assert.match(formatDate('2026-11-04','en'),/Nov/);
