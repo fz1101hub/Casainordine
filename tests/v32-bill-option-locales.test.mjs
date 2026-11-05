@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {t} from '../lib/i18n.mjs';
+import {translate} from '../lib/i18n.mjs';
 
 const page=readFileSync(new URL('../app/page.jsx',import.meta.url),'utf8');
 const languages=['it','en','es','fr','de','pt'];
@@ -10,8 +10,8 @@ const frequencies=['none','monthly','bimonthly','quarterly','yearly','biennial']
 
 test('stored category and frequency codes have six localized display labels',()=>{
  for(const lang of languages){
-  for(const category of categories){const key='billCategory.'+category;assert.notEqual(t(lang,key),key,lang+' '+key);}
-  for(const frequency of frequencies){const key='billFrequency.'+frequency;assert.notEqual(t(lang,key),key,lang+' '+key);}
+  for(const category of categories){const key='billCategory.'+category;assert.notEqual(translate(lang,key),key,lang+' '+key);}
+  for(const frequency of frequencies){const key='billFrequency.'+frequency;assert.notEqual(translate(lang,key),key,lang+' '+key);}
  }
 });
 
