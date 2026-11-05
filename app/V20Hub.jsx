@@ -36,7 +36,7 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   const next={};for(let i=0;i<specs.length;i++)next[specs[i][0]]=res[i].data||[];
   next.alerts=res[specs.length].data||[];next.connections=res[specs.length+1].data||[];next.preferences=res[specs.length+2].data||null;
   setRows(next);setLoading(false);
- },[client,homeId,user?.id]);
+ },[client,homeId,user?.id,language]);
  useEffect(()=>{load();},[load]);
  useEffect(()=>{if(tab==='offline'){listDrafts().then(setDrafts).catch(e=>setOfflineError(e.message));}},[tab]);
  const common={user_id:user?.id,home_id:homeId||null};
