@@ -11,7 +11,7 @@ const initial={assets:[],properties:[],events:[],docs:[],contracts:[],emergency:
 function Item({children,actions}){return <div className="extra-item"><div>{children}</div><div className="extra-buttons">{actions}</div></div>}
 function Field({label,children}){return <label className="extra-field">{label}{children}</label>}
 function Card({title,children}){return <section className="panel extra-panel"><h2>{title}</h2>{children}</section>}
-function DownloadJson({name,object,label='Esporta JSON'}){return <button className="btn btn-soft" type="button" onClick={()=>{const blob=new Blob([JSON.stringify(object,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);}}><Download size={16}/>{label}</button>}
+function DownloadJson({name,object,label}){return <button className="btn btn-soft" type="button" onClick={()=>{const blob=new Blob([JSON.stringify(object,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);}}><Download size={16}/>{label}</button>}
 function QrPreview({asset,copy}){
  const [image,setImage]=useState('');const url=typeof window!=='undefined'?assetQrUrl(window.location.origin,asset.id):null;
  useEffect(()=>{let live=true;setImage('');if(!url)return;import('qrcode').then(m=>m.default.toDataURL(url,{errorCorrectionLevel:'M',width:220,margin:2})).then(data=>{if(live)setImage(data)}).catch(()=>{});return()=>{live=false}},[url]);
