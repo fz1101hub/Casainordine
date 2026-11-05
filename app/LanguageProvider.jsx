@@ -22,6 +22,7 @@ export function LanguageProvider({children}){
  const [saveError,setSaveError]=useState('');
  const authRequest=useRef(0);
  const selectionEpoch=useRef(0);
+ const currentAccount=useRef(null);
  useEffect(()=>{
   setLanguageState(deviceLanguage());
   const client=db();
@@ -30,9 +31,10 @@ export function LanguageProvider({children}){
   const load=async(user)=>{
    const request=++authRequest.current;
    const epoch=selectionEpoch.current;
-   setAccountId(user?.id||null);
+   currentAccount.current=user?.id||null;
+   setAccountId(currentAccount.current);
    setSaveError('');
-   if(!user){if(active)setLanguageState(deviceLanguage());return;}
+   if(!user){if(active&&request===authRequest.current&&selectionEpoch.current===epoch)setLanguageState(deviceLanguage());return;}
    const {data,error}=await client.from('user_language_preferences')
     .select('language').eq('user_id',user.id).maybeSingle();
    if(!active||request!==authRequest.current)return;
@@ -53,16 +55,17 @@ export function LanguageProvider({children}){
  },[language]);
  const setLanguage=useCallback(async(code)=>{
   const next=normalizeLanguage(code);
-  selectionEpoch.current++;
+  const epoch=++selectionEpoch.current;
+  const selectedAccount=accountId;
   setLanguageState(next);setSaveError('');
   try{localStorage.setItem(languageStorageKey(accountId),next);}catch{}
-  if(!accountId)return true;
+  if(!selectedAccount)return true;
   const client=db();
-  if(!client)return false;
+  if(!client){if(selectionEpoch.current===epoch&&currentAccount.current===selectedAccount)setSaveError(translate(next,'settings.language.error'));return false;}
   const {error}=await client.from('user_language_preferences').upsert({
-   user_id:accountId,language:next,updated_at:new Date().toISOString()
+   user_id:selectedAccount,language:next,updated_at:new Date().toISOString()
   },{onConflict:'user_id'});
-  if(error){setSaveError(translate(next,'settings.language.error'));return false;}
+  if(error){if(selectionEpoch.current===epoch&&currentAccount.current===selectedAccount)setSaveError(translate(next,'settings.language.error'));return false;}
   return true;
  },[accountId]);
  const value=useMemo(()=>({
