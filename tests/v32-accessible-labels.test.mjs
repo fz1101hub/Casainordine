@@ -20,6 +20,6 @@ test('main page and HomeExtra use translated accessible labels',()=>{
   assert.doesNotMatch(page,new RegExp('(?:aria-label|title)="'+label+'"'));
  }
  assert.doesNotMatch(extra,/title="Elimina"/);
- assert.match(page,/function Toast\\(\\{message,onClose\\}\\) \\{ const \\{t\\}=useLanguage\\(\\)/);
- assert.match(extra,/title=\\{tr\\('ui.delete'\\)\\}/);
+ assert.match(page,/function Toast\(\{message,onClose\}\) \{ const \{t\}=useLanguage\(\)/);
+ assert.match(extra,/title=\{tr\('ui.delete'\)\}/);
 });
