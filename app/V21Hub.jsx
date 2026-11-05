@@ -31,7 +31,7 @@ export default function V21Hub({client,user,homeId,canWrite,demo,bills=[],tasks=
  const [scenario,setScenario]=useState({monthlyBaseline:'500',consumptionShare:'30',consumptionReduction:'15',otherDelta:'0',unexpectedCost:'0',months:'12'});
  const [propertyId,setPropertyId]=useState(''),[address,setAddress]=useState(false),[serials,setSerials]=useState(false);
  const [selectedAsset,setSelectedAsset]=useState(()=>typeof window!=='undefined'?new URLSearchParams(location.search).get('asset')||'':'');
- const scope=q=>homeId?q.eq('home_id',homeId):q.is('home_id',null);
+ const scope=q=>homeId?q.eq('home_id',homeId):q.eq('user_id',user?.id).is('home_id',null);
  const load=useCallback(async()=>{
   if(!client){setLoading(false);return;}setLoading(true);
   const tables={assets:'maintenance_assets',properties:'home_properties',events:'maintenance_events',docs:'home_documents',contracts:'home_contracts',emergency:'home_emergency_cards',inventory:'home_inventory_items',vacations:'home_vacation_plans',decisions:'home_decisions',refunds:'home_refund_expectations'};
