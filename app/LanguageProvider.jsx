@@ -31,8 +31,13 @@ export function LanguageProvider({children}){
   const load=async(user)=>{
    const request=++authRequest.current;
    const epoch=selectionEpoch.current;
-   currentAccount.current=user?.id||null;
-   setAccountId(currentAccount.current);
+   const nextAccount=user?.id||null;
+   if(currentAccount.current!==nextAccount){
+    // Never display the previous account's language while the new preference is loading.
+    setLanguageState(nextAccount?accountLanguage(nextAccount):deviceLanguage());
+   }
+   currentAccount.current=nextAccount;
+   setAccountId(nextAccount);
    setSaveError('');
    if(!user){if(active&&request===authRequest.current&&selectionEpoch.current===epoch)setLanguageState(deviceLanguage());return;}
    const {data,error}=await client.from('user_language_preferences')
