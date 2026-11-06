@@ -20,3 +20,9 @@ test('import integration ternaries evaluate translations rather than string lite
   assert.ok(!page.includes("'{tr('connect."+key+"')}'"));
  }
 });
+
+test('copy-key notification is a valid evaluated translation expression',()=>{
+ assert.ok(page.includes("notify(tr('connect.keyCopied'))"));
+ assert.ok(!page.includes("notify('{tr('"));
+ assert.ok(!/'\\{tr\\('[^']+'\\)\\}'/.test(page));
+});
