@@ -194,29 +194,29 @@ export default function Page() {
   function writeDemo(next) {setData(next);localStorage.setItem('casainordine-demo-v1',JSON.stringify(next));}
   function localUpdate(key,fn) {writeDemo({...data,[key]:fn(data[key])});}
   async function updateRow(table,id,patch,key=table) {
-    if(!canWrite){notify('Il ruolo di lettura non consente modifiche.');return false;}
+    if(!canWrite){notify(tr('v32.feedback.1'));return false;}
     if (demo) {localUpdate(key,rows=>rows.map(x=>x.id===id?{...x,...patch}:x));return true;}
     const {error} = await client.from(table).update(patch).eq('id',id);
     if(error) {notify(error.message);return false;} await reload();return true;
   }
   async function deleteRow(table,id,key=table) {
-    if(!canWrite){notify('Il ruolo di lettura non consente modifiche.');return;}
+    if(!canWrite){notify(tr('v32.feedback.1'));return;}
     if (!window.confirm('Vuoi eliminare questo elemento?')) return;
-    if(demo){localUpdate(key,rows=>rows.filter(x=>x.id!==id));notify('Elemento eliminato.');return;}
+    if(demo){localUpdate(key,rows=>rows.filter(x=>x.id!==id));notify(tr('v32.feedback.2'));return;}
     const {error}=await client.from(table).delete().eq('id',id);
-    if(error)notify(error.message);else{await reload();notify('Elemento eliminato.');}
+    if(error)notify(error.message);else{await reload();notify(tr('v32.feedback.2'));}
   }
   async function saveBill(e) {
-    e.preventDefault();if(!canWrite)return notify('Ruolo di sola lettura.');
+    e.preventDefault();if(!canWrite)return notify(tr('v32.feedback.3'));
     if(form.source==='document'&&['ricevuta','sollecito'].includes(form.import_document_type)){
       const label=form.import_document_type==='ricevuta'?'una ricevuta di pagamento':'un sollecito già potenzialmente registrato';
       if(!window.confirm(`Questo file sembra ${label}. Vuoi davvero aggiungerlo come nuova bolletta da monitorare?`))return;
     }
     setBusy(true);
     const amount=Number(form.amount);
-    if(!Number.isFinite(amount)||amount<0||!normalizeDate(form.due_date)){notify('Controlla importo e scadenza.');setBusy(false);return;}
+    if(!Number.isFinite(amount)||amount<0||!normalizeDate(form.due_date)){notify(tr('v32.feedback.4'));setBusy(false);return;}
     const item={title:form.title.trim(),supplier:form.supplier.trim(),category:form.category,amount,due_date:form.due_date,paid_at:form.paid?new Date().toISOString():null,is_estimate:false,source:form.source==='document'?'document':'manual',...(form.source==='document'&&form.external_id?{external_id:form.external_id}:{})};
-    if(item.source==='document' && data.bills.some(b=>b.source==='document'&&b.external_id===item.external_id)){notify('Questa bolletta è già stata importata.');setBusy(false);return;}
+    if(item.source==='document' && data.bills.some(b=>b.source==='document'&&b.external_id===item.external_id)){notify(tr('v32.feedback.5'));setBusy(false);return;}
     let savedBillId=null;
     if(demo)localUpdate('bills',x=>[...x,{...item,id:uuid()}]);
     else {const {data:created,error}=await client.from('bills').insert({...item,user_id:user.id,home_id:activeHomeId}).select('id').single(); if(error){notify(error.code==='23505'?'Questa bolletta è già stata importata.':error.message);setBusy(false);return;}savedBillId=created.id;await reload();}
@@ -242,9 +242,9 @@ export default function Page() {
     setModal(null);setBusy(false);notify(postSaveWarning||'Bolletta salvata.');
   }
   async function saveUtility(e) {
-    e.preventDefault();if(!canWrite)return notify('Ruolo di sola lettura.');setBusy(true);
+    e.preventDefault();if(!canWrite)return notify(tr('v32.feedback.3'));setBusy(true);
     const estimated_amount=Number(form.estimated_amount);
-    if(!Number.isFinite(estimated_amount)||estimated_amount<0||!normalizeDate(form.next_due_date)){notify('Controlla importo e data.');setBusy(false);return;}
+    if(!Number.isFinite(estimated_amount)||estimated_amount<0||!normalizeDate(form.next_due_date)){notify(tr('v32.feedback.6'));setBusy(false);return;}
     const billing_day=Number(form.next_due_date.split('-')[2]);
     const item={supplier:form.supplier.trim(),category:form.category,account_reference:form.account_reference.trim(),estimated_amount,frequency:form.frequency,next_due_date:form.next_due_date,billing_day,active:true};
     const initialBill={title:`${item.category} · ${item.supplier}`,supplier:item.supplier,category:item.category,amount:estimated_amount,due_date:item.next_due_date,is_estimate:true,paid_at:null,source:'recurring'};
@@ -258,25 +258,25 @@ export default function Page() {
       else if(following){await client.from('utilities').update({next_due_date:following}).eq('id',created.id);}
       await reload();
     }
-    setModal(null);setBusy(false);notify('Utenza aggiunta. La prima scadenza è stata creata come importo stimato.');
+    setModal(null);setBusy(false);notify(tr('v32.feedback.7'));
   }
   async function saveTask(e) {
-    e.preventDefault();if(!canWrite)return notify('Ruolo di sola lettura.');setBusy(true);
+    e.preventDefault();if(!canWrite)return notify(tr('v32.feedback.3'));setBusy(true);
     const item={title:form.title.trim(),due_date:form.due_date||null,done_at:null,...(activeHomeId?{assigned_to:form.assigned_to||null}:{})};
     if(demo)localUpdate('tasks',x=>[...x,{...item,id:uuid()}]);
     else {const {error}=await client.from('house_tasks').insert({...item,user_id:user.id,home_id:activeHomeId});if(error){notify(error.message);setBusy(false);return;}await reload();}
-    setModal(null);setBusy(false);notify('Attività aggiunta.');
+    setModal(null);setBusy(false);notify(tr('v32.feedback.8'));
   }
   async function addSupplier(e){
     e.preventDefault();
     const name=supplierForm.name.trim(), address=supplierForm.sender_email.trim().toLowerCase();
-    if(name.length<3||name.length>120){notify('Inserisci il nome del fornitore (minimo 3 caratteri).');return;}
-    if(address&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)){notify('Indirizzo mittente non valido.');return;}
-    if((data.suppliers||[]).some(s=>s.name.toLowerCase()===name.toLowerCase()&&s.category===supplierForm.category)){notify('Fornitore già presente.');return;}
+    if(name.length<3||name.length>120){notify(tr('v32.feedback.9'));return;}
+    if(address&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)){notify(tr('v32.feedback.10'));return;}
+    if((data.suppliers||[]).some(s=>s.name.toLowerCase()===name.toLowerCase()&&s.category===supplierForm.category)){notify(tr('v32.feedback.11'));return;}
     const item={name,category:supplierForm.category,sender_email:address||null};
     if(demo)localUpdate('suppliers',rows=>[...(rows||[]),{id:uuid(),...item}]);
     else {const {error}=await client.from('user_suppliers').insert({...item,user_id:user.id});if(error){notify(error.message);return;}await reload();}
-    setSupplierForm({...supplierForm,name:'',sender_email:''});notify('Fornitore aggiunto ai suggerimenti per la ricerca email.');
+    setSupplierForm({...supplierForm,name:'',sender_email:''});notify(tr('v32.feedback.12'));
   }
   function prepareRatePlan(text,source,partial=false){
     const result=parseRatePlanText(text,{unitFilter:rateUnit});
@@ -285,14 +285,14 @@ export default function Page() {
     notify(`${result.rows.length} rate proposte: controlla tutti i dati prima di salvare.`);
   }
   async function importBillFromText(){
-    if(billPaste.trim().length<25){notify('Incolla almeno qualche riga del documento.');return;}
-    if(billPaste.length>60000){notify('Il testo è troppo lungo (massimo 60.000 caratteri).');return;}
+    if(billPaste.trim().length<25){notify(tr('v32.feedback.13'));return;}
+    if(billPaste.length>60000){notify(tr('v32.feedback.14'));return;}
     const details=extractBillFields(billPaste);
     const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(billPaste));
     const fingerprint=Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
-    if(data.bills.some(b=>b.source==='document'&&b.external_id===fingerprint)){notify('Testo già importato.');return;}
+    if(data.bills.some(b=>b.source==='document'&&b.external_id===fingerprint)){notify(tr('v32.feedback.15'));return;}
     setForm({...billDefault,title:details.title,supplier:details.supplier,category:details.category,amount:details.amount??'',due_date:details.due_date||'',paid:false,source:'document',external_id:fingerprint,import_file:'Testo incollato',import_document_type:details.documentType,import_warnings:details.warnings,ibanCandidate:details.ibanCandidate});
-    setModal('bill');notify('Verifica i dati proposti dal testo prima di salvare.');
+    setModal('bill');notify(tr('v32.feedback.16'));
   }
   async function rateFileImport(event){
     const file=event.target.files?.[0];event.target.value='';if(!file)return;
@@ -302,14 +302,14 @@ export default function Page() {
     finally{setDocumentState({busy:false,message:''});}
   }
   async function saveRatePlan(){
-    if(!canWrite)return notify('Ruolo di sola lettura.');
+    if(!canWrite)return notify(tr('v32.feedback.3'));
     const selected=ratePlan?.rows.filter(r=>r.selected)||[];
-    if(!selected.length){notify('Seleziona almeno una rata.');return;}
-    if(selected.length>120){notify('Massimo 120 rate per importazione.');return;}
+    if(!selected.length){notify(tr('v32.feedback.17'));return;}
+    if(selected.length>120){notify(tr('v32.feedback.18'));return;}
     const supplier=rateSupplier.trim()||'Condominio';
-    if(selected.some(r=>!r.title.trim()||!normalizeDate(r.due_date)||!Number.isFinite(Number(r.amount))||Number(r.amount)<=0)){notify('Correggi titolo, data e importo di tutte le rate selezionate.');return;}
+    if(selected.some(r=>!r.title.trim()||!normalizeDate(r.due_date)||!Number.isFinite(Number(r.amount))||Number(r.amount)<=0)){notify(tr('v32.feedback.19'));return;}
     const unique=new Set(selected.map(r=>`${r.due_date}:${Number(r.amount)}`));
-    if(unique.size!==selected.length){notify('Ci sono rate duplicate nella selezione: verifica date e importi.');return;}
+    if(unique.size!==selected.length){notify(tr('v32.feedback.20'));return;}
     // Same imported rate is identified by source + date + amount; repeat uploads are idempotent.
     const items=selected.map(r=>({title:r.title.trim(),supplier,category:'Condominio',amount:Number(r.amount),due_date:r.due_date,paid_at:null,source:'document',is_estimate:false,
       external_id:`rate:${supplier.toLowerCase().slice(0,60)}:${r.due_date}:${Number(r.amount).toFixed(2)}`}));
@@ -317,7 +317,7 @@ export default function Page() {
     try{
       const existing=new Set((data.bills||[]).filter(b=>b.source==='document'&&b.external_id?.startsWith('rate:')).map(b=>b.external_id));
       const todo=items.filter(b=>!existing.has(b.external_id));
-      if(!todo.length){notify('Tutte le rate selezionate sono già state importate.');return;}
+      if(!todo.length){notify(tr('v32.feedback.21'));return;}
       if(demo)localUpdate('bills',rows=>[...rows,...todo.map(row=>({...row,id:uuid()}))]);
       else {const {error}=await client.from('bills').upsert(todo.map(item=>({...item,user_id:user.id,home_id:activeHomeId})),{onConflict:'user_id,source,external_id',ignoreDuplicates:true});if(error)throw error;await reload();}
       setRatePlan(null);notify(`Importate fino a ${todo.length} nuove scadenze condominiali.`);
@@ -332,7 +332,7 @@ export default function Page() {
   async function pay(bill) {const ok=await updateRow('bills',bill.id,{paid_at:bill.paid_at?null:new Date().toISOString()});if(ok)notify(bill.paid_at?'Riaperta come da pagare.':'Pagamento registrato.');}
   async function toggleTask(t) {await updateRow('house_tasks',t.id,{done_at:t.done_at?null:new Date().toISOString()},'tasks');}
   async function csvImport(event) {
-    if(!canWrite)return notify('Ruolo di sola lettura.');
+    if(!canWrite)return notify(tr('v32.feedback.3'));
     const file=event.target.files?.[0];if(!file)return;
     try {
       const text=await file.text(),{bills,errors}=parseBillsCsv(text);
@@ -345,28 +345,28 @@ export default function Page() {
     finally{event.target.value='';}
   }
   async function documentImport(event) {
-    if(!canWrite)return notify('Ruolo di sola lettura.');
+    if(!canWrite)return notify(tr('v32.feedback.3'));
     const file=event.target.files?.[0];
     event.target.value='';
     if(!file||documentState.busy)return;
-    if(file.size>15*1024*1024){notify('Il documento deve essere più piccolo di 15 MB.');return;}
+    if(file.size>15*1024*1024){notify(tr('v32.feedback.22'));return;}
     setDocumentState({busy:true,message:'Preparazione del documento…'});
     try{
       const {readBillDocument,documentFingerprint}=await import('../lib/document-reader.js');
       const fingerprint=await documentFingerprint(file);
       const already=data.bills.some(b=>b.source==='document'&&b.external_id===fingerprint);
-      if(already){notify('Questo documento è già presente tra le tue bollette.');return;}
+      if(already){notify(tr('v32.feedback.23'));return;}
       if(!demo){
         const {data:existing,error}=await client.from('bills').select('id').eq('source','document').eq('external_id',fingerprint).maybeSingle();
         if(error)throw new Error(error.message);
-        if(existing){notify('Questo documento è già presente tra le tue bollette.');return;}
+        if(existing){notify(tr('v32.feedback.23'));return;}
       }
       const extracted=await readBillDocument(file,message=>setDocumentState({busy:true,message}));
       setForm({...billDefault,title:extracted.title,supplier:extracted.supplier,category:extracted.category,
         amount:extracted.amount??'',due_date:extracted.due_date||'',paid:false,
         source:'document',external_id:fingerprint,import_file:file.name,import_document_type:extracted.documentType,import_warnings:extracted.warnings,ibanCandidate:extracted.ibanCandidate});
       setModal('bill');
-      notify('Ho preparato i dati rilevati. Controllali prima di salvare.');
+      notify(tr('v32.feedback.24'));
     }catch(error){notify(`Non riesco a leggere il documento: ${error.message}`);}
     finally{setDocumentState({busy:false,message:''});}
   }
@@ -376,11 +376,11 @@ export default function Page() {
       const {readBillDocument,documentFingerprint}=await import('../lib/document-reader.js');
       const fingerprint=await documentFingerprint(file);
       if(data.bills.some(b=>b.source==='document'&&b.external_id===fingerprint)){
-        notify('Questa bolletta è già stata salvata. Puoi scartare la copia in attesa.');return;
+        notify(tr('v32.feedback.25'));return;
       }
       const {data:existing,error}=await client.from('bills').select('id').eq('source','document').eq('external_id',fingerprint).maybeSingle();
       if(error)throw error;
-      if(existing){notify('Questa bolletta è già stata importata. Puoi scartare la copia in attesa.');return;}
+      if(existing){notify(tr('v32.feedback.26'));return;}
       const extracted=await readBillDocument(file,message=>setDocumentState({busy:true,message}));
       const suggested=document.suggestion||{};
       setForm({...billDefault,title:extracted.title||suggested.title||'',supplier:extracted.supplier||suggested.supplier||suggested.learned_supplier_hint||'',
@@ -388,7 +388,7 @@ export default function Page() {
         amount:extracted.amount??suggested.amount??'',due_date:extracted.due_date||suggested.due_date||'',
         paid:false,source:'document',external_id:fingerprint,mail_doc_id:document.id,import_file:file.name,
         import_document_type:extracted.documentType,ibanCandidate:extracted.ibanCandidate,mailSender:document.sender||'',mailSenderAuth:suggested.sender_auth==='reported_fail'?'fail':'unknown',import_warnings:[...(extracted.warnings||[]),...(suggested.learned_supplier_hint?[`Mittente associato in passato a ${suggested.learned_supplier_hint} (${suggested.sender_match==='exact'?'indirizzo esatto':'dominio'}). Controlla che sia lo stesso fornitore.`]:[]),...(suggested.sender_auth==='reported_fail'?['Attenzione: autenticazione del mittente non superata secondo gli header disponibili.']:[])]});
-      setModal('bill');notify('Controlla importo e scadenza prima del salvataggio.');
+      setModal('bill');notify(tr('v32.feedback.27'));
     }catch(e){notify(`Documento email non leggibile: ${e.message}`);}
     finally{setDocumentState({busy:false,message:''});}
   }
@@ -398,8 +398,8 @@ export default function Page() {
     const payload=await response.json();if(!response.ok)throw new Error(payload.error||'Errore');return payload;
   }
   async function loadIntegration() {if(demo)return;try{setIntegration(await authApi());}catch(e){notify(e.message);}}
-  async function generateToken() {try{const p=await authApi('POST');setNewToken(p.token);await loadIntegration();notify('Chiave generata. Copiala ora, perché non sarà mostrata di nuovo.');}catch(e){notify(e.message);}}
-  async function revokeToken() {if(!window.confirm('Revocare la chiave di importazione automatica?'))return;try{await authApi('DELETE');setNewToken('');await loadIntegration();notify('Chiave revocata.');}catch(e){notify(e.message);}}
+  async function generateToken() {try{const p=await authApi('POST');setNewToken(p.token);await loadIntegration();notify(tr('v32.feedback.28'));}catch(e){notify(e.message);}}
+  async function revokeToken() {if(!window.confirm('Revocare la chiave di importazione automatica?'))return;try{await authApi('DELETE');setNewToken('');await loadIntegration();notify(tr('v32.feedback.29'));}catch(e){notify(e.message);}}
   async function toggleEmails() {
     const enabled=!data.profile?.reminders_enabled;
     if(demo){writeDemo({...data,profile:{...data.profile,reminders_enabled:enabled}});return;}
@@ -436,7 +436,7 @@ export default function Page() {
   const monthly=recentMonths.map(m=>({label:new Date(`${m}-01T12:00:00Z`).toLocaleDateString('it-IT',{month:'short',timeZone:'UTC'}), total:bills.filter(b=>b.due_date.startsWith(m)).reduce((sum,b)=>sum+Number(b.amount),0)}));
   const maxMonthly=Math.max(...monthly.map(x=>x.total),1);
   const displayName=(data.profile?.full_name||user?.email?.split('@')[0]||'').split(' ')[0];
-  function openModal(type){if(!canWrite){notify('Questa casa è in sola lettura.');return;}setForm({...({bill:billDefault,utility:utilityDefault,task:taskDefault}[type])});setModal(type);}
+  function openModal(type){if(!canWrite){notify(tr('v32.feedback.30'));return;}setForm({...({bill:billDefault,utility:utilityDefault,task:taskDefault}[type])});setModal(type);}
   function changePage(id){setTab(id);setMobile(false);setBellOpen(false);}
   function switchHome(id){setActiveHomeId(id||null);setTab(id?'dashboard':'household');setData(old=>({...old,bills:[],utilities:[],tasks:[],reminders:[]}));}
   // QR codes contain only the asset UUID. Resolve its home via RLS after login.
