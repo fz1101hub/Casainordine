@@ -33,3 +33,12 @@ test('missing nullable names are rejected and source names stay unchanged',()=>{
  assert.match(result.text,/Invoice /);
  assert.equal(result.text.split('\n')[0].split(' is due')[0].replace('The bill ','').length,160);
 });
+
+test('reminder truncation preserves complete Unicode code points',()=>{
+ const name='a'.repeat(159)+'😀'+'z';
+ const result=billReminderCopy({language:'en',name,dueDate:'2026-11-04'});
+ const rendered=result.text.split(' is due')[0].replace('The bill ','');
+ assert.equal(Array.from(rendered).length,160);
+ assert.equal(rendered,'a'.repeat(159)+'😀');
+ assert.doesNotMatch(rendered,/\uFFFD/);
+});
