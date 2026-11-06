@@ -219,7 +219,7 @@ export default function Page() {
     if(item.source==='document' && data.bills.some(b=>b.source==='document'&&b.external_id===item.external_id)){notify(tr('v32.feedback.5'));setBusy(false);return;}
     let savedBillId=null;
     if(demo)localUpdate('bills',x=>[...x,{...item,id:uuid()}]);
-    else {const {data:created,error}=await client.from('bills').insert({...item,user_id:user.id,home_id:activeHomeId}).select('id').single(); if(error){notify(error.code==='23505'?'Questa bolletta è già stata importata.':error.message);setBusy(false);return;}savedBillId=created.id;await reload();}
+    else {const {data:created,error}=await client.from('bills').insert({...item,user_id:user.id,home_id:activeHomeId}).select('id').single(); if(error){notify(error.code==='23505'?tr('v32.payment.duplicate'):error.message);setBusy(false);return;}savedBillId=created.id;await reload();}
     let postSaveWarning='';
     // A detected Italian IBAN is hashed locally and never saved in full.
     // The security check only queues a review; it does not authorize the payee or confirm payment.
@@ -233,13 +233,13 @@ export default function Page() {
         const flags=billFraudSignals({...item,id:savedBillId},data.bills,{sender:form.mailSender||'',senderAuth:form.mailSenderAuth||'unknown',ibanFingerprint:ibanHash,historicalIbanFingerprints:trusted}).flags;
         const {error:riskError}=await client.from('bill_security_reviews').insert({user_id:user.id,home_id:activeHomeId,bill_id:savedBillId,iban_fingerprint:ibanHash,iban_suffix:form.ibanCandidate.slice(-4),sender:form.mailSender||'',sender_auth:form.mailSenderAuth||'unknown',risk_flags:flags,review_status:'pending'});
         if(riskError)throw riskError;
-        if(flags.length)postSaveWarning='Bolletta salvata. Controlla gli avvisi nella sezione Antifrode.';
-      }catch(err){postSaveWarning='Bolletta salvata, ma la verifica IBAN non è stata registrata: '+err.message;}
+        if(flags.length)postSaveWarning=tr('v32.payment.fraudReview');
+      }catch(err){postSaveWarning=tr('v32.payment.ibanFailure',{error:err.message});}
     }
     if(form.mail_doc_id && !demo){
       try {const {data:{session}}=await client.auth.getSession();const response=await fetch('/api/mail/documents',{method:'PATCH',headers:{Authorization:`Bearer ${session?.access_token||''}`,'Content-Type':'application/json'},body:JSON.stringify({id:form.mail_doc_id,action:'imported',bill_id:savedBillId})});const outcome=await response.json().catch(()=>({}));if(!response.ok)throw new Error(outcome.error||'Impossibile archiviare il documento importato');if(outcome.warning)postSaveWarning=[postSaveWarning,outcome.warning].filter(Boolean).join(' · ');setMailRefresh(x=>x+1);}catch(error){postSaveWarning=`Bolletta salvata; il documento email è ancora in attesa: ${error.message}`;}
     }
-    setModal(null);setBusy(false);notify(postSaveWarning||'Bolletta salvata.');
+    setModal(null);setBusy(false);notify(postSaveWarning||tr('v32.payment.saved'));
   }
   async function saveUtility(e) {
     e.preventDefault();if(!canWrite)return notify(tr('v32.feedback.3'));setBusy(true);
@@ -329,7 +329,7 @@ export default function Page() {
     const {error}=await client.from('profiles').update(patch).eq('id',user.id);
     if(error)notify(error.message);else await reload();
   }
-  async function pay(bill) {const ok=await updateRow('bills',bill.id,{paid_at:bill.paid_at?null:new Date().toISOString()});if(ok)notify(bill.paid_at?'Riaperta come da pagare.':'Pagamento registrato.');}
+  async function pay(bill) {const ok=await updateRow('bills',bill.id,{paid_at:bill.paid_at?null:new Date().toISOString()});if(ok)notify(bill.paid_at?tr('v32.payment.reopened'):tr('v32.payment.paid'));}
   async function toggleTask(t) {await updateRow('house_tasks',t.id,{done_at:t.done_at?null:new Date().toISOString()},'tasks');}
   async function csvImport(event) {
     if(!canWrite)return notify(tr('v32.feedback.3'));
