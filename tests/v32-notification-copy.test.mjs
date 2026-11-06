@@ -53,3 +53,16 @@ test('reminder truncation does not split grapheme clusters',()=>{
  const combinedRendered=billReminderCopy({language:'en',name:combined,dueDate:'2026-11-04'}).text.split(' is due')[0].replace('The bill ','');
  if(typeof Intl.Segmenter==='function')assert.equal(combinedRendered,'a'.repeat(159)+'e\u0301');
 });
+
+test('email reminder preserves emoji joins but removes isolated joiners',()=>{
+ const family='👨‍👩‍👧‍👦';
+ const result=billReminderCopy({language:'fr',name:'Énergie '+family+'\u200d broken \u200d text',dueDate:'2026-11-04'});
+ assert.match(result.text,/Énergie 👨‍👩‍👧‍👦/);
+ assert.doesNotMatch(result.text,/👦\u200d broken|\u200d text/);
+ assert.equal(result.text.split('\n').length,3);
+});
+test('email reminder rejects names made only of direction controls and joiners',()=>{
+ for(const name of ['\u202e\u2066\u2069','\u200d\u200b\ufeff']){
+  assert.throws(()=>billReminderCopy({language:'de',name,dueDate:'2026-11-04'}),TypeError);
+ }
+});
