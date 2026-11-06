@@ -433,7 +433,7 @@ export default function Page() {
     return true;
   }).sort((a,b)=>a.due_date.localeCompare(b.due_date));
   const recentMonths=Array.from({length:6},(_,i)=>{const d=new Date(`${today.slice(0,7)}-01T12:00:00Z`);d.setUTCMonth(d.getUTCMonth()-5+i);return d.toISOString().slice(0,7);});
-  const monthly=recentMonths.map(m=>({label:new Date(`${m}-01T12:00:00Z`).toLocaleDateString('it-IT',{month:'short',timeZone:'UTC'}), total:bills.filter(b=>b.due_date.startsWith(m)).reduce((sum,b)=>sum+Number(b.amount),0)}));
+  const monthly=recentMonths.map(m=>({label:new Date(`${m}-01T12:00:00Z`).toLocaleDateString(locale,{month:'short',timeZone:'UTC'}), total:bills.filter(b=>b.due_date.startsWith(m)).reduce((sum,b)=>sum+Number(b.amount),0)}));
   const maxMonthly=Math.max(...monthly.map(x=>x.total),1);
   const displayName=(data.profile?.full_name||user?.email?.split('@')[0]||'').split(' ')[0];
   function openModal(type){if(!canWrite){notify(tr('v32.feedback.30'));return;}setForm({...({bill:billDefault,utility:utilityDefault,task:taskDefault}[type])});setModal(type);}
