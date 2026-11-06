@@ -149,7 +149,7 @@ export default function Page() {
   const reloadHomes=useCallback(async()=>{
     if(!client)return;
     const {data:membership,error}=await client.from('home_members').select('home_id,role,homes(id,name,owner_id)').order('joined_at');
-    if(error){if(error.code!=='42P01')notify(`Case condivise: ${error.message}`);return;}
+    if(error){if(error.code!=='42P01')notify(tr('v32.flow.homesError',{error:error.message}));return;}
     const allowed=membership||[];
     setHomes(allowed);
     setActiveHomeId(old=>old && !allowed.some(h=>h.home_id===old)?null:old);
@@ -167,7 +167,7 @@ export default function Page() {
       client.from('bill_summaries').select('*').order('summary_date',{ascending:false}).limit(12)
     ]);
     const err = [b,u,t,p,r,sp,sm].find(x=>x.error);
-    if (err) notify(`Errore caricamento: ${err.error.message}`);
+    if (err) notify(tr('v32.flow.loadError',{error:err.error.message}));
     setData({bills:b.data||[],utilities:u.data||[],tasks:t.data||[],suppliers:sp.data||[],summaries:sm.data||[],profile:p.data||null,
       reminders:(r.data||[]).filter(item=>item.bills&&!item.bills.paid_at&&item.bills.home_id===activeHomeId)});
   },[client,activeHomeId]);
@@ -201,7 +201,7 @@ export default function Page() {
   }
   async function deleteRow(table,id,key=table) {
     if(!canWrite){notify(tr('v32.feedback.1'));return;}
-    if (!window.confirm('Vuoi eliminare questo elemento?')) return;
+    if (!window.confirm(tr('v32.flow.deleteConfirm'))) return;
     if(demo){localUpdate(key,rows=>rows.filter(x=>x.id!==id));notify(tr('v32.feedback.2'));return;}
     const {error}=await client.from(table).delete().eq('id',id);
     if(error)notify(error.message);else{await reload();notify(tr('v32.feedback.2'));}
@@ -209,8 +209,8 @@ export default function Page() {
   async function saveBill(e) {
     e.preventDefault();if(!canWrite)return notify(tr('v32.feedback.3'));
     if(form.source==='document'&&['ricevuta','sollecito'].includes(form.import_document_type)){
-      const label=form.import_document_type==='ricevuta'?'una ricevuta di pagamento':'un sollecito già potenzialmente registrato';
-      if(!window.confirm(`Questo file sembra ${label}. Vuoi davvero aggiungerlo come nuova bolletta da monitorare?`))return;
+      const label=form.import_document_type==='ricevuta'?tr('v32.flow.receiptLabel'):tr('v32.flow.reminderLabel');
+      if(!window.confirm(tr('v32.flow.documentConfirm',{kind:label})))return;
     }
     setBusy(true);
     const amount=Number(form.amount);
@@ -254,7 +254,7 @@ export default function Page() {
       const {data:created,error}=await client.from('utilities').insert({...item,user_id:user.id,home_id:activeHomeId}).select('id').single();
       if(error){notify(error.message);setBusy(false);return;}
       const {error:billError}=await client.from('bills').insert({...initialBill,utility_id:created.id,user_id:user.id,home_id:activeHomeId});
-      if(billError){notify(`Utenza creata, ma la prima bolletta non è stata generata: ${billError.message}`);}
+      if(billError){notify(tr('v32.flow.utilityPartial',{error:billError.message}));}
       else if(following){await client.from('utilities').update({next_due_date:following}).eq('id',created.id);}
       await reload();
     }
@@ -280,7 +280,7 @@ export default function Page() {
   }
   function prepareRatePlan(text,source,partial=false){
     const result=parseRatePlanText(text,{unitFilter:rateUnit});
-    if(!result.rows.length){notify('Nessuna rata riconosciuta. Puoi incollare il testo o caricare un documento con una data e un importo per riga.');return;}
+    if(!result.rows.length){notify(tr('v32.flow.noRates'));return;}
     setRatePlan({rows:result.rows,warnings:[...result.warnings,...(partial?['PDF lungo: oltre le prime 8 pagine non sono state lette.']:[])],source});
     notify(`${result.rows.length} rate proposte: controlla tutti i dati prima di salvare.`);
   }
@@ -399,7 +399,7 @@ export default function Page() {
   }
   async function loadIntegration() {if(demo)return;try{setIntegration(await authApi());}catch(e){notify(e.message);}}
   async function generateToken() {try{const p=await authApi('POST');setNewToken(p.token);await loadIntegration();notify(tr('v32.feedback.28'));}catch(e){notify(e.message);}}
-  async function revokeToken() {if(!window.confirm('Revocare la chiave di importazione automatica?'))return;try{await authApi('DELETE');setNewToken('');await loadIntegration();notify(tr('v32.feedback.29'));}catch(e){notify(e.message);}}
+  async function revokeToken() {if(!window.confirm(tr('v32.flow.revokeConfirm')))return;try{await authApi('DELETE');setNewToken('');await loadIntegration();notify(tr('v32.feedback.29'));}catch(e){notify(e.message);}}
   async function toggleEmails() {
     const enabled=!data.profile?.reminders_enabled;
     if(demo){writeDemo({...data,profile:{...data.profile,reminders_enabled:enabled}});return;}
