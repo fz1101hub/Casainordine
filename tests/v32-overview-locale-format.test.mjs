@@ -15,7 +15,6 @@ test('all supported locales format dates and amounts without shifting ISO day',(
   assert.ok(d.includes('2026'),code);
   const money=formatMoney(1234.5,code);
   assert.ok(money.includes('€'),code);
-  assert.notEqual(formatDate('2026-02-30',code),'—'===d?d:'invalid');
   assert.equal(formatDate('2026-02-30',code),'—');
   assert.equal(formatMoney('not-a-number',code),'—');
  }
