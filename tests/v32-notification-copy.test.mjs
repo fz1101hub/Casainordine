@@ -23,3 +23,13 @@ test('email reminder names cannot inject lines or invisible formatting',()=>{
  assert.equal(result.text.split('\n').length,3);
  assert.throws(()=>billReminderCopy({language:'en',name:'\n\u200b\t',dueDate:'2026-11-04'}),TypeError);
 });
+
+test('missing nullable names are rejected and source names stay unchanged',()=>{
+ for(const name of [null,undefined])assert.throws(()=>billReminderCopy({language:'en',name,dueDate:'2026-11-04'}),TypeError);
+ const name='Invoice\u202e'+('x'.repeat(200));
+ const result=billReminderCopy({language:'en',name,dueDate:'2026-11-04'});
+ assert.doesNotMatch(result.text,/\u202e/);
+ assert.equal(name.length,208);
+ assert.match(result.text,/Invoice /);
+ assert.equal(result.text.split('\n')[0].split(' is due')[0].replace('The bill ','').length,160);
+});
