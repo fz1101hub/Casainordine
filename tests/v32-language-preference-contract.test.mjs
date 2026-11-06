@@ -32,3 +32,11 @@ test('a pending remote preference read cannot overwrite a newer manual choice',(
   assert.match(provider,/languageStorageKey\(accountId\)/);
   assert.match(provider,/\.eq\('user_id',user\.id\)/);
 });
+
+test('switching accounts resets the visible language before the remote preference read resolves',()=>{
+  assert.match(provider,/if\(currentAccount\.current!==nextAccount\)\s*\{/);
+  assert.match(provider,/setLanguageState\(nextAccount\?accountLanguage\(nextAccount\):deviceLanguage\(\)\)/);
+  const reset=provider.indexOf('setLanguageState(nextAccount?accountLanguage(nextAccount):deviceLanguage())');
+  const read=provider.indexOf("client.from('user_language_preferences')");
+  assert.ok(reset>=0&&read>reset,'account-local fallback must precede remote preference fetch');
+});
