@@ -42,3 +42,14 @@ test('reminder truncation preserves complete Unicode code points',()=>{
  assert.equal(rendered,'a'.repeat(159)+'😀');
  assert.doesNotMatch(rendered,/\uFFFD/);
 });
+
+test('reminder truncation does not split grapheme clusters',()=>{
+ const family='👨‍👩‍👧‍👦';
+ const name='a'.repeat(159)+family+'z';
+ const rendered=billReminderCopy({language:'en',name,dueDate:'2026-11-04'}).text.split(' is due')[0].replace('The bill ','');
+ if(typeof Intl.Segmenter==='function')assert.equal(rendered,'a'.repeat(159)+family);
+ else assert.equal(rendered,'a'.repeat(159)+'👨');
+ const combined='a'.repeat(159)+'e\u0301'+'z';
+ const combinedRendered=billReminderCopy({language:'en',name:combined,dueDate:'2026-11-04'}).text.split(' is due')[0].replace('The bill ','');
+ if(typeof Intl.Segmenter==='function')assert.equal(combinedRendered,'a'.repeat(159)+'e\u0301');
+});
