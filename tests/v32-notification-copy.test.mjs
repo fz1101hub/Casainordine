@@ -15,3 +15,11 @@ test('invalid dates and missing names fail closed',()=>{
 test('unsupported recipient language falls back to Italian',()=>{
  assert.deepEqual(billReminderCopy({language:'xx',name:'Test',dueDate:'2026-11-04'}),billReminderCopy({language:'it',name:'Test',dueDate:'2026-11-04'}));
 });
+
+test('email reminder names cannot inject lines or invisible formatting',()=>{
+ const result=billReminderCopy({language:'en',name:'  Electricity\r\n\turgent\u202e\u200b  ',dueDate:'2026-11-04'});
+ assert.match(result.text,/Electricity urgent/);
+ assert.doesNotMatch(result.text,/\r|\u202e|\u200b/);
+ assert.equal(result.text.split('\n').length,3);
+ assert.throws(()=>billReminderCopy({language:'en',name:'\n\u200b\t',dueDate:'2026-11-04'}),TypeError);
+});
