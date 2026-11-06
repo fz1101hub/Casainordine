@@ -282,7 +282,7 @@ export default function Page() {
     const result=parseRatePlanText(text,{unitFilter:rateUnit});
     if(!result.rows.length){notify(tr('v32.flow.noRates'));return;}
     setRatePlan({rows:result.rows,warnings:[...result.warnings,...(partial?['PDF lungo: oltre le prime 8 pagine non sono state lette.']:[])],source});
-    notify(`${result.rows.length} rate proposte: controlla tutti i dati prima di salvare.`);
+    notify(tr('v32.import.rateProposed',{count:result.rows.length}));
   }
   async function importBillFromText(){
     if(billPaste.trim().length<25){notify(tr('v32.feedback.13'));return;}
@@ -298,7 +298,7 @@ export default function Page() {
     const file=event.target.files?.[0];event.target.value='';if(!file)return;
     setDocumentState({busy:true,message:'Lettura del piano rate…'});
     try{const {readRatePlanDocument}=await import('../lib/document-reader.js');const result=await readRatePlanDocument(file,message=>setDocumentState({busy:true,message}));prepareRatePlan(result.text,file.name,result.partial);}
-    catch(e){notify(`Piano rate non leggibile: ${e.message}`);}
+    catch(e){notify(tr('v32.import.rateReadError',{detail:e.message}));}
     finally{setDocumentState({busy:false,message:''});}
   }
   async function saveRatePlan(){
@@ -320,8 +320,8 @@ export default function Page() {
       if(!todo.length){notify(tr('v32.feedback.21'));return;}
       if(demo)localUpdate('bills',rows=>[...rows,...todo.map(row=>({...row,id:uuid()}))]);
       else {const {error}=await client.from('bills').upsert(todo.map(item=>({...item,user_id:user.id,home_id:activeHomeId})),{onConflict:'user_id,source,external_id',ignoreDuplicates:true});if(error)throw error;await reload();}
-      setRatePlan(null);notify(`Importate fino a ${todo.length} nuove scadenze condominiali.`);
-    }catch(e){notify(`Importazione rate non riuscita: ${e.message}`);}
+      setRatePlan(null);notify(tr('v32.import.rateSaved',{count:todo.length}));
+    }catch(e){notify(tr('v32.import.rateSaveError',{detail:e.message}));}
     finally{setBusy(false);}
   }
   async function updateSummaryPrefs(patch){
@@ -337,11 +337,11 @@ export default function Page() {
     try {
       const text=await file.text(),{bills,errors}=parseBillsCsv(text);
       if(!bills.length) throw new Error(errors.slice(0,3).join(' · ') || 'Nessuna riga valida');
-      if(!window.confirm(`Importare ${bills.length} bollette${errors.length?` (${errors.length} righe escluse)`:''}?`))return;
+      if(!window.confirm(tr('v32.import.csvConfirm',{count:bills.length,excluded:errors.length?tr('v32.import.csvExcluded',{count:errors.length}):''})))return;
       if(demo)localUpdate('bills',x=>[...x,...bills.map(b=>({...b,id:uuid()}))]);
       else {const {error}=await client.from('bills').insert(bills.map(b=>({...b,user_id:user.id,home_id:activeHomeId})));if(error)throw error;await reload();}
-      notify(`Importate ${bills.length} bollette.${errors.length?` ${errors.length} righe ignorate.`:''}`);
-    } catch(e){notify(`Importazione non riuscita: ${e.message}`);}
+      notify(tr('v32.import.csvSaved',{count:bills.length,ignored:errors.length?tr('v32.import.csvIgnored',{count:errors.length}):''}));
+    } catch(e){notify(tr('v32.import.csvError',{detail:e.message}));}
     finally{event.target.value='';}
   }
   async function documentImport(event) {
@@ -367,7 +367,7 @@ export default function Page() {
         source:'document',external_id:fingerprint,import_file:file.name,import_document_type:extracted.documentType,import_warnings:extracted.warnings,ibanCandidate:extracted.ibanCandidate});
       setModal('bill');
       notify(tr('v32.feedback.24'));
-    }catch(error){notify(`Non riesco a leggere il documento: ${error.message}`);}
+    }catch(error){notify(tr('v32.import.documentReadError',{detail:error.message}));}
     finally{setDocumentState({busy:false,message:''});}
   }
   async function reviewEmailDocument(document, file){
@@ -389,7 +389,7 @@ export default function Page() {
         paid:false,source:'document',external_id:fingerprint,mail_doc_id:document.id,import_file:file.name,
         import_document_type:extracted.documentType,ibanCandidate:extracted.ibanCandidate,mailSender:document.sender||'',mailSenderAuth:suggested.sender_auth==='reported_fail'?'fail':'unknown',import_warnings:[...(extracted.warnings||[]),...(suggested.learned_supplier_hint?[`Mittente associato in passato a ${suggested.learned_supplier_hint} (${suggested.sender_match==='exact'?'indirizzo esatto':'dominio'}). Controlla che sia lo stesso fornitore.`]:[]),...(suggested.sender_auth==='reported_fail'?['Attenzione: autenticazione del mittente non superata secondo gli header disponibili.']:[])]});
       setModal('bill');notify(tr('v32.feedback.27'));
-    }catch(e){notify(`Documento email non leggibile: ${e.message}`);}
+    }catch(e){notify(tr('v32.import.emailReadError',{detail:e.message}));}
     finally{setDocumentState({busy:false,message:''});}
   }
   async function authApi(method='GET') {
