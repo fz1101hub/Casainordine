@@ -459,14 +459,14 @@ export default function Page() {
   },[client,user?.id,homes,activeHomeId]);
 
 
-  if(initializing)return <div className="loading"><div className="brand-icon"><House size={26}/></div><p>Caricamento della tua casa…</p></div>;
+  if(initializing)return <div className="loading"><div className="brand-icon"><House size={26}/></div><p>{tr('v32.shell.loading')}</p></div>;
   if(!demo&&!user)return <Auth client={client}/>;
   return <div className="shell">
     {mobile&&<button className="mobile-backdrop" onClick={()=>setMobile(false)} aria-label={tr('ui.closeMenu')}/>}
     <aside className={`sidebar ${mobile?'sidebar-show':''}`}>
       <div className="brand"><span className="brand-icon"><House size={22}/></span><b>Casa<span>inOrdine</span></b></div>
       <div className="sidebar-label">{activeHomeId?homeMembership?.homes?.name||"CASA CONDIVISA":"SPAZIO PERSONALE"}</div><nav className="nav">{menu.map(({id,title,icon:Icon})=><button key={id} className={`nav-item ${tab===id?'active':''}`} onClick={()=>changePage(id)}><Icon size={19}/><span>{tr('nav.'+id)}</span>{tab===id&&<span className="nav-active-indicator"/>}</button>)}</nav>
-      <div className="sidebar-spacer"/><div className="sidebar-info"><div className="sidebar-info-icon"><Bell size={18}/></div><b>Mai più una scadenza dimenticata.</b><p>Promemoria automatici 3 giorni prima, se non hai ancora pagato.</p></div>
+      <div className="sidebar-spacer"/><div className="sidebar-info"><div className="sidebar-info-icon"><Bell size={18}/></div><b>{tr('v32.shell.reminderTitle')}</b><p>{tr('v32.shell.reminderHelp')}</p></div>
       <div className="sidebar-profile"><span className="avatar"><UserRound size={18}/></span><div className="profile-copy"><b>{demo?'Modalità demo':user?.email?.split('@')[0]}</b><small>{demo?'Dati salvati in locale':'Spazio personale e privato'}</small></div>{!demo&&<button title={tr('ui.signOut')} className="icon-button" onClick={()=>client.auth.signOut()}><LogOut size={17}/></button>}</div>
     </aside>
     <main className="main">
@@ -474,7 +474,7 @@ export default function Page() {
         <div className="topbar-right"><LanguageSelector id="topbar-language" className="topbar-language" label={false}/><select className="house-switch" aria-label={tr('ui.selectSpace')} value={activeHomeId||''} onChange={e=>switchHome(e.target.value||null)}><option value="">{tr('general.private')}</option>{homes.map(h=><option key={h.home_id} value={h.home_id}>{h.homes?.name||'Casa'}</option>)}</select><span className="today-label"><CalendarDays size={16}/> <DateText iso={today}/></span><div className="bell-parent"><button className="icon-button bell-button" onClick={()=>setBellOpen(!bellOpen)} aria-label={tr('ui.reminders')}><Bell size={20}/>{data.reminders.length>0&&<span className="notification-dot"/>}</button>{bellOpen&&<div className="bell-popover"><b>Promemoria</b>{data.reminders.length?data.reminders.slice(0,6).map(r=><div className="bell-entry" key={r.id}><p><Bell size={14}/> <span><strong>Hai già effettuato il pagamento?</strong><span>{r.bills?.title||'Bolletta'} · scade il <DateText iso={r.bills?.due_date||r.reminder_date}/></span></span></p>{r.bills&&!r.bills.paid_at&&<button className="text-link" onClick={()=>{const b=bills.find(x=>x.id===r.bills.id);if(b)pay(b);setBellOpen(false);}}>Segna come pagata <Check size={13}/></button>}</div>):<p>Nessun promemoria ancora registrato.</p>}</div>}</div><span className="top-avatar"><UserRound size={18}/></span></div>
       </header>
       <div className="content">
-        {activeHomeId&&!canWrite&&<div className="informative"><ShieldCheck size={17}/><p>Hai accesso in sola lettura a questa casa. Le modifiche sono riservate al proprietario e agli editor.</p></div>}
+        {activeHomeId&&!canWrite&&<div className="informative"><ShieldCheck size={17}/><p>{tr('v32.shell.readOnly')}</p></div>}
         {demo&&<div className="demo-banner"><Info size={17}/><div><b>Anteprima interattiva.</b> Puoi provare l'app e aggiungere dati: resteranno soltanto in questo browser. Per usarla con amici, attiva Supabase e pubblicala online.</div><button onClick={()=>{localStorage.removeItem('casainordine-demo-v1');setData(fakeData());notify('Demo ripristinata.');}}>Ripristina</button></div>}
         {['insights','archive','properties','maintenance','contracts','payments','alerts'].includes(tab)&&<HomeExtra client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} bills={bills} utilities={utilities} tab={tab} onNotify={notify} onRefresh={reload}/>}
         {['tags','sos','radar','simulator','passport','vacation','inventory','decisions','briefing'].includes(tab)&&<V21Hub client={client} user={user} homeId={activeHomeId} canWrite={canWrite} demo={demo} bills={bills} tasks={tasks} tab={tab} onNotify={notify}/>}
