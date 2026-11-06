@@ -17,7 +17,7 @@ test('bill payment and IBAN-check messages exist in all six locales',()=>{
  }
 });
 test('no Italian-only payment feedback remains in live expressions',()=>{
- assert.doesNotMatch(page,/notify\\(bill\\.paid_at\\?'Riaperta come da pagare\\.'/);
+ assert.doesNotMatch(page,/notify\(bill\.paid_at\\?'Riaperta come da pagare\.'/);
  assert.doesNotMatch(page,/postSaveWarning='Bolletta salvata/);
- assert.doesNotMatch(page,/notify\\(postSaveWarning\\|\\|'Bolletta salvata\\.'/);
+ assert.doesNotMatch(page,/notify\(postSaveWarning\|\|'Bolletta salvata\.'/);
 });
