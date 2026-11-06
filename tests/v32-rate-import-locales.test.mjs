@@ -8,7 +8,7 @@ const keys=['title','help','supplier','supplierPlaceholder','unit','unitPlacehol
 test('condominium installment import has all six translations',()=>{
  for(const language of LANGUAGES){
   for(const key of keys){
-   const value=translate('rateImport.'+key,language.code);
+   const value=translate(language.code,'rateImport.'+key);
    assert.equal(typeof value,'string');
    assert.ok(value.trim().length>0,language.code+' '+key);
   }
