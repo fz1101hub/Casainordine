@@ -19,7 +19,7 @@ test('V21: all six languages have a non-empty translation for every copy key',()
 });
 
 test('V21: placeholders stay identical across translations',()=>{
-  const tokens=text=>[...text.matchAll(/\\{([a-zA-Z][a-zA-Z0-9]*)\\}/g)].map(match=>match[1]).sort();
+  const tokens=text=>[...text.matchAll(/\{([a-zA-Z][a-zA-Z0-9]*)\}/g)].map(match=>match[1]).sort();
   for(const key of keys){
     const expected=tokens(italian[key]);
     for(const language of languages){
