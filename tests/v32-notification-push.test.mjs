@@ -124,7 +124,7 @@ test('push names replace malformed UTF-16 without damaging valid emoji pairs',()
  const name='Water'+high+' bill '+low+' ⚡ '+rocket;
  const body=billDuePushCopy({language:'en',name}).body;
  assert.match(body,/Water bill ⚡ 🚀/);
- assert.equal([...body].some(ch=>{const n=ch.charCodeAt(0);return n>=0xD800&&n<=0xDFFF;}),false);
+ assert.equal([...body].some(ch=>ch.length===1 && ch.charCodeAt(0)>=0xD800 && ch.charCodeAt(0)<=0xDFFF),false);
  assert.ok(name.includes(high));
  assert.throws(()=>billDuePushCopy({name:high}),TypeError);
  assert.throws(()=>billDuePushCopy({name:low}),TypeError);
