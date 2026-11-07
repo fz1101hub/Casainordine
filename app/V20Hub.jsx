@@ -4,6 +4,7 @@ import {AlertTriangle,Check,Download,History,House,MailWarning,Plus,ShieldAlert,
 import {todayRome} from '../lib/dates.mjs';
 import {useLanguage} from './LanguageProvider';
 import {v20UiCopy} from '../lib/v20-ui-copy.mjs';
+import {localizedMoveChecklist} from '../lib/v20-move-i18n.mjs';
 import {v20MailHealthLabel} from '../lib/v20-alert-copy.mjs';
 import {missingBillCandidates,billFraudSignals,parsePagoPA,moveChecklist,savingsProjection,mailHealth} from '../lib/v20-core.mjs';
 import {readRatePlanDocument} from '../lib/document-reader.js';
@@ -60,7 +61,7 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   if(res){setIban('');setRiskPreview(null)}
  }
  async function createMove(e){e.preventDefault();const plan=await save('home_move_plans',move,ui.movePlanCreated);if(!plan)return;
-  const steps=moveChecklist(move.move_on).map(s=>({...common,plan_id:plan.id,title:s.title,due_on:s.due_on,done_at:null}));
+  const steps=localizedMoveChecklist(moveChecklist(move.move_on),language).map(s=>({...common,plan_id:plan.id,title:s.title,due_on:s.due_on,done_at:null}));
   const {error}=await client.from('home_move_steps').insert(steps);if(error)onNotify(ui.moveStepsPartial+error.message);else onNotify(ui.movePlanAndStepsCreated);await load();setMove({title:'',move_on:today(),notes:''});}
  async function parseNoticeText(value){const guess=parsePagoPA(value);setNotice(o=>({...o,notice_code:guess.noticeCode||o.notice_code,creditor_code:guess.creditorCode||o.creditor_code}));
   setNoticeMessage(guess.ambiguous?ui.multipleNoticeCodes:guess.noticeCode?ui.suggestedNoticeCode:ui.unrecognizedNoticeCode);}
