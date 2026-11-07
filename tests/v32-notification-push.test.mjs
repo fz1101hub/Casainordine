@@ -102,3 +102,18 @@ test('push rejects names containing only combining or variation marks',()=>{
  assert.match(billDuePushCopy({language:'en',name:'Électricité'}).body,/Électricité/);
  assert.match(billDuePushCopy({language:'en',name:'⚡'}).body,/⚡/);
 });
+
+test('monthly push uses singular grammar for one bill in all six languages',()=>{
+ const expected={
+  it:/1 scadenza ancora aperta/,en:/1 upcoming bill remains unpaid/,
+  es:/1 factura pendiente/,fr:/1 facture reste à payer/,
+  de:/1 Rechnung ist noch offen/,pt:/1 fatura por pagar/
+ };
+ for(const language of languages){
+  const singular=billSummaryPushCopy({language,count:1,total:12.5});
+  const plural=billSummaryPushCopy({language,count:2,total:12.5});
+  assert.match(singular.body,expected[language],language);
+  assert.doesNotMatch(plural.body,expected[language],language);
+  assert.match(singular.body,/€/);
+ }
+});
