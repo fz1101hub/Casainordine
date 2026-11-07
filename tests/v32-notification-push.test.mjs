@@ -44,3 +44,21 @@ test('push names remove bidi overrides and isolates without changing source',()=
  assert.match(name,/\u202e/);
  assert.throws(()=>billDuePushCopy({name:'\u202e\u2067\u2069'}),TypeError);
 });
+
+test('push truncation preserves emoji and combining grapheme clusters',()=>{
+ const family='👨‍👩‍👧‍👦';
+ const name='a'.repeat(159)+family+'z';
+ const rendered=billDuePushCopy({language:'en',name}).body.split(' is due')[0];
+ if(typeof Intl.Segmenter==='function')assert.equal(rendered,'a'.repeat(159)+family);
+ else assert.equal(rendered,'a'.repeat(159)+'👨');
+ const accented=billDuePushCopy({language:'en',name:'a'.repeat(159)+'e\u0301z'}).body.split(' is due')[0];
+ if(typeof Intl.Segmenter==='function')assert.equal(accented,'a'.repeat(159)+'e\u0301');
+ assert.equal(name,'a'.repeat(159)+family+'z');
+});
+test('push removes isolated joiners and rejects invisible-only names',()=>{
+ const family='👨‍👩‍👧‍👦';
+ const body=billDuePushCopy({language:'fr',name:'Eau '+family+'\u200d texte \u200d seul'}).body;
+ assert.match(body,/Eau 👨‍👩‍👧‍👦/);
+ assert.doesNotMatch(body,/👦\u200d texte|\u200d seul/);
+ assert.throws(()=>billDuePushCopy({name:'\u200d\u200b\ufeff'}),TypeError);
+});
