@@ -2,7 +2,7 @@ name: Test automatici
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/i18n-sei-lingue-v32]
   pull_request:
 
 permissions:
@@ -18,5 +18,9 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
+      - name: Installa dipendenze
+        run: npm install --no-audit --no-fund
       - name: Esegui i test di logica
         run: npm test
+      - name: Verifica build Next.js
+        run: npm run build

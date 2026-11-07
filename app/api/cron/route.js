@@ -4,20 +4,24 @@ import { shouldSendSummary, monthEndISO, upcomingSummaryBills } from '../../../l
 import { sendPush, configuredPush } from '../../../lib/push.mjs';
 import { processExtraAlerts, pushAllowed } from '../../../lib/extra-alerts.mjs';
 import { processV20Alerts } from '../../../lib/v20-alerts.mjs';
+import { billReminderCopy } from '../../../lib/notification-copy.mjs';
+import { billSummaryCopy } from '../../../lib/notification-summary.mjs';
+import { billDuePushCopy, billSummaryPushCopy } from '../../../lib/notification-push-copy.mjs';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const htmlEscape = text => String(text || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-async function emailReminder(recipient, bill) {
+async function emailReminder(recipient, bill, language='it') {
   const apiKey = process.env.RESEND_API_KEY, from = process.env.RESEND_FROM;
   if (!apiKey || !from) return {skipped:true};
   const appUrl = process.env.APP_URL?.startsWith('https://') ? process.env.APP_URL : 'http://localhost:3000';
+  const copy = billReminderCopy({language,name:bill.title,dueDate:bill.due_date});
   const response = await fetch('https://api.resend.com/emails', {
     method:'POST', headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},
     body:JSON.stringify({from,to:recipient,
-      subject:`Casa in Ordine · ${htmlEscape(bill.title)} scade tra 3 giorni`,
-      html:`<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#24323a"><h2>Hai già effettuato il pagamento?</h2><p>La scadenza <b>${htmlEscape(bill.title)}</b> (${htmlEscape(bill.supplier)}) è il <b>${htmlEscape(bill.due_date)}</b>, tra 3 giorni.</p><p>Importo: <b>${htmlEscape(euro(bill.amount))}</b>.</p><p>Se hai già pagato, entra nell'app e contrassegna la bolletta come pagata. In caso contrario, puoi organizzare il pagamento prima della scadenza.</p><p><a href="${htmlEscape(appUrl)}" style="display:inline-block;background:#156e65;color:white;padding:12px 18px;border-radius:9px;text-decoration:none">Apri Casa in Ordine</a></p><small>Puoi disattivare questi promemoria nelle Impostazioni.</small></div>`
+      subject:`Casa in Ordine · ${copy.subject}`,
+      html:`<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#24323a"><p style="white-space:pre-line">${htmlEscape(copy.text)}</p><p><a href="${htmlEscape(appUrl)}" style="display:inline-block;background:#156e65;color:white;padding:12px 18px;border-radius:9px;text-decoration:none">Casa in Ordine</a></p></div>`
     })
   });
   const result = await response.json().catch(()=>({}));
@@ -25,15 +29,15 @@ async function emailReminder(recipient, bill) {
   return {sent:true};
 }
 
-async function emailSummary(recipient, bills, today){
+async function emailSummary(recipient,bills,today,language='it'){
   const key=process.env.RESEND_API_KEY,from=process.env.RESEND_FROM;
   if(!key||!from)return {skipped:true};
   const appUrl=process.env.APP_URL?.startsWith('https://')?process.env.APP_URL:'http://localhost:3000';
-  const total=bills.reduce((n,b)=>n+Number(b.amount),0);
-  const rows=bills.map(b=>`<li>${htmlEscape(b.title)} (${htmlEscape(b.supplier)}) — ${htmlEscape(b.due_date)} — ${htmlEscape(euro(b.amount))}</li>`).join('');
+  const copy=billSummaryCopy({language,today,bills});
+  const rows=copy.rows.map(b=>`<li>${htmlEscape(b.title)} (${htmlEscape(b.supplier)}) — ${htmlEscape(b.date)} — ${htmlEscape(b.amount)}</li>`).join('');
   const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},
-    body:JSON.stringify({from,to:recipient,subject:`Casa in Ordine · Riepilogo bollette del mese (${today.slice(0,7)})`,
-      html:`<div style="font-family:Arial,sans-serif"><h2>Scadenze da oggi a fine mese</h2><p>${bills.length} bollette ancora da pagare per un totale di <strong>${htmlEscape(euro(total))}</strong>.</p><ul>${rows}</ul><p><a href="${htmlEscape(appUrl)}">Apri Casa in Ordine</a></p></div>`})});
+    body:JSON.stringify({from,to:recipient,subject:`Casa in Ordine · ${copy.subject}`,
+      html:`<div style="font-family:Arial,sans-serif"><h2>${htmlEscape(copy.heading)}</h2><p>${htmlEscape(copy.description)}</p><ul>${rows}</ul><p><a href="${htmlEscape(appUrl)}">${htmlEscape(copy.openLabel)}</a></p></div>`})});
   const body=await response.json().catch(()=>({}));
   if(!response.ok)throw new Error(String(body.message||`Email HTTP ${response.status}`).slice(0,160));
   return {sent:true};
@@ -62,10 +66,13 @@ async function notifyPushForBill(admin,bill,today,counts){
       const {data:old}=await admin.from('push_delivery_log').select('sent_at').eq('bill_id',bill.id).eq('user_id',userId).eq('reminder_date',today).maybeSingle();
       if(old?.sent_at)continue;
     }
+    const {data:languagePreference,error:languageError}=await admin.from('user_language_preferences').select('language').eq('user_id',userId).maybeSingle();
+    if(languageError){counts.errors.push(`Lingua push ${userId}: ${languageError.message}`);continue;}
+    const pushCopy=billDuePushCopy({language:languagePreference?.language||'it',name:bill.title});
     let successful=false;
     for(const device of devices){
       try{
-        await sendPush(device,{title:'Casa in Ordine · scadenza vicina',body:`${bill.title} scade tra 3 giorni. Hai già pagato?`});
+        await sendPush(device,pushCopy);
         counts.push_sent++;successful=true;
       }catch(e){
         if(e.statusCode===404||e.statusCode===410)await admin.from('push_subscriptions').delete().eq('id',device.id).eq('user_id',userId);
@@ -123,7 +130,10 @@ export async function GET(request) {
       counts.notifications_created++;
       if (profile.email) {
         try {
-          const res = await emailReminder(profile.email,bill);
+          // Language is personal; a shared home's language must never override it.
+          const {data:languagePreference,error:languageError}=await admin.from('user_language_preferences').select('language').eq('user_id',bill.user_id).maybeSingle();
+          if(languageError)throw languageError; // fail closed rather than silently send the wrong language
+          const res = await emailReminder(profile.email,bill,languagePreference?.language||'it');
           if (res.sent) {
             await admin.from('reminders').update({email_sent_at:new Date().toISOString(),email_error:null}).eq('id',reminder.id);
             counts.emails_sent++;
@@ -163,10 +173,16 @@ export async function GET(request) {
       const {data:digestPreferences}=await admin.from('user_alert_preferences').select('*').eq('user_id',profile.id).maybeSingle();
       if(configuredPush()&&pushAllowed(digestPreferences||{},'digest')){
         const {data:devices}=await admin.from('push_subscriptions').select('id,endpoint,p256dh,auth_secret').eq('user_id',profile.id).limit(10);
+        let pushCopy=null;
+        if(devices?.length){
+          const {data:languagePreference,error:languageError}=await admin.from('user_language_preferences').select('language').eq('user_id',profile.id).maybeSingle();
+          if(languageError)counts.errors.push(`Lingua push riepilogo ${profile.id}: ${languageError.message}`);
+          else pushCopy=billSummaryPushCopy({language:languagePreference?.language||'it',count:items.length,total});
+        }
         let sent=false;
-        for(const device of devices||[]){
+        for(const device of pushCopy?(devices||[]):[]){
           try{
-            await sendPush(device,{title:'Casa in Ordine · riepilogo del mese',body:`${items.length} scadenze ancora aperte, totale ${euro(total)}.`});
+            await sendPush(device,pushCopy);
             counts.summary_push_sent++;sent=true;
           }catch(e){
             if(e.statusCode===404||e.statusCode===410)await admin.from('push_subscriptions').delete().eq('id',device.id).eq('user_id',profile.id);
@@ -177,7 +193,9 @@ export async function GET(request) {
       }
       if(profile.email){
         try{
-          const result=await emailSummary(profile.email,items,today);
+          const {data:languagePreference,error:languageError}=await admin.from('user_language_preferences').select('language').eq('user_id',profile.id).maybeSingle();
+          if(languageError)throw languageError;
+          const result=await emailSummary(profile.email,items,today,languagePreference?.language||'it');
           if(result.sent){await admin.from('bill_summaries').update({email_sent_at:new Date().toISOString(),email_error:null}).eq('id',recap.id);counts.summary_emails_sent++;}
         }catch(e){await admin.from('bill_summaries').update({email_error:String(e.message).slice(0,150)}).eq('id',recap.id);counts.errors.push(`Email riepilogo ${profile.id} non riuscita`);}
       }
