@@ -70,10 +70,11 @@ test('email reminder rejects names made only of direction controls and joiners',
 
 test('recipient locale changes the rendered due date without changing the stored ISO date',()=>{
  const dueDate='2026-12-31';
- const expected={it:/31\\/12\\/2026/,en:/Dec 31, 2026|31 Dec 2026/,es:/31.*dic.*2026/i,fr:/31.*déc.*2026/i,de:/31\\.12\\.2026|31\\. Dezember 2026/,pt:/31.*dez.*2026/i};
- for(const [language,datePattern] of Object.entries(expected)){
+ const locales={it:'it-IT',en:'en-GB',es:'es-ES',fr:'fr-FR',de:'de-DE',pt:'pt-PT'};
+ for(const [language,locale] of Object.entries(locales)){
   const {text}=billReminderCopy({language,name:'Acqua',dueDate});
-  assert.match(text,datePattern,language);
+  const formatted=new Intl.DateTimeFormat(locale,{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date('2026-12-31T12:00:00Z'));
+  assert.ok(text.includes(formatted),language+' should use '+locale+' date');
   assert.match(text,/Acqua/,language);
  }
  assert.equal(dueDate,'2026-12-31');
