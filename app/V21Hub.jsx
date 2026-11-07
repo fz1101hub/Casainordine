@@ -70,7 +70,7 @@ export default function V21Hub({client,user,homeId,canWrite,demo,bills=[],tasks=
   if(typeof response==='string'){setShareLink(`${location.origin}/vacanza/${response}`);setShareText('');}
  }
  async function openAttachment(id){const document=rows.docs.find(d=>d.id===id);if(!document)return;
-  const {data,error}=await client.storage.from('house-documents').createSignedUrl(document.storage_path,60);if(error)return onNotify(error.message);window.open(data.signedUrl,'_blank','noopener,noreferrer');}
+  const {data,error}=await client.storage.from('house-documents').createSignedUrl(document.storage_path,60);if(error||!data?.signedUrl)return onNotify(briefingCopy.operationFailed);window.open(data.signedUrl,'_blank','noopener,noreferrer');}
  async function uploadInventoryPhoto(file){
   if(!file||!client||!canWrite||!user)return;
   if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size<1||file.size>10485760)return onNotify(briefingCopy.photoTypeLimit);
