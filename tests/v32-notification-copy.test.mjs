@@ -66,3 +66,15 @@ test('email reminder rejects names made only of direction controls and joiners',
   assert.throws(()=>billReminderCopy({language:'de',name,dueDate:'2026-11-04'}),TypeError);
  }
 });
+
+
+test('recipient locale changes the rendered due date without changing the stored ISO date',()=>{
+ const dueDate='2026-12-31';
+ const expected={it:/31\\/12\\/2026/,en:/Dec 31, 2026|31 Dec 2026/,es:/31.*dic.*2026/i,fr:/31.*déc.*2026/i,de:/31\\.12\\.2026|31\\. Dezember 2026/,pt:/31.*dez.*2026/i};
+ for(const [language,datePattern] of Object.entries(expected)){
+  const {text}=billReminderCopy({language,name:'Acqua',dueDate});
+  assert.match(text,datePattern,language);
+  assert.match(text,/Acqua/,language);
+ }
+ assert.equal(dueDate,'2026-12-31');
+});
