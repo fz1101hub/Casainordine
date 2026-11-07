@@ -111,3 +111,12 @@ test('V20 monitor, migration and demo fallback texts use six-language copy',()=>
  assert.match(source,/\{ui\.lastChecked\}/);
  assert.match(source,/\{ui\.demoSetupNotice\}/);
 });
+
+test('V20 regional language preferences resolve to their supported base language',()=>{
+ for(const [input,base] of [[' EN-gb ','en'],['es_ES','es'],['FR-fr','fr'],['de-DE','de'],['pt-PT','pt'],['it-IT','it']]){
+  assert.deepEqual(v20UiCopy(input),v20UiCopy(base),input);
+ }
+ for(const input of [null,undefined,42,{},'xx-XX','']){
+  assert.deepEqual(v20UiCopy(input),v20UiCopy('it'),String(input));
+ }
+});
