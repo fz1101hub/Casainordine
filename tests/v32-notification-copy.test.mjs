@@ -79,3 +79,9 @@ test('recipient locale changes the rendered due date without changing the stored
  }
  assert.equal(dueDate,'2026-12-31');
 });
+
+test('pt-PT reminder uses a natural preposition before the localized date',()=>{
+ const {text}=billReminderCopy({language:'pt',name:'Água',dueDate:'2026-12-31'});
+ assert.match(text,/A fatura Água vence em 31/);
+ assert.doesNotMatch(text,/vence a 31/);
+});
