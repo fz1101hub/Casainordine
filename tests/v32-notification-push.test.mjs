@@ -117,3 +117,12 @@ test('monthly push uses singular grammar for one bill in all six languages',()=>
   assert.match(singular.body,/€/);
  }
 });
+
+test('push names replace malformed UTF-16 without damaging valid emoji pairs',()=>{
+ const name='Water\\uD800 bill \\uDC00 ⚡ \\uD83D\\uDE80';
+ const body=billDuePushCopy({language:'en',name}).body;
+ assert.match(body,/Water bill ⚡ 🚀/);
+ assert.doesNotMatch(body,/[\\uD800-\\uDFFF]/u);
+ assert.ok(name.includes('\\uD800'));
+ assert.throws(()=>billDuePushCopy({name:'\\uD800\\uDC00'.slice(0,1)}),TypeError);
+});
