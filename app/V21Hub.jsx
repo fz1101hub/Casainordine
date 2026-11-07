@@ -47,7 +47,7 @@ export default function V21Hub({client,user,homeId,canWrite,demo,bills=[],tasks=
  },[client,homeId,user?.id,language]);
  useEffect(()=>{load()},[load]);
  const common={user_id:user?.id,home_id:homeId||null};
- async function act(operation,success){if(!client||demo)return onNotify(briefingCopy.enableDatabase);setBusy(true);try{const result=await operation();if(result?.error)throw result.error;onNotify(success);await load();return result?.data||true;}catch(e){onNotify(e.message||briefingCopy.operationFailed);return null;}finally{setBusy(false)}}
+ async function act(operation,success){if(!client||demo)return onNotify(briefingCopy.enableDatabase);setBusy(true);try{const result=await operation();if(result?.error)throw result.error;onNotify(success);await load();return result?.data||true;}catch(e){onNotify(briefingCopy.operationFailed);return null;}finally{setBusy(false)}}
  const add=(table,item,msg)=>canWrite?act(()=>client.from(table).insert({...common,...item}),msg):onNotify(briefingCopy.readOnlyHome);
  const scopedMutation=query=>homeId?query.eq('home_id',homeId):query.eq('user_id',user?.id).is('home_id',null);
  const edit=(table,id,patch,msg)=>canWrite&&user?.id?act(()=>scopedMutation(client.from(table).update(patch).eq('id',id)),msg):onNotify(briefingCopy.readOnlyHome);
