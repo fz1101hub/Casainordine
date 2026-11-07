@@ -64,7 +64,6 @@ test('push removes isolated joiners and rejects invisible-only names',()=>{
 });
 
 test('monthly push counts use recipient locale grouping without changing values',()=>{
- const expected={it:'12.345',en:'12,345',es:'12.345',fr:'12\u202f345',de:'12.345',pt:'12\u00a0345'};
  for(const language of languages){
   const copy=billSummaryPushCopy({language,count:12345,total:12.5});
   const formatted=new Intl.NumberFormat(({it:'it-IT',en:'en-GB',es:'es-ES',fr:'fr-FR',de:'de-DE',pt:'pt-PT'})[language]).format(12345);
