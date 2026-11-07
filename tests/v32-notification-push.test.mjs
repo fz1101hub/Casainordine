@@ -94,3 +94,11 @@ test('monthly push rejects fractional, unsafe and nonnumeric counts in every loc
   assert.ok(result.body.includes('€'),language);
  }
 });
+
+test('push rejects names containing only combining or variation marks',()=>{
+ for(const name of ['\u0301','\u034f','\ufe0f',' \u0301\ufe0f ']){
+  assert.throws(()=>billDuePushCopy({language:'en',name}),TypeError);
+ }
+ assert.match(billDuePushCopy({language:'en',name:'Électricité'}).body,/Électricité/);
+ assert.match(billDuePushCopy({language:'en',name:'⚡'}).body,/⚡/);
+});
