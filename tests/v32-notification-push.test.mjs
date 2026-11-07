@@ -119,10 +119,13 @@ test('monthly push uses singular grammar for one bill in all six languages',()=>
 });
 
 test('push names replace malformed UTF-16 without damaging valid emoji pairs',()=>{
- const name='Water\\uD800 bill \\uDC00 ⚡ \\uD83D\\uDE80';
+ const high=String.fromCharCode(0xD800),low=String.fromCharCode(0xDC00);
+ const rocket=String.fromCodePoint(0x1F680);
+ const name='Water'+high+' bill '+low+' ⚡ '+rocket;
  const body=billDuePushCopy({language:'en',name}).body;
  assert.match(body,/Water bill ⚡ 🚀/);
- assert.doesNotMatch(body,/[\\uD800-\\uDFFF]/u);
- assert.ok(name.includes('\\uD800'));
- assert.throws(()=>billDuePushCopy({name:'\\uD800\\uDC00'.slice(0,1)}),TypeError);
+ assert.equal([...body].some(ch=>{const n=ch.charCodeAt(0);return n>=0xD800&&n<=0xDFFF;}),false);
+ assert.ok(name.includes(high));
+ assert.throws(()=>billDuePushCopy({name:high}),TypeError);
+ assert.throws(()=>billDuePushCopy({name:low}),TypeError);
 });
