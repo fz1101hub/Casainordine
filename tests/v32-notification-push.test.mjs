@@ -77,3 +77,10 @@ test('monthly push locale follows shared language normalization for regional and
   assert.deepEqual(billSummaryPushCopy({language:tag,count:12345,total:1234.5}),billSummaryPushCopy({language,count:12345,total:1234.5}));
  }
 });
+
+test('push reminders reject missing and non-text bill names instead of displaying coerced values',()=>{
+ for(const name of [null,undefined,42,true,{},['Electricity']]){
+  assert.throws(()=>billDuePushCopy({language:'en',name}),TypeError);
+ }
+ assert.match(billDuePushCopy({language:'en',name:'Electricity'}).body,/Electricity/);
+});
