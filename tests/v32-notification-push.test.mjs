@@ -84,3 +84,13 @@ test('push reminders reject missing and non-text bill names instead of displayin
  }
  assert.match(billDuePushCopy({language:'en',name:'Electricity'}).body,/Electricity/);
 });
+
+test('monthly push rejects fractional, unsafe and nonnumeric counts in every locale',()=>{
+ for(const language of languages){
+  for(const count of [-1,0,1.5,Number.MAX_SAFE_INTEGER+1,NaN,Infinity,'2',null,undefined]){
+   assert.throws(()=>billSummaryPushCopy({language,count,total:12.5}),TypeError,language+': '+String(count));
+  }
+  const result=billSummaryPushCopy({language,count:1,total:0});
+  assert.ok(result.body.includes('€'),language);
+ }
+});
