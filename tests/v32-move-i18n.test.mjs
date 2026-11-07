@@ -23,3 +23,13 @@ test('regional locales and unsupported languages use safe fallback',()=>{
  assert.deepEqual(localizedMoveChecklist(original,'unknown'),localizedMoveChecklist(original,'it'));
  assert.deepEqual(localizedMoveChecklist(original,null),localizedMoveChecklist(original,'it'));
 });
+
+test('moving checklist accepts padded regional language preferences without mutating inputs',()=>{
+ const original=moveChecklist('2026-12-15');
+ const snapshot=structuredClone(original);
+ for(const lang of [' EN-gb ',' es-ES ',' FR_fr ',' de-DE ',' pt-PT ',' it-IT ']){
+  const normalized=lang.trim().slice(0,2).toLowerCase();
+  assert.deepEqual(localizedMoveChecklist(original,lang),localizedMoveChecklist(original,normalized));
+ }
+ assert.deepEqual(original,snapshot);
+});
