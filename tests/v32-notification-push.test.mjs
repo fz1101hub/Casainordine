@@ -71,3 +71,9 @@ test('monthly push counts use recipient locale grouping without changing values'
   assert.doesNotMatch(copy.body,/\{count\}|\{total\}/);
  }
 });
+
+test('monthly push locale follows shared language normalization for regional and unknown tags',()=>{
+ for(const [tag,language] of [['en-US','en'],['pt-BR','pt'],['de-AT','de'],['xx-XX','it']]){
+  assert.deepEqual(billSummaryPushCopy({language:tag,count:12345,total:1234.5}),billSummaryPushCopy({language,count:12345,total:1234.5}));
+ }
+});
