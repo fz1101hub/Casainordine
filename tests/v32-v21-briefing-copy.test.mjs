@@ -10,7 +10,7 @@ test('V21 briefing text and privacy copy exist in six languages',()=>{
  const keys=Object.keys(copies[0]);
  assert.equal(keys.length,220);
  for(const copy of copies){assert.deepEqual(Object.keys(copy),keys);for(const value of Object.values(copy))assert.ok(value.trim());}
- for(const key of keys)assert.ok(source.includes('briefingCopy.'+key)||source.includes('copy.'+key)||source.includes('briefingCopy[key]')||core.includes('copy?.'+key),key);
+ for(const key of keys)assert.ok(source.includes('briefingCopy.'+key)||source.includes('copy.'+key)||(['migrationRequired','operationFailed'].includes(key)&&source.includes('briefingCopy[errorKind]'))||core.includes('copy?.'+key),key);
  assert.deepEqual(v21BriefingCopy('unknown'),v21BriefingCopy('it'));
  assert.match(source,/v21BriefingCopy\(language\)/);
 });
