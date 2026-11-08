@@ -9,6 +9,7 @@ test('V21 catches rejected primary and related data reads without leaking provid
  assert.match(load,/Promise\.all\(keys\.map\(k=>Promise\.resolve\(/);
  assert.match(load,/home_decision_votes[\s\S]*?\.catch\(\(\)=>\(\{data:\[\],error:true\}\)\)/);
  assert.match(load,/home_vacation_shares[\s\S]*?\.catch\(\(\)=>\(\{data:\[\],error:true\}\)\)/);
- assert.match(load,/if\(errors\.length\)onNotify\(errors\.every\(r=>r\.error\?\.code==='42P01'\)\?briefingCopy\.migrationRequired:briefingCopy\.operationFailed\)/);
+ assert.match(load,/const errorKind=v21LoadErrorKind\(errors\)/);
+ assert.match(load,/if\(errorKind\)onNotify\(briefingCopy\[errorKind\]\)/);
  assert.doesNotMatch(load,/onNotify\([^)]*\.message/);
 });
