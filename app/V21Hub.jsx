@@ -69,8 +69,13 @@ export default function V21Hub({client,user,homeId,canWrite,demo,bills=[],tasks=
   const response=await act(()=>client.rpc('v21_create_vacation_share',{plan:sharePlan,text_to_share:shareText,hours_valid:Number(shareDuration)}),briefingCopy.shareLinkCreated);
   if(typeof response==='string'){setShareLink(`${location.origin}/vacanza/${response}`);setShareText('');}
  }
- async function openAttachment(id){const document=rows.docs.find(d=>d.id===id);if(!document)return;
-  const {data,error}=await client.storage.from('house-documents').createSignedUrl(document.storage_path,60);if(error||!data?.signedUrl)return onNotify(briefingCopy.operationFailed);window.open(data.signedUrl,'_blank','noopener,noreferrer');}
+ async function openAttachment(id){const document=rows.docs.find(d=>d.id===id);if(!document||!client)return;
+  try{
+   const {data,error}=await client.storage.from('house-documents').createSignedUrl(document.storage_path,60);
+   if(error||!data?.signedUrl)return onNotify(briefingCopy.operationFailed);
+   window.open(data.signedUrl,'_blank','noopener,noreferrer');
+  }catch(_error){onNotify(briefingCopy.operationFailed)}
+ }
  async function uploadInventoryPhoto(file){
   if(!file||!client||!canWrite||!user)return;
   if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size<1||file.size>10485760)return onNotify(briefingCopy.photoTypeLimit);
