@@ -63,7 +63,7 @@ export default function V21Hub({client,user,homeId,canWrite,demo,bills=[],tasks=
  const readonly=(!canWrite||demo||busy);
  async function saveSos(e){e.preventDefault();if(!canWrite)return;const res=sosEditing?await edit('home_emergency_cards',sosEditing,sos,briefingCopy.sosUpdated):await add('home_emergency_cards',sos,briefingCopy.sosSaved);if(res)setSosEditing(null);}
  async function offlineSos(card){try{await sealSos(card,passphrase);setPassphrase('');onNotify(briefingCopy.sosEncrypted)}catch(e){onNotify(briefingCopy.operationFailed)}}
- async function createVacation(e){e.preventDefault();await add('home_vacation_plans',{...vacation,checklist:VACATION_CHECKLIST.map(title=>({title,done:false}))},briefingCopy.vacationCreated);setVacation({title:'',starts_on:todayRome(),ends_on:todayRome(),notes:''});}
+ async function createVacation(e){e.preventDefault();const saved=await add('home_vacation_plans',{...vacation,checklist:VACATION_CHECKLIST.map(title=>({title,done:false}))},briefingCopy.vacationCreated);if(saved)setVacation({title:'',starts_on:todayRome(),ends_on:todayRome(),notes:''});}
  async function createShare(){if(!sharePlan||!shareText.trim())return onNotify(briefingCopy.chooseSharePlan);
   if(!confirm(briefingCopy.confirmShareLink))return;
   const response=await act(()=>client.rpc('v21_create_vacation_share',{plan:sharePlan,text_to_share:shareText,hours_valid:Number(shareDuration)}),briefingCopy.shareLinkCreated);
