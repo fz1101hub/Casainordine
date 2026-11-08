@@ -43,7 +43,7 @@ export default function V21Hub({client,user,homeId,canWrite,demo,bills=[],tasks=
   if(decisionIds.length){const v=await Promise.resolve(client.from('home_decision_votes').select('decision_id,user_id,choice,created_at').in('decision_id',decisionIds.slice(0,500)).limit(2000)).catch(()=>({data:[],error:true}));newRows.votes=v.data||[];if(v.error)errors.push(v);}
   if(planIds.length){const s=await Promise.resolve(client.from('home_vacation_shares').select('id,plan_id,expires_at,revoked_at,created_at').in('plan_id',planIds.slice(0,500)).order('created_at',{ascending:false}).limit(100)).catch(()=>({data:[],error:true}));newRows.shares=s.data||[];if(s.error)errors.push(s);}
   setRows(newRows);setLoading(false);
-  if(errors.length)onNotify(briefingCopy.migrationRequired);
+  if(errors.length)onNotify(errors.every(r=>r.error?.code==='42P01')?briefingCopy.migrationRequired:briefingCopy.operationFailed);
  },[client,homeId,user?.id,language]);
  useEffect(()=>{load()},[load]);
  const common={user_id:user?.id,home_id:homeId||null};
