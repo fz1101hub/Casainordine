@@ -36,12 +36,12 @@ export default function V21Hub({client,user,homeId,canWrite,demo,bills=[],tasks=
   if(!client){setLoading(false);return;}setLoading(true);
   const tables={assets:'maintenance_assets',properties:'home_properties',events:'maintenance_events',docs:'home_documents',contracts:'home_contracts',emergency:'home_emergency_cards',inventory:'home_inventory_items',vacations:'home_vacation_plans',decisions:'home_decisions',refunds:'home_refund_expectations'};
   const keys=Object.keys(tables);
-  const results=await Promise.all(keys.map(k=>scope(client.from(tables[k]).select('*')).order('created_at',{ascending:false}).limit(500)));
+  const results=await Promise.all(keys.map(k=>Promise.resolve(scope(client.from(tables[k]).select('*')).order('created_at',{ascending:false}).limit(500)).catch(()=>({data:[],error:true}))));
   const newRows={...initial};keys.forEach((k,i)=>newRows[k]=results[i].data||[]);
   const errors=results.filter(r=>r.error);
   const decisionIds=newRows.decisions.map(x=>x.id),planIds=newRows.vacations.map(x=>x.id);
-  if(decisionIds.length){const v=await client.from('home_decision_votes').select('decision_id,user_id,choice,created_at').in('decision_id',decisionIds.slice(0,500)).limit(2000);newRows.votes=v.data||[];if(v.error)errors.push(v);}
-  if(planIds.length){const s=await client.from('home_vacation_shares').select('id,plan_id,expires_at,revoked_at,created_at').in('plan_id',planIds.slice(0,500)).order('created_at',{ascending:false}).limit(100);newRows.shares=s.data||[];if(s.error)errors.push(s);}
+  if(decisionIds.length){const v=await Promise.resolve(client.from('home_decision_votes').select('decision_id,user_id,choice,created_at').in('decision_id',decisionIds.slice(0,500)).limit(2000)).catch(()=>({data:[],error:true}));newRows.votes=v.data||[];if(v.error)errors.push(v);}
+  if(planIds.length){const s=await Promise.resolve(client.from('home_vacation_shares').select('id,plan_id,expires_at,revoked_at,created_at').in('plan_id',planIds.slice(0,500)).order('created_at',{ascending:false}).limit(100)).catch(()=>({data:[],error:true}));newRows.shares=s.data||[];if(s.error)errors.push(s);}
   setRows(newRows);setLoading(false);
   if(errors.length)onNotify(briefingCopy.migrationRequired);
  },[client,homeId,user?.id,language]);
