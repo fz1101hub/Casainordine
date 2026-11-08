@@ -8,7 +8,7 @@ test('mail importer localizes unauthenticated and failed API fallback errors',()
  assert.match(source,/tr\('mail\.sessionExpired'\)/);
  assert.match(source,/tr\('mail\.operationFailed'\)/);
  assert.match(source,/const request=\(path,method,payload\)=>mailRequest\(client,path,method,payload,tr,language\)/);
- assert.match(source,/localizeMailApiMessage\(result\.error,language\)/);
+ assert.match(source,/safeMailApiMessage\(result\.error,language\)/);
  assert.doesNotMatch(source,/throw new Error\('Sessione scaduta/);
  for(const {code} of LANGUAGES){
   for(const key of ['mail.sessionExpired','mail.operationFailed']){
