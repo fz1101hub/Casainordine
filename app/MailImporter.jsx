@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Mail, RefreshCcw, Link2, Trash2, FileText, Eye, ShieldCheck, Info, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { IMAP_PROVIDERS, providerLabel } from '../lib/mail-providers.mjs';
 import {useLanguage} from './LanguageProvider';
-import {localizeMailApiMessage} from '../lib/mail-api-errors.mjs';
+import {safeMailApiMessage} from '../lib/mail-api-errors.mjs';
 
 async function mailRequest(client,path,method='GET',payload,tr,language){
   const {data:{session}}=await client.auth.getSession();
@@ -14,11 +14,7 @@ async function mailRequest(client,path,method='GET',payload,tr,language){
   });
   const result=await response.json().catch(()=>({}));
   if(!response.ok){
-    const localized=localizeMailApiMessage(result.error,language);
-    // Never surface unknown provider/server diagnostics in the UI.
-    const safe=typeof result.error==='string' && localized!==result.error;
-    const knownItalian=typeof result.error==='string' && ['Non autorizzato','ID non valido','Casella non trovata','Richiesta non valida.','Ricollega l’account prima di sincronizzare.','Sincronizzazione già eseguita recentemente. Riprova tra 5 minuti.','Scegli una bolletta da associare al pagamento.','Bolletta non trovata.','Questa bolletta è già segnata come pagata.'].includes(result.error.trim());
-    throw new Error(safe||knownItalian?localized:tr('mail.operationFailed'));
+    throw new Error(safeMailApiMessage(result.error,language)||tr('mail.operationFailed'));
   }
   return result;
 }
