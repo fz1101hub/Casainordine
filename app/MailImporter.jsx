@@ -4,6 +4,7 @@ import { Mail, RefreshCcw, Link2, Trash2, FileText, Eye, ShieldCheck, Info, Aler
 import { IMAP_PROVIDERS, providerLabel } from '../lib/mail-providers.mjs';
 import {useLanguage} from './LanguageProvider';
 import {safeMailApiMessage} from '../lib/mail-api-errors.mjs';
+import {formatMailDate} from '../lib/mail-date.mjs';
 
 async function mailRequest(client,path,method='GET',payload,tr,language){
   const {data:{session}}=await client.auth.getSession();
@@ -21,7 +22,7 @@ async function mailRequest(client,path,method='GET',payload,tr,language){
 export default function MailImporter({client,onReview,notify,refresh=0,onPaymentsChanged,bills=[]}){
   const {t:tr,money,locale,language}=useLanguage();
   const request=(path,method,payload)=>mailRequest(client,path,method,payload,tr,language);
-  const date=value=>value?new Intl.DateTimeFormat(locale,{day:'2-digit',month:'short',year:'numeric'}).format(new Date(value)):tr('mail.never');
+  const date=value=>formatMailDate(value,locale,tr('mail.never'));
   const [connections,setConnections]=useState([]),[documents,setDocuments]=useState([]),[payments,setPayments]=useState([]),[trustedSenders,setTrustedSenders]=useState([]),[billSenders,setBillSenders]=useState([]),[choices,setChoices]=useState({}),[trusted,setTrusted]=useState({}),[busy,setBusy]=useState(''),[loading,setLoading]=useState(true);
   const [imapProvider,setImapProvider]=useState('icloud'),[imapEmail,setImapEmail]=useState(''),[imapLogin,setImapLogin]=useState(''),[imapPassword,setImapPassword]=useState(''),[imapOpen,setImapOpen]=useState(false);
   async function load(){
