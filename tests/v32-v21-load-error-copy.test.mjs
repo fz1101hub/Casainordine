@@ -24,3 +24,12 @@ test('successful reads, empty results and malformed responses do not trigger mis
   assert.equal(v21LoadErrorKind([{data:[]},{error:null}]),null);
   assert.equal(v21LoadErrorKind([{error:null},{error:{code:'42P01'}}]),'migrationRequired');
 });
+
+
+test('classifier tolerates malformed provider failures without exposing raw messages',()=>{
+  assert.equal(v21LoadErrorKind([{error:'network unavailable'}]),'operationFailed');
+  assert.equal(v21LoadErrorKind([{error:{code:null,message:'private detail'}}]),'operationFailed');
+  assert.equal(v21LoadErrorKind([{error:{code:'42P01'}},{error:'timeout'}]),'operationFailed');
+  assert.equal(v21LoadErrorKind([{error:{code:'42P01'}},{data:[]}]),'migrationRequired');
+  assert.equal(v21LoadErrorKind([undefined,null,{error:false}]),null);
+});
