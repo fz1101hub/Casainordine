@@ -50,7 +50,7 @@ export default function MailImporter({client,onReview,notify,refresh=0,onPayment
   });
   const disconnect=c=>{
     if(!window.confirm(tr('mail.disconnectConfirm',{email:c.email_address})))return;
-    act(c.id,async()=>{const result=await request('connections','DELETE',{id:c.id});await load();notify(result.notice||tr('mail.disconnectDone'));});
+    act(c.id,async()=>{const result=await request('connections','DELETE',{id:c.id});await load();notify(tr('mail.disconnectDone'));});
   };
   const dismiss=d=>{
     if(!window.confirm(tr('mail.dismissConfirm')))return;
@@ -62,7 +62,7 @@ export default function MailImporter({client,onReview,notify,refresh=0,onPayment
     const result=await request('payments','PATCH',payload);
     await load();
     if(action==='confirm')await onPaymentsChanged?.();
-    notify(result.warning||tr(action==='confirm'?'mail.confirmedPayment':'mail.rejectedPayment'));
+    notify(tr(action==='confirm'?'mail.confirmedPayment':'mail.rejectedPayment'));
   });
   const revokeSender=entry=>act(`revoke-${entry.id}`,async()=>{
     await request('payments','DELETE',{id:entry.id});
