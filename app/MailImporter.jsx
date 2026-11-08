@@ -13,7 +13,13 @@ async function mailRequest(client,path,method='GET',payload,tr,language){
     ...(payload?{body:JSON.stringify(payload)}:{})
   });
   const result=await response.json().catch(()=>({}));
-  if(!response.ok)throw new Error(localizeMailApiMessage(result.error,language)||tr('mail.operationFailed'));
+  if(!response.ok){
+    const localized=localizeMailApiMessage(result.error,language);
+    // Never surface unknown provider/server diagnostics in the UI.
+    const safe=typeof result.error==='string' && localized!==result.error;
+    const knownItalian=typeof result.error==='string' && ['Non autorizzato','ID non valido','Casella non trovata','Richiesta non valida.','Ricollega l’account prima di sincronizzare.','Sincronizzazione già eseguita recentemente. Riprova tra 5 minuti.','Scegli una bolletta da associare al pagamento.','Bolletta non trovata.','Questa bolletta è già segnata come pagata.'].includes(result.error.trim());
+    throw new Error(safe||knownItalian?localized:tr('mail.operationFailed'));
+  }
   return result;
 }
 export default function MailImporter({client,onReview,notify,refresh=0,onPaymentsChanged,bills=[]}){
@@ -81,7 +87,7 @@ export default function MailImporter({client,onReview,notify,refresh=0,onPayment
     <div className="mail-privacy"><ShieldCheck size={18}/><span>{tr('mail.privacy')}</span></div>
     {loading?<p>{tr('mail.loading')}</p>:<>
       {connections.length>0&&<div className="mail-accounts">{connections.map(c=><div className="mail-account" key={c.id}>
-        <div><b><Mail size={16}/> {c.email_address} <span className="mail-provider-label">{providerLabel(c.provider)}</span></b><small>{tr('mail.lastCheck',{date:date(c.last_sync_at)})} · {tr(c.status==='active'?'mail.connected':c.status==='reconnect'?'mail.reconnect':'mail.tempError')}</small>{c.last_error&&<small className="danger-text">{c.last_error}</small>}</div>
+        <div><b><Mail size={16}/> {c.email_address} <span className="mail-provider-label">{providerLabel(c.provider)}</span></b><small>{tr('mail.lastCheck',{date:date(c.last_sync_at)})} · {tr(c.status==='active'?'mail.connected':c.status==='reconnect'?'mail.reconnect':'mail.tempError')}</small>{c.last_error&&<small className="danger-text">{tr('mail.operationFailed')}</small>}</div>
         <div className="mail-account-actions"><button className="btn btn-soft" disabled={!!busy||c.status==='reconnect'} onClick={()=>sync(c)}><RefreshCcw size={15}/> {tr(busy===c.id?'mail.checking':'mail.check')}</button><button className="icon-button danger" disabled={!!busy} onClick={()=>disconnect(c)} title={tr('mail.disconnect')} aria-label={tr('mail.disconnect')}><Trash2 size={17}/></button></div>
       </div>)}</div>}
       <div className="mail-connect-options">
