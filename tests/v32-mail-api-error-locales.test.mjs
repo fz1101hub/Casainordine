@@ -18,7 +18,7 @@ test('legacy mail API errors are localized in six languages',()=>{
 });
 
 test('mail importer applies translations to API errors using selected language',()=>{
- assert.match(source,/localizeMailApiMessage\(result\.error,language\)/);
+ assert.match(source,/safeMailApiMessage\(result\.error,language\)/);
  assert.match(source,/const \{t:tr,money,locale,language\}=useLanguage\(\)/);
  assert.match(source,/mailRequest\(client,path,method,payload,tr,language\)/);
 });
