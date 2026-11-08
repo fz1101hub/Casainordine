@@ -109,7 +109,7 @@ export default function MailImporter({client,onReview,notify,refresh=0,onPayment
         <div className="mail-document-info"><b>{p.subject||tr('mail.possiblePayment')}</b><small>{p.sender_email} · {date(p.received_at)}</small><small>{tr('mail.foundAmount')}: <strong>{money(Number(p.amount))}</strong></small>
           <label className="payment-match-label">{tr('mail.match')}
             <select value={choices[p.id]??p.bill_id??''} onChange={e=>setChoices(v=>({...v,[p.id]:e.target.value}))}>
-              <option value="">{tr('mail.selectBill')}</option>{bills.filter(b=>!b.paid_at).map(b=><option key={b.id} value={b.id}>{b.supplier} · {b.title} · {money(Number(b.amount))} · {b.due_date}</option>)}
+              <option value="">{tr('mail.selectBill')}</option>{bills.filter(b=>!b.paid_at).map(b=><option key={b.id} value={b.id}>{b.supplier} · {b.title} · {money(Number(b.amount))} · {date(b.due_date)}</option>)}
             </select>
           </label>
           <label className="payment-trust-label"><input type="checkbox" checked={!!trusted[p.id]} onChange={e=>setTrusted(v=>({...v,[p.id]:e.target.checked}))}/> {tr('mail.trust')}</label>
@@ -121,7 +121,7 @@ export default function MailImporter({client,onReview,notify,refresh=0,onPayment
       {billSenders.length?<div className="mail-accounts">{billSenders.map(s=><div key={s.id} className="mail-account"><div><b>{s.sender_email}</b><small>{tr('mail.confirmedSupplier')}: {s.supplier} · {tr(s.auth_state==='reported_pass'?'mail.dmarcPass':s.auth_state==='reported_fail'?'mail.dmarcFail':'mail.notVerifiable')} · {date(s.confirmed_at)}</small></div><button className="btn btn-soft" disabled={!!busy} onClick={()=>forgetBillSender(s)}>{tr('mail.forget')}</button></div>)}</div>:<div className="mail-empty"><Info size={18}/> {tr('mail.sendersEmpty')}</div>}
       <div className="mail-documents-head"><h3>{tr('mail.documents')} <span>{documents.length}</span></h3><p>{tr('mail.documentsHelp')}</p></div>
       {documents.length? <div className="mail-documents">{documents.map(d=><div className="mail-document" key={d.id}>
-        <span className="mail-file-icon"><FileText size={20}/></span><div className="mail-document-info"><b>{d.filename}</b><small>{d.subject||tr('mail.noSubject')} · {date(d.received_at)}</small>{d.suggestion?.amount!==null&&d.suggestion?.amount!==undefined&&<small>{tr('mail.suggested',{amount:money(Number(d.suggestion.amount)),date:d.suggestion.due_date||tr('mail.unknownDue')})}</small>}</div>
+        <span className="mail-file-icon"><FileText size={20}/></span><div className="mail-document-info"><b>{d.filename}</b><small>{d.subject||tr('mail.noSubject')} · {date(d.received_at)}</small>{d.suggestion?.amount!==null&&d.suggestion?.amount!==undefined&&<small>{tr('mail.suggested',{amount:money(Number(d.suggestion.amount)),date:d.suggestion.due_date?date(d.suggestion.due_date):tr('mail.unknownDue')})}</small>}</div>
         <div className="mail-account-actions"><button className="btn btn-soft" disabled={!!busy} onClick={()=>review(d)}><Eye size={16}/>{tr(busy===d.id?'mail.reading':'mail.verifyDocument')}</button><button className="icon-button danger" disabled={!!busy} title={tr('mail.discardDocument')} aria-label={tr('mail.discardDocument')} onClick={()=>dismiss(d)}><Trash2 size={17}/></button></div>
       </div>)}</div>:<div className="mail-empty"><Info size={19}/> {tr('mail.documentsEmpty')}</div>}
     </>}
