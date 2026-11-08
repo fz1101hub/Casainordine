@@ -62,7 +62,7 @@ export default function V21Hub({client,user,homeId,canWrite,demo,bills=[],tasks=
  const checklistCopy=Object.fromEntries(VACATION_CHECKLIST.map((item,index)=>[item,[briefingCopy.checkDoors,briefingCopy.checkPayments,briefingCopy.checkContacts,briefingCopy.checkShutoffs,briefingCopy.checkMailPets,briefingCopy.checkReturn][index]]));
  const readonly=(!canWrite||demo||busy);
  async function saveSos(e){e.preventDefault();if(!canWrite)return;const res=sosEditing?await edit('home_emergency_cards',sosEditing,sos,briefingCopy.sosUpdated):await add('home_emergency_cards',sos,briefingCopy.sosSaved);if(res)setSosEditing(null);}
- async function offlineSos(card){try{await sealSos(card,passphrase);setPassphrase('');onNotify(briefingCopy.sosEncrypted)}catch(e){onNotify(e.message)}}
+ async function offlineSos(card){try{await sealSos(card,passphrase);setPassphrase('');onNotify(briefingCopy.sosEncrypted)}catch(e){onNotify(briefingCopy.operationFailed)}}
  async function createVacation(e){e.preventDefault();await add('home_vacation_plans',{...vacation,checklist:VACATION_CHECKLIST.map(title=>({title,done:false}))},briefingCopy.vacationCreated);setVacation({title:'',starts_on:todayRome(),ends_on:todayRome(),notes:''});}
  async function createShare(){if(!sharePlan||!shareText.trim())return onNotify(briefingCopy.chooseSharePlan);
   if(!confirm(briefingCopy.confirmShareLink))return;
@@ -85,7 +85,7 @@ export default function V21Hub({client,user,homeId,canWrite,demo,bills=[],tasks=
     const {data,error}=await client.from('home_documents').insert({...common,property_id:inventory.property_id||null,name:file.name.slice(0,200)||briefingCopy.itemPhotoName,doc_type:'altro',mime_type:file.type,storage_path:path,file_size:file.size,sha256:sha,notes:briefingCopy.inventoryPhotoNotes}).select('id').single();
     if(error){await client.storage.from('house-documents').remove([path]);throw error;}
     setInventory(s=>({...s,document_id:data.id}));onNotify(briefingCopy.photoSaved);await load();
-  }catch(e){onNotify(briefingCopy.photoUploadFailed+e.message)}finally{setBusy(false)}
+  }catch(e){onNotify(briefingCopy.photoUploadFailed)}finally{setBusy(false)}
  }
  async function vote(decisionId,choice){if(!user||!homeId)return;await act(()=>client.from('home_decision_votes').upsert({decision_id:decisionId,user_id:user.id,choice},{onConflict:'decision_id,user_id'}),briefingCopy.voteSaved);}
  const title={tags:briefingCopy.tabTags,sos:briefingCopy.tabSos,radar:briefingCopy.tabRadar,simulator:briefingCopy.tabSimulator,passport:briefingCopy.tabPassport,vacation:briefingCopy.tabVacation,inventory:briefingCopy.tabInventory,decisions:briefingCopy.tabDecisions,briefing:briefingCopy.tabBriefing}[tab];
