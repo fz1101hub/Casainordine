@@ -124,7 +124,8 @@ test('Cron email: rotazione sull’ultimo tentativo, anche fallito, con limite d
   assert.match(s,/order\('last_attempt_at',\{ascending:true,nullsFirst:true\}\)/);
   assert.match(s,/update\(\{last_attempt_at:new Date\(\)\.toISOString\(\)\}\)/);
   assert.ok(s.indexOf('last_attempt_at:new Date')<s.indexOf('await syncConnection('),'il tentativo si registra prima di sincronizzare');
-  assert.match(s,/Date\.now\(\)-started>40_000/);
+  assert.match(s,/Date\.now\(\)-started>240_000/);
+  assert.match(s,/export const maxDuration=300;/);
   // Se la migrazione v3.3 non è ancora stata eseguita resta il comportamento precedente.
   assert.match(s,/order\('last_sync_at',\{ascending:true,nullsFirst:true\}\)\.limit\(8\)/);
   assert.match(source('app/api/mail/sync/route.js'),/data\.last_attempt_at/);
