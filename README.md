@@ -9,7 +9,7 @@ Cosa cambia per chi usa l'app:
 - La **conferma automatica dei pagamenti** richiede anche che Gmail o Outlook riportino DMARC superato per il dominio del mittente; con le caselle IMAP la conferma resta sempre manuale. In una casa condivisa serve il ruolo di proprietario o editor.
 - Un membro rimosso da una casa non può più aprire né cancellare i file che vi aveva caricato.
 
-Ordine completo di installazione su un database nuovo: `schema.sql`, `migrate_v19.sql`, `migrate_v20.sql`, `migrate_v21.sql`, `migrate_v30.sql`, `migrate_v32_languages.sql`, `harden_trigger_permissions.sql`, `migrate_v33_audit.sql`.
+Ordine completo di installazione su un database nuovo: `schema.sql`, `migrate_v19.sql`, `migrate_v20.sql`, `migrate_v21.sql`, `migrate_v30.sql`, `migrate_v32_languages.sql`, `harden_trigger_permissions.sql`, `migrate_v33_audit.sql`, `migrate_v34_saldi.sql` (saldi tra coinquilini calcolati nel database; finché non è eseguita l'app usa il calcolo precedente sulle ultime 250 spese).
 
 ---
 ## Provare Casa in Ordine con dati di esempio

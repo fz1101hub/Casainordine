@@ -15,7 +15,7 @@ const vehicleTranslationKeys={
  'Bollo':'family.vehicle.tax','Assicurazione':'family.vehicle.insurance',
  'Revisione':'family.vehicle.inspection','Tagliando':'family.vehicle.service','Altro':'family.vehicle.other'
 };
-const empty = {members:[],invites:[],expenses:[],shares:[],budgets:[],shopping:[],vehicles:[],deadlines:[]};
+const empty = {members:[],invites:[],expenses:[],shares:[],budgets:[],shopping:[],vehicles:[],deadlines:[],balanceCents:null};
 const fmtName = m => m?.email?.split('@')[0] || 'Membro';
 
 export default function HouseholdHub({client,demo,user,homes,homeId,role,onChangeHome,onHomesReload,onNotify,section='household',bills=[]}) {
@@ -54,11 +54,15 @@ export default function HouseholdHub({client,demo,user,homes,homeId,role,onChang
     // Solo le quote delle spese di questa casa (prima: le prime 1000 di tutte le case visibili).
     const expenseIds=(e.data||[]).map(x=>x.id);
     const s=expenseIds.length?await client.from('home_expense_shares').select('expense_id,user_id,amount').in('expense_id',expenseIds).limit(5000):{data:[],error:null};
+    // Saldi su TUTTE le spese della casa, calcolati nel database (migrate_v34_saldi.sql).
+    // Senza la migrazione si ripiega sul calcolo nel browser, limitato alle ultime 250 spese.
+    const totals=await client.rpc('v33_home_balances',{home:homeId});
     // Cambiando casa in fretta può arrivare per ultima la risposta della casa precedente: si scarta.
     if(seq!==loadSeq.current)return;
     const err=[m,e,s,b,sh,v,d].find(x=>x.error);
     if(err)inform(err.error.message);
-    setRows({members:m.data||[],invites:i.data||[],expenses:e.data||[],shares:s.data||[],budgets:b.data||[],shopping:sh.data||[],vehicles:v.data||[],deadlines:d.data||[]});
+    const balanceCents=totals.error?null:Object.fromEntries((totals.data||[]).map(x=>[x.user_id,Number(x.balance_cents)]));
+    setRows({members:m.data||[],invites:i.data||[],expenses:e.data||[],shares:s.data||[],budgets:b.data||[],shopping:sh.data||[],vehicles:v.data||[],deadlines:d.data||[],balanceCents});
   },[client,homeId,month]);
   useEffect(()=>{load();},[load]);
   useEffect(()=>{const q=new URLSearchParams(window.location.search).get('invite')||sessionStorage.getItem('pending_house_invite');if(q&&/^[a-f0-9]{64}$/.test(q))setInviteCode(q);},[]);
@@ -80,8 +84,9 @@ export default function HouseholdHub({client,demo,user,homes,homeId,role,onChang
   const expensesForMonth=rows.expenses.filter(e=>e.incurred_on.startsWith(month));
   const spentByCategory=useMemo(()=>{const out={};for(const e of expensesForMonth)out[e.category]=(out[e.category]||0)+Number(e.amount);return out;},[rows.expenses,month]);
   const balances=useMemo(()=>rows.members.map(m=>{
-    return {...m,balance:signedMemberBalance(rows.expenses,rows.shares,m.user_id)/100};
-  }),[rows.members,rows.expenses,rows.shares]);
+    const cents=rows.balanceCents&&m.user_id in rows.balanceCents?rows.balanceCents[m.user_id]:signedMemberBalance(rows.expenses,rows.shares,m.user_id);
+    return {...m,balance:cents/100};
+  }),[rows.members,rows.expenses,rows.shares,rows.balanceCents]);
   const inviteSection=<section className="panel hub-panel"><h2><Users size={19}/> {tr('family.homes')}</h2><p>{tr('family.privacy')}</p>
     <div className="hub-home-choices"><button className={`btn ${!homeId?'btn-primary':'btn-soft'}`} onClick={()=>onChangeHome(null)}>{tr('family.personal')}</button>{homes.map(h=><button key={h.home_id} className={`btn ${homeId===h.home_id?'btn-primary':'btn-soft'}`} onClick={()=>onChangeHome(h.home_id)}><House size={16}/>{h.homes?.name} · {h.role}</button>)}</div>
     <form onSubmit={createHome} className="hub-inline"><label>{tr('family.name')}<input required minLength={2} maxLength={100} value={homeName} onChange={e=>setHomeName(e.target.value)}/></label><button className="btn btn-soft" disabled={busy}><Plus size={16}/> {tr('family.create')}</button></form>
