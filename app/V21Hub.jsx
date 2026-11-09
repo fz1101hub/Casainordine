@@ -29,7 +29,9 @@ export default function V21Hub({client,user,homeId,canWrite,demo,bills=[],tasks=
  const previousSosDefault=useRef(briefingCopy.defaultSosTitle);
  useEffect(()=>{
   const previous=previousSosDefault.current;
-  previousSosDefault.current=briefingCopy.defaultSosTitle;
+  // Keep the previous suggestion while editing, so cancelling an edit after
+  // a language change can still refresh an untouched draft title.
+  if(!sosEditing)previousSosDefault.current=briefingCopy.defaultSosTitle;
   if(previous!==briefingCopy.defaultSosTitle&&!sosEditing){
    setSos(current=>current.title===previous?{...current,title:briefingCopy.defaultSosTitle}:current);
   }
