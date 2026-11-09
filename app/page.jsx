@@ -125,6 +125,10 @@ function Auth({client}) {
     </div></div>;
 }
 
+// Esiti del ritorno da Google/Microsoft (app/api/mail/callback/route.js).
+const MAIL_STATUS={connected:'Casella email collegata! Ora puoi cercare le bollette.',denied:'Autorizzazione annullata: la casella non è stata collegata.',expired:'Il collegamento è scaduto: riprova.',other_browser:'Per sicurezza il collegamento va completato nello stesso browser in cui l’hai avviato. Riprova dall’app; se usi l’app dalla schermata Home di iPhone e il problema continua, avvia il collegamento da Safari.',no_refresh:'Il provider non ha concesso l’accesso continuativo: rimuovi Casa in Ordine dalle app autorizzate del tuo account email e riprova.'};
+function mailStatusMessage(status){return MAIL_STATUS[status]||'Collegamento della casella non riuscito: riprova più tardi.';}
+
 export default function Page() {
   const {t:tr,money,locale}=useLanguage();
   const weekdayLabel=day=>new Intl.DateTimeFormat(locale,{weekday:'long',timeZone:'UTC'}).format(new Date(Date.UTC(2023,0,1+day)));
@@ -414,7 +418,7 @@ export default function Page() {
   }
   useEffect(()=>{if(tab==='connect'&&!demo&&user)loadIntegration();},[tab,user?.id]);
   useEffect(()=>{if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('/sw.js').catch(()=>{});},[]);
-  useEffect(()=>{if(new URLSearchParams(window.location.search).has('invite')||sessionStorage.getItem('pending_house_invite'))setTab('household');const mail=new URLSearchParams(window.location.search).get('mail');if(mail){setTab('connect');notify(mail==='connected'?'Gmail collegata! Ora puoi cercare le bollette.':mail==='denied'?'Autorizzazione Gmail annullata.':'Collegamento Gmail non riuscito: verifica le impostazioni OAuth.');window.history.replaceState({},'',window.location.pathname);}},[]);
+  useEffect(()=>{if(new URLSearchParams(window.location.search).has('invite')||sessionStorage.getItem('pending_house_invite'))setTab('household');const mail=new URLSearchParams(window.location.search).get('mail');if(mail){setTab('connect');notify(mailStatusMessage(mail));window.history.replaceState({},'',window.location.pathname);}},[]);
 
   const today=todayRome(), soon=addDaysISO(today,7);
   const bills=data.bills||[], utilities=data.utilities||[],tasks=data.tasks||[],suppliers=data.suppliers||[];
