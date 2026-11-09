@@ -13,7 +13,8 @@ console.log(JSON.stringify(locales.map(locale => ({
   locale,
   dateOnly: formatMailDate('2026-01-02', locale, 'INVALID'),
   leapDay: formatMailDate('2024-02-29', locale, 'INVALID'),
-  invalid: formatMailDate('2026-02-30', locale, 'INVALID')
+  invalid: formatMailDate('2026-02-30', locale, 'INVALID'),
+  instant: formatMailDate('2026-01-02T00:30:00Z', locale, 'INVALID')
 }))));
 `;
 
@@ -26,7 +27,8 @@ test('mail date-only rendering is independent of browser/system time zone in six
     leapDay: new Intl.DateTimeFormat(locale, {
       day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC'
     }).format(new Date('2024-02-29T12:00:00Z')),
-    invalid: 'INVALID'
+    invalid: 'INVALID',
+    instant: null
   }));
   for (const TZ of zones) {
     const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
@@ -36,6 +38,12 @@ test('mail date-only rendering is independent of browser/system time zone in six
       timeout: 10000
     });
     assert.equal(result.status, 0, `${TZ}: ${result.stderr || result.error?.message}`);
-    assert.deepEqual(JSON.parse(result.stdout), expected, TZ);
+    const expectedForZone = expected.map(item => ({
+      ...item,
+      instant: new Intl.DateTimeFormat(item.locale, {
+        day: '2-digit', month: 'short', year: 'numeric', timeZone: TZ
+      }).format(new Date('2026-01-02T00:30:00Z'))
+    }));
+    assert.deepEqual(JSON.parse(result.stdout), expectedForZone, TZ);
   }
 });
