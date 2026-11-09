@@ -110,7 +110,7 @@ test('V20 monitor, migration and demo fallback texts use six-language copy',()=>
   const copy=v20UiCopy(lang);
   for(const key of ['migrationRequired','demoSetupNotice','expectedAround','daysOverdue','lastChecked','v20Name'])assert.ok(copy[key]?.trim(),lang+':'+key);
  }
- assert.match(source,/onNotify\(ui\.migrationRequired\+v20SafeError\(language\)\)/);
+ assert.match(source,/onNotify\(ui\.migrationRequired\+v20SafeError\(language,error\.error\)\)/);
  assert.match(source,/\{ui\.expectedAround\}/);
  assert.match(source,/\{ui\.lastChecked\}/);
  assert.match(source,/\{ui\.demoSetupNotice\}/);
