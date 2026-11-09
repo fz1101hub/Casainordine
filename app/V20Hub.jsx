@@ -1,5 +1,5 @@
 'use client';
-import {useCallback,useEffect,useMemo,useState} from 'react';
+import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {AlertTriangle,Check,Download,History,House,MailWarning,Plus,ShieldAlert,Trash2,WifiOff,RefreshCw,Wallet,ScanLine,Car,FileText} from 'lucide-react';
 import {todayRome} from '../lib/dates.mjs';
 import {useLanguage} from './LanguageProvider';
@@ -25,7 +25,9 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
  const [selectedBill,setSelectedBill]=useState(''),[sender,setSender]=useState(''),[auth,setAuth]=useState('unknown'),[iban,setIban]=useState('');
  const [riskPreview,setRiskPreview]=useState(null),[drafts,setDrafts]=useState([]),[offlineError,setOfflineError]=useState('');
  const scope=(q)=>homeId?q.eq('home_id',homeId):q.is('home_id',null);
+ const loadSeq=useRef(0);
  const load=useCallback(async()=>{
+  const seq=++loadSeq.current;
   if(!client){setLoading(false);return;}setLoading(true);
   const specs=[['goals','home_savings_goals'],['moves','home_move_plans'],['steps','home_move_steps'],['notices','pagopa_notices'],['risk','bill_security_reviews'],['audit','home_audit_log'],['recycle','home_recycle_bin']];
   const res=await Promise.all([...specs.map(([k,t])=>scope(client.from(t).select('*')).order(k==='audit'?'created_at':k==='recycle'?'deleted_at':'created_at',{ascending:false}).limit(k==='audit'?200:400)),
@@ -36,6 +38,8 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
       .catch(e=>({data:[],error:{message:e.message}})),
     client.from('user_alert_preferences').select('user_id,push_monitor').eq('user_id',user.id).maybeSingle()
   ]);
+  // Cambiando casa in fretta può arrivare per ultima la risposta della casa precedente: si scarta.
+  if(seq!==loadSeq.current)return;
   const error=res.find(r=>r.error);if(error)onNotify(ui.migrationRequired+error.error.message);
   const next={};for(let i=0;i<specs.length;i++)next[specs[i][0]]=res[i].data||[];
   next.alerts=res[specs.length].data||[];next.connections=res[specs.length+1].data||[];next.preferences=res[specs.length+2].data||null;
