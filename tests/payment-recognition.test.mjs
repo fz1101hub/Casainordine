@@ -102,7 +102,8 @@ test('a subject claiming payment does not turn a request-to-pay into evidence',(
   assert.equal(extractPaymentEvidence({...receipt,text}),null);
 });
 test('a subject-only receipt is not eligible for auto-payment without body confirmation',()=>{
-  const x=extractPaymentEvidence({...receipt,text:'La tua bolletta Enel Energia è disponibile. Importo € 87,50.'});
+  // A body announcing a new bill ("La tua bolletta … è disponibile") is never evidence: see v33-audit-logic.
+  const x=extractPaymentEvidence({...receipt,text:'Gentile cliente, ti scriviamo in merito alla bolletta Enel Energia. Importo € 87,50.'});
   assert.ok(x);assert.equal(x.autoEligible,false);
 });
 test('an explicit confirmation in the body can qualify for opt-in automatic reconciliation',()=>{

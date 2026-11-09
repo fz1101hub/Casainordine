@@ -156,3 +156,22 @@ test('Intestazioni di sicurezza su tutte le pagine',async()=>{
   assert.match(h['Permissions-Policy'],/camera=\(self\)/,'serve per leggere i QR');
   assert.equal(config.poweredByHeader,false);
 });
+
+// --- Abbinamento ricevuta/bolletta: due bollette aperte con lo stesso importo restano ambigue ---
+import { matchOutstandingBill } from '../lib/payment-recognition.mjs';
+test('Pagamenti: con due bollette aperte compatibili nessun abbinamento, anche se una è più vicina',()=>{
+  const ev={amount:29.9,subject:'Ricevuta di pagamento Iliad',sender:'ricevute@iliad.it',text:'Abbiamo ricevuto il pagamento della bolletta Iliad Fibra.',receivedAt:'2026-11-01T10:00:00.000Z'};
+  const oct={id:'oct',supplier:'Iliad Fibra',amount:29.9,due_date:'2026-10-15',paid_at:null};
+  const nov={id:'nov',supplier:'Iliad Fibra',amount:29.9,due_date:'2026-11-15',paid_at:null};
+  assert.equal(matchOutstandingBill(ev,[oct,nov]),null);
+  assert.equal(matchOutstandingBill(ev,[{...oct,paid_at:'2026-10-14T09:00:00Z'},nov]),nov);
+});
+
+// --- Import documenti: "spese di sollecito" nelle condizioni non rende la bolletta un sollecito ---
+import { extractBillFields } from '../lib/document-import.mjs';
+test('Documenti: una bolletta normale che cita le spese di sollecito resta una bolletta',()=>{
+  const bill=extractBillFields('Bolletta luce\nFornitore: Energia Casa\nTotale da pagare € 80,00\nScadenza: 25/11/2026\nIn caso di ritardo saranno addebitate le spese di sollecito e potrà essere inviato un avviso di sospensione.');
+  assert.equal(bill.documentType,'bolletta');
+  const reminder=extractBillFields('Oggetto: sollecito\nFornitore: Energia Casa\nTotale da pagare € 80,00\nScadenza: 25/11/2026');
+  assert.equal(reminder.documentType,'sollecito');
+});

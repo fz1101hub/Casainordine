@@ -212,8 +212,8 @@ export default function Page() {
   }
   async function saveBill(e) {
     e.preventDefault();if(!canWrite)return notify(tr('v32.feedback.3'));
-    if(form.source==='document'&&['ricevuta','sollecito'].includes(form.import_document_type)){
-      const label=form.import_document_type==='ricevuta'?tr('v32.flow.receiptLabel'):tr('v32.flow.reminderLabel');
+    if(form.source==='document'&&['ricevuta','sollecito','nota_credito'].includes(form.import_document_type)){
+      const label=form.import_document_type==='ricevuta'?tr('v32.flow.receiptLabel'):form.import_document_type==='nota_credito'?tr('v32.flow.creditNoteLabel'):tr('v32.flow.reminderLabel');
       if(!window.confirm(tr('v32.flow.documentConfirm',{kind:label})))return;
     }
     setBusy(true);
