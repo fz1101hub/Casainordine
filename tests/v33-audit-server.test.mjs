@@ -130,3 +130,29 @@ test('Cron email: rotazione sull’ultimo tentativo, anche fallito, con limite d
   assert.match(source('app/api/mail/sync/route.js'),/data\.last_attempt_at/);
   assert.match(source('supabase/migrate_v33_audit.sql'),/add column if not exists last_attempt_at timestamptz/);
 });
+
+// --- Cifratura e intestazioni ---
+import { encryptSecret, decryptSecret } from '../lib/mail-core.mjs';
+test('Credenziali: un tag GCM accorciato viene rifiutato',()=>{
+  const prev=process.env.MAIL_TOKEN_ENCRYPTION_KEY;
+  try{
+    process.env.MAIL_TOKEN_ENCRYPTION_KEY=Buffer.alloc(32,7).toString('base64');
+    const box=encryptSecret('refresh-token');
+    assert.equal(decryptSecret(box),'refresh-token');
+    const [v,iv,tag,ct]=box.split('.');
+    const short=Buffer.from(tag,'base64url').subarray(0,4).toString('base64url');
+    assert.throws(()=>decryptSecret([v,iv,short,ct].join('.')),/Formato/);
+    assert.throws(()=>decryptSecret([v,iv.slice(0,4),tag,ct].join('.')),/Formato/);
+  }finally{if(prev===undefined)delete process.env.MAIL_TOKEN_ENCRYPTION_KEY;else process.env.MAIL_TOKEN_ENCRYPTION_KEY=prev;}
+});
+test('Intestazioni di sicurezza su tutte le pagine',async()=>{
+  const {default:config}=await import('../next.config.mjs');
+  const [rule]=await config.headers();
+  assert.equal(rule.source,'/:path*');
+  const h=Object.fromEntries(rule.headers.map(x=>[x.key,x.value]));
+  assert.equal(h['X-Content-Type-Options'],'nosniff');
+  assert.equal(h['X-Frame-Options'],'DENY');
+  assert.match(h['Content-Security-Policy'],/frame-ancestors 'none'/);
+  assert.match(h['Permissions-Policy'],/camera=\(self\)/,'serve per leggere i QR');
+  assert.equal(config.poweredByHeader,false);
+});
