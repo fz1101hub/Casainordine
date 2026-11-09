@@ -15,5 +15,5 @@ test('all V20 fraud signals render localized text in six languages',()=>{
 test('historical signals keep unknown labels and never invent missing baseline',()=>{
  assert.equal(localizedFraudFlag({id:'future_signal',label:'Historical note'},'fr'),'Historical note');
  assert.ok(!localizedFraudFlag({id:'high_amount',label:'Old text'},'de').includes('{amount}'));
- assert.match(localizedFraudFlag({id:'high_amount'},'en',1234.5,'en-GB'),/1,234\\.50/);
+ assert.match(localizedFraudFlag({id:'high_amount'},'en',1234.5,'en-GB'),/1,234\.50/);
 });
