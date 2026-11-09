@@ -19,8 +19,9 @@ test('V21 copy has a nonempty translation for every key in all six languages', (
 });
 
 test('V21 interpolated placeholders match Italian source in each locale', () => {
-  const placeholders = value => [...value.matchAll(/\\{([a-zA-Z][a-zA-Z0-9_]*)\\}/g)]
+  const placeholders = value => [...value.matchAll(/\{([a-zA-Z][a-zA-Z0-9_]*)\}/g)]
     .map(match => match[1]).sort();
+  assert.deepEqual(placeholders('Promemoria {name} del {date}'), ['date', 'name']);
   for (const language of languages.slice(1)) {
     const copy = v21BriefingCopy(language);
     for (const key of keys) {
