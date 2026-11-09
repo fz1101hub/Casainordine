@@ -37,16 +37,18 @@ test('unknown language falls back to Italian without missing keys', () => {
 
 test('V21 translations do not contain broken interpolation markers', () => {
   // A misspelled or half-written marker would otherwise appear verbatim in UI.
-  const marker = /\\{[^{}]*\\}/g;
+  const marker = /\{[^{}]*\}/g;
+  assert.equal('Promemoria {name'.replace(/\{[a-zA-Z][a-zA-Z0-9_]*\}/g, '').includes('{'), true);
+  assert.equal('Promemoria {name}'.replace(/\{[a-zA-Z][a-zA-Z0-9_]*\}/g, '').includes('{'), false);
   for (const language of languages) {
     const copy = v21BriefingCopy(language);
     for (const key of keys) {
       const value = copy[key];
-      const withoutValidMarkers = value.replace(/\\{[a-zA-Z][a-zA-Z0-9_]*\\}/g, '');
+      const withoutValidMarkers = value.replace(/\{[a-zA-Z][a-zA-Z0-9_]*\}/g, '');
       assert.equal(withoutValidMarkers.includes('{') || withoutValidMarkers.includes('}'), false,
         language + ':' + key + ' has an incomplete or invalid marker');
       assert.equal((value.match(marker) || []).length,
-        (value.match(/\\{[a-zA-Z][a-zA-Z0-9_]*\\}/g) || []).length,
+        (value.match(/\{[a-zA-Z][a-zA-Z0-9_]*\}/g) || []).length,
         language + ':' + key);
     }
   }
