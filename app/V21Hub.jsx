@@ -25,6 +25,7 @@ export default function V21Hub({client,user,homeId,canWrite,demo,bills=[],tasks=
  const [sos,setSos]=useState({title:briefingCopy.defaultSosTitle,location_hint:'',instructions:'',contact_label:'',contact_phone:''});
  // Update only the untouched suggested title when the user changes language.
  // Never overwrite a manually entered title or a card currently being edited.
+ const [passphrase,setPassphrase]=useState('');const [sosEditing,setSosEditing]=useState(null);const [assetId,setAssetId]=useState('');
  const previousSosDefault=useRef(briefingCopy.defaultSosTitle);
  useEffect(()=>{
   const previous=previousSosDefault.current;
@@ -33,7 +34,7 @@ export default function V21Hub({client,user,homeId,canWrite,demo,bills=[],tasks=
    setSos(current=>current.title===previous?{...current,title:briefingCopy.defaultSosTitle}:current);
   }
  },[briefingCopy.defaultSosTitle,sosEditing]);
- const [passphrase,setPassphrase]=useState('');const [sosEditing,setSosEditing]=useState(null);const [assetId,setAssetId]=useState('');
+
  const [inventory,setInventory]=useState({name:'',room:'',serial_number:'',estimated_value:'0',property_id:'',document_id:'',asset_id:'',notes:''});
  const [vacation,setVacation]=useState({title:'',starts_on:todayRome(),ends_on:todayRome(),notes:''});
  const [shareText,setShareText]=useState(''),[shareDuration,setShareDuration]=useState(72),[sharePlan,setSharePlan]=useState(''),[shareLink,setShareLink]=useState('');
