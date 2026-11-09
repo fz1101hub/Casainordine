@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   LayoutDashboard, ReceiptText, PlugZap, House, UploadCloud, Settings, Bell,
   Plus, Search, CheckCircle2, CalendarDays, LogOut, ArrowUpRight, TrendingDown,
@@ -189,12 +189,32 @@ export default function Page() {
       return;
     }
     client.auth.getSession().then(({data:{session}})=>{setUser(session?.user||null);setInitializing(false);if(session){reload();reloadHomes();}});
-    const {data:{subscription}} = client.auth.onAuthStateChange((_event,session)=>{
+    const {data:{subscription}} = client.auth.onAuthStateChange((event,session)=>{
+      // Dopo un'uscita (anche per sessione scaduta) si ricarica la pagina: nello stato React
+      // restano altrimenti chiave d'integrazione, testi incollati e moduli dell'account precedente.
+      if(event==='SIGNED_OUT'){window.location.replace('/');return;}
       setUser(session?.user||null); if(session) {setTimeout(()=>{reload();reloadHomes();},0);} else {setHomes([]);setActiveHomeId(null);setData({bills:[],utilities:[],tasks:[],suppliers:[],summaries:[],profile:null,reminders:[]});}
     });
     return ()=>subscription.unsubscribe();
   },[demo,client,reload,reloadHomes]);
 
+  async function signOut(){
+    // Questo dispositivo smette di ricevere le notifiche dell'account che esce.
+    try{
+      const registration='serviceWorker' in navigator?await Promise.race([navigator.serviceWorker.ready,new Promise(done=>setTimeout(()=>done(null),1500))]):null;
+      const subscription=await registration?.pushManager?.getSubscription();
+      if(subscription){
+        const {data:{session}}=await client.auth.getSession();
+        await fetch('/api/push/subscribe',{method:'DELETE',headers:{Authorization:`Bearer ${session?.access_token||''}`,'Content-Type':'application/json'},body:JSON.stringify({endpoint:subscription.endpoint})}).catch(()=>{});
+        await subscription.unsubscribe().catch(()=>{});
+      }
+    }catch{}
+    // Solo questo dispositivo (prima l'uscita chiudeva la sessione su tutti). Senza rete
+    // signOut restituisce un errore e lascia la sessione salvata: la si cancella comunque.
+    const {error}=await client.auth.signOut({scope:'local'}).catch(e=>({error:e}));
+    if(error){try{Object.keys(localStorage).filter(k=>/^sb-.+-auth-token/.test(k)).forEach(k=>localStorage.removeItem(k));}catch{}}
+    window.location.replace('/');
+  }
   function writeDemo(next) {setData(next);localStorage.setItem('casainordine-demo-v1',JSON.stringify(next));}
   function localUpdate(key,fn) {writeDemo({...data,[key]:fn(data[key])});}
   async function updateRow(table,id,patch,key=table) {
@@ -445,14 +465,17 @@ export default function Page() {
   function switchHome(id){setActiveHomeId(id||null);setTab(id?'dashboard':'household');setData(old=>({...old,bills:[],utilities:[],tasks:[],reminders:[]}));}
   // QR codes contain only the asset UUID. Resolve its home via RLS after login.
   // Never bypass the user's membership permissions or infer an inaccessible home.
+  const assetHandled=useRef(false);
   useEffect(()=>{
-    if(!client||!user)return;
+    if(!client||!user||assetHandled.current)return;
     const ref=new URLSearchParams(window.location.search).get('asset');
     if(!ref||!/^[0-9a-f-]{36}$/i.test(ref))return;
     let current=true;
     client.from('maintenance_assets').select('home_id').eq('id',ref).maybeSingle().then(({data:asset,error})=>{
       if(!current||error||!asset)return;
       if(asset.home_id&& !homes.some(h=>h.home_id===asset.home_id))return;
+      // Una volta sola: prima ogni ricarica delle case riportava l'utente sulla scheda QR.
+      assetHandled.current=true;
       if((asset.home_id||null)!==(activeHomeId||null)){
         setActiveHomeId(asset.home_id||null);
         setData(old=>({...old,bills:[],utilities:[],tasks:[],reminders:[]}));
@@ -471,7 +494,7 @@ export default function Page() {
       <div className="brand"><span className="brand-icon"><House size={22}/></span><b>Casa<span>inOrdine</span></b></div>
       <div className="sidebar-label">{activeHomeId?homeMembership?.homes?.name||"CASA CONDIVISA":"SPAZIO PERSONALE"}</div><nav className="nav">{menu.map(({id,title,icon:Icon})=><button key={id} className={`nav-item ${tab===id?'active':''}`} onClick={()=>changePage(id)}><Icon size={19}/><span>{tr('nav.'+id)}</span>{tab===id&&<span className="nav-active-indicator"/>}</button>)}</nav>
       <div className="sidebar-spacer"/><div className="sidebar-info"><div className="sidebar-info-icon"><Bell size={18}/></div><b>{tr('v32.shell.reminderTitle')}</b><p>{tr('v32.shell.reminderHelp')}</p></div>
-      <div className="sidebar-profile"><span className="avatar"><UserRound size={18}/></span><div className="profile-copy"><b>{demo?tr('v32.overview.demoMode'):user?.email?.split('@')[0]}</b><small>{demo?tr('v32.overview.localData'):tr('v32.overview.privateSpace')}</small></div>{!demo&&<button title={tr('ui.signOut')} className="icon-button" onClick={()=>client.auth.signOut()}><LogOut size={17}/></button>}</div>
+      <div className="sidebar-profile"><span className="avatar"><UserRound size={18}/></span><div className="profile-copy"><b>{demo?tr('v32.overview.demoMode'):user?.email?.split('@')[0]}</b><small>{demo?tr('v32.overview.localData'):tr('v32.overview.privateSpace')}</small></div>{!demo&&<button title={tr('ui.signOut')} className="icon-button" onClick={signOut}><LogOut size={17}/></button>}</div>
     </aside>
     <main className="main">
       <header className="topbar"><button className="icon-button burger" onClick={()=>setMobile(true)} aria-label={tr('ui.openMenu')}><Menu size={23}/></button><div className="crumb"><span>{activeHomeId?homeMembership?.homes?.name||tr('v32.overview.sharedHome'):tr('v32.overview.personalSpace')}</span><ChevronRight size={15}/><b>{tr('nav.'+tab)}</b></div>
@@ -543,7 +566,7 @@ export default function Page() {
             {data.profile?.summary_frequency==='monthly'&&<label>{tr('settings.monthDay')}<input type="number" min="1" max="28" value={data.profile?.summary_month_day??1} onChange={e=>{const d=Number(e.target.value);if(d>=1&&d<=28)updateSummaryPrefs({summary_month_day:d});}}/></label>}
             <small>{tr('settings.summaryNote')}</small></div>
             {!demo&&<><PushSettings client={client} onNotify={notify}/><CalendarFeed client={client} onNotify={notify}/></>}<div className="summary-settings"><h3>{tr('settings.phoneCalendar')}</h3><p>{tr('settings.exportHelp')}</p><button className="btn btn-soft" onClick={()=>downloadCalendar(bills.filter(b=>!b.paid_at),activeHomeId?'scadenze-casa':'scadenze-personali')}><CalendarDays size={16}/> {tr('settings.exportCalendar')}</button></div><div className="setting-row"><div><b>{tr('settings.autoPayment')}</b><small>{tr('settings.autoPaymentHelp')}</small></div><button className={`toggle ${data.profile?.auto_confirm_payments?'on':''}`} onClick={toggleAutoPayment} aria-label={tr('settings.autoPaymentToggle')} aria-pressed={!!data.profile?.auto_confirm_payments}><span/></button></div></section>
-          <section className="panel settings-panel"><div className="settings-heading"><span className="settings-icon"><LockKeyhole size={20}/></span><div><h2>{tr('settings.privacyHeading')}</h2><p>{tr('settings.privacyHelp')}</p></div></div><div className="setting-row"><div><b>{tr('settings.account')}</b><small>{demo?tr('settings.demoLocal'):user?.email||tr('settings.personalAccount')}</small></div><ShieldCheck size={20} className="subtle-green"/></div><div className="setting-row"><div><b>{tr('settings.sharing')}</b><small>{tr('settings.sharingHelp')}</small></div><button className="btn btn-soft" onClick={()=>changePage('household')}>{tr('settings.manageHomes')}</button></div>{!demo&&<button className="btn btn-soft" onClick={()=>client.auth.signOut()}><LogOut size={17}/> {tr('settings.signout')}</button>}</section></div></>}
+          <section className="panel settings-panel"><div className="settings-heading"><span className="settings-icon"><LockKeyhole size={20}/></span><div><h2>{tr('settings.privacyHeading')}</h2><p>{tr('settings.privacyHelp')}</p></div></div><div className="setting-row"><div><b>{tr('settings.account')}</b><small>{demo?tr('settings.demoLocal'):user?.email||tr('settings.personalAccount')}</small></div><ShieldCheck size={20} className="subtle-green"/></div><div className="setting-row"><div><b>{tr('settings.sharing')}</b><small>{tr('settings.sharingHelp')}</small></div><button className="btn btn-soft" onClick={()=>changePage('household')}>{tr('settings.manageHomes')}</button></div>{!demo&&<button className="btn btn-soft" onClick={signOut}><LogOut size={17}/> {tr('settings.signout')}</button>}</section></div></>}
       </div>
     </main>
     {ratePlan&&<div className="modal-overlay"><div className="modal rate-modal"><div className="modal-head"><div><div className="eyebrow">{tr('rates.eyebrow')}</div><h2>{tr('rates.count',{count:ratePlan.rows.length})}</h2></div><button className="icon-button" onClick={()=>setRatePlan(null)} aria-label={t('ui.close')}><X size={20}/></button></div>

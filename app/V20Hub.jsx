@@ -30,7 +30,10 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   const specs=[['goals','home_savings_goals'],['moves','home_move_plans'],['steps','home_move_steps'],['notices','pagopa_notices'],['risk','bill_security_reviews'],['audit','home_audit_log'],['recycle','home_recycle_bin']];
   const res=await Promise.all([...specs.map(([k,t])=>scope(client.from(t).select('*')).order(k==='audit'?'created_at':k==='recycle'?'deleted_at':'created_at',{ascending:false}).limit(k==='audit'?200:400)),
     client.from('user_alerts').select('*').eq('user_id',user.id).in('kind',['missing_bill','mail_sync','fraud','move','savings']).order('created_at',{ascending:false}).limit(100),
-    client.from('mail_connections').select('id,provider,email_address,status,last_sync_at,last_error').eq('user_id',user.id).limit(100),
+    // mail_connections contiene credenziali cifrate e non è leggibile dal browser: si passa dall'API.
+    client.auth.getSession().then(({data:{session}})=>fetch('/api/mail/connections',{headers:{Authorization:`Bearer ${session?.access_token||''}`}}))
+      .then(async r=>{const body=await r.json().catch(()=>({}));return r.ok?{data:body.connections||[],error:null}:{data:[],error:{message:body.error||`HTTP ${r.status}`}};})
+      .catch(e=>({data:[],error:{message:e.message}})),
     client.from('user_alert_preferences').select('user_id,push_monitor').eq('user_id',user.id).maybeSingle()
   ]);
   const error=res.find(r=>r.error);if(error)onNotify(ui.migrationRequired+error.error.message);
