@@ -292,3 +292,11 @@
 .lang-settings .language-picker select{min-width:220px}
 @media(max-width:1050px){.topbar-language select{max-width:96px}}
 @media(max-width:650px){.topbar-language{display:none}.auth-language{margin-bottom:12px}}
+/* Accessibilità (audit 2026-11): area di tocco di almeno 44 px senza cambiare l'aspetto,
+   campi a 16 px sui telefoni (sotto i 16 px Safari su iPhone ingrandisce la pagina al tocco),
+   contorno visibile sulle finestre quando ricevono il focus da tastiera. */
+.task-check,.toast button{position:relative}
+.task-check::after{content:'';position:absolute;inset:-11px}
+.toast button::after{content:'';position:absolute;inset:-12px}
+.modal:focus-visible{outline:3px solid var(--green);outline-offset:2px}
+@media (max-width:760px){input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select,textarea{font-size:16px}}
