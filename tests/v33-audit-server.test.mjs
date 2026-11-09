@@ -98,3 +98,35 @@ test('Pagamenti: canEditBill e la route di conferma manuale controllano casa e r
   assert.match(source('lib/mail-google.mjs'),/senderAuth:reportedAuthentication\(headers,head\('from'\),'gmail'\)/);
   assert.match(source('lib/mail-microsoft.mjs'),/senderAuth:paymentSenderAuth/);
 });
+
+// --- Cron ---
+import { cronAuthorized } from '../lib/server.mjs';
+test('Cron: segreto confrontato a tempo costante su entrambe le route',()=>{
+  const req=h=>({headers:{get:()=>h}});
+  assert.equal(cronAuthorized(req('Bearer segreto'),'segreto'),true);
+  assert.equal(cronAuthorized(req('Bearer segretO'),'segreto'),false);
+  assert.equal(cronAuthorized(req('Bearer segreto2'),'segreto'),false);
+  assert.equal(cronAuthorized(req(null),'segreto'),false);
+  assert.equal(cronAuthorized(req('Bearer '),''),false);
+  for(const path of ['app/api/cron/route.js','app/api/mail/cron/route.js']){
+    const s=source(path);
+    assert.match(s,/cronAuthorized\(request/,path);
+    assert.doesNotMatch(s,/authorization'\)\s*!==/,path);
+  }
+});
+test('Cron promemoria: l’email va solo a chi è ancora membro della casa',()=>{
+  const s=source('app/api/cron/route.js');
+  assert.match(s,/isHomeMember\(admin,bill\.home_id,bill\.user_id\)/);
+  assert.ok(s.indexOf('isHomeMember(admin,bill.home_id')<s.indexOf("admin.from('reminders').upsert"));
+});
+test('Cron email: rotazione sull’ultimo tentativo, anche fallito, con limite di tempo',()=>{
+  const s=source('app/api/mail/cron/route.js');
+  assert.match(s,/order\('last_attempt_at',\{ascending:true,nullsFirst:true\}\)/);
+  assert.match(s,/update\(\{last_attempt_at:new Date\(\)\.toISOString\(\)\}\)/);
+  assert.ok(s.indexOf('last_attempt_at:new Date')<s.indexOf('await syncConnection('),'il tentativo si registra prima di sincronizzare');
+  assert.match(s,/Date\.now\(\)-started>40_000/);
+  // Se la migrazione v3.3 non è ancora stata eseguita resta il comportamento precedente.
+  assert.match(s,/order\('last_sync_at',\{ascending:true,nullsFirst:true\}\)\.limit\(8\)/);
+  assert.match(source('app/api/mail/sync/route.js'),/data\.last_attempt_at/);
+  assert.match(source('supabase/migrate_v33_audit.sql'),/add column if not exists last_attempt_at timestamptz/);
+});

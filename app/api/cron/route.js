@@ -1,4 +1,5 @@
-import { getAdmin, json } from '../../../lib/server.mjs';
+import { getAdmin, json, cronAuthorized } from '../../../lib/server.mjs';
+import { isHomeMember } from '../../../lib/home-access.mjs';
 import { addDaysISO, nextRecurringDue, todayRome, euro } from '../../../lib/dates.mjs';
 import { shouldSendSummary, monthEndISO, upcomingSummaryBills } from '../../../lib/summary-schedule.mjs';
 import { sendPush, configuredPush } from '../../../lib/push.mjs';
@@ -86,7 +87,7 @@ async function notifyPushForBill(admin,bill,today,counts){
 export async function GET(request) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return json({error:'CRON_SECRET non impostato'},503);
-  if (request.headers.get('authorization') !== `Bearer ${secret}`) return json({error:'Non autorizzato'},401);
+  if (!cronAuthorized(request, secret)) return json({error:'Non autorizzato'},401);
   const admin = getAdmin();
   const today = todayRome(), horizon = addDaysISO(today, 45), target = addDaysISO(today, 3);
   const counts = {recurring_created:0, notifications_created:0, emails_sent:0, summaries_created:0, summary_emails_sent:0, push_sent:0, summary_push_sent:0, errors:[]};
@@ -122,6 +123,11 @@ export async function GET(request) {
       await notifyPushForBill(admin,bill,today,counts);
       const {data:profile,error:pError} = await admin.from('profiles').select('email,reminders_enabled').eq('id',bill.user_id).maybeSingle();
       if (pError || !profile?.reminders_enabled) continue;
+      // Chi ha creato la bolletta di una casa e poi ne è uscito non riceve più l'email.
+      if (bill.home_id) {
+        const member = await isHomeMember(admin,bill.home_id,bill.user_id).catch(e=>{counts.errors.push(`Membri casa ${bill.home_id}: ${String(e.message).slice(0,80)}`);return null;});
+        if (!member) continue;
+      }
       const {data:reminder,error:remErr} = await admin.from('reminders').upsert({
         user_id:bill.user_id,bill_id:bill.id,reminder_date:today
       },{onConflict:'bill_id,reminder_date',ignoreDuplicates:true}).select('id,email_sent_at').maybeSingle();
