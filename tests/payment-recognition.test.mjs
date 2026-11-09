@@ -85,7 +85,7 @@ test('Auto-confirmation requires BOTH opt-in AND trust for the exact sender and 
         then(done){return Promise.resolve({error:null}).then(done);}
       };return q;
     }};
-    const outcome=await processPaymentMessage(admin,{id:'connection1',user_id:'user1'},{...receipt,messageId:'different-message'});
+    const outcome=await processPaymentMessage(admin,{id:'connection1',user_id:'user1'},{...receipt,messageId:'different-message',senderAuth:'reported_pass'});
     return {outcome,events};
   }
   const withoutOptIn=await run(false,true);

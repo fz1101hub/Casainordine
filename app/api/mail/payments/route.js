@@ -1,5 +1,6 @@
 import { authenticatedUser, getAdmin, json } from '../../../../lib/server.mjs';
 import { supplierKey } from '../../../../lib/payment-recognition.mjs';
+import { canEditBill } from '../../../../lib/home-access.mjs';
 export const runtime='nodejs';
 const validId=id=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id));
 
@@ -31,9 +32,13 @@ export async function PATCH(request){
   }
   const selected=bill_id||receipt.bill_id;
   if(!validId(selected))return json({error:'Scegli una bolletta da associare al pagamento.'},400);
-  const {data:bill,error:bError}=await admin.from('bills').select('id,supplier,amount,paid_at')
+  const {data:bill,error:bError}=await admin.from('bills').select('id,user_id,home_id,supplier,amount,paid_at')
     .eq('id',selected).eq('user_id',user.id).maybeSingle();
   if(bError||!bill)return json({error:'Bolletta non trovata.'},404);
+  // In una casa condivisa serve ancora il ruolo di proprietario o editor (un lettore non paga).
+  const allowed=await canEditBill(admin,bill,user.id).catch(()=>null);
+  if(allowed===null)return json({error:'Impossibile verificare i permessi sulla casa.'},500);
+  if(!allowed)return json({error:'Non hai i permessi per modificare le bollette di questa casa.'},403);
   if(bill.paid_at)return json({error:'Questa bolletta è già segnata come pagata.'},409);
   if(Math.round(Number(bill.amount)*100)!==Math.round(Number(receipt.amount)*100))return json({error:'L’importo della conferma non corrisponde alla bolletta. Controlla manualmente.'},409);
   const {data:paid,error:paymentError}=await admin.from('bills').update({paid_at:receipt.received_at})
