@@ -7,6 +7,7 @@ import {v20UiCopy} from '../lib/v20-ui-copy.mjs';
 import {localizedMoveChecklist} from '../lib/v20-move-i18n.mjs';
 import {v20MailHealthLabel} from '../lib/v20-alert-copy.mjs';
 import {localizedFraudFlag} from '../lib/v20-fraud-i18n.mjs';
+import {v20OcrProgress,v20OcrError} from '../lib/v20-ocr-i18n.mjs';
 import {missingBillCandidates,billFraudSignals,parsePagoPA,moveChecklist,savingsProjection,mailHealth} from '../lib/v20-core.mjs';
 import {readRatePlanDocument} from '../lib/document-reader.js';
 import {listDrafts,removeDraft} from '../lib/offline-queue.js';
@@ -71,8 +72,8 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
    const barcodes=await detector.detect(bit);bit.close?.();const data=barcodes.map(b=>b.rawValue).filter(Boolean).join('\n');
    if(data){setRawNotice(data);await parseNoticeText(data);return;}}catch{/* Riprova con OCR se il lettore QR non è disponibile. */}
   }
-  const output=await readRatePlanDocument(file,progress=>setNoticeMessage(progress));setRawNotice(output.text.slice(0,4000));await parseNoticeText(output.text);
- }catch(e){setNoticeMessage(ui.noticeScanFailed+' '+e.message)}}
+  const output=await readRatePlanDocument(file,progress=>setNoticeMessage(v20OcrProgress(progress,language)));setRawNotice(output.text.slice(0,4000));await parseNoticeText(output.text);
+ }catch(e){setNoticeMessage(ui.noticeScanFailed+' '+v20OcrError(language))}}
  async function saveNotice(e){e.preventDefault();const code=notice.notice_code.replace(/\D/g,'');if(![15,18].includes(code.length))return onNotify(ui.noticeCodeInvalid);
   if(createBill&&(!notice.due_on||notice.amount===''))return onNotify(ui.noticeReminderRequiresDetails);
   if(createBill&&!window.confirm(ui.confirmNoticeOriginal))return;
