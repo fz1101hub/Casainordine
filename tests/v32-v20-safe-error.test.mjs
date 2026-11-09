@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {v20SafeError} from '../lib/v20-safe-error.mjs';
+import {v20SafeError,v20ErrorCategory} from '../lib/v20-safe-error.mjs';
 
 test('V20 errors are localized in all six languages without leaking provider details',()=>{
  const messages=['it','en','es','fr','de','pt'].map(v20SafeError);
@@ -11,4 +11,20 @@ test('V20 errors default to Italian for unknown or invalid locale',()=>{
  assert.equal(v20SafeError('zz'),v20SafeError('it'));
  assert.equal(v20SafeError(null),v20SafeError('it'));
  assert.equal(v20SafeError('en-GB'),v20SafeError('en'));
+});
+
+test('V20 structured provider codes produce safe localized categories',()=>{
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const generic=v20SafeError(locale);
+  for(const error of [{code:'42501'},{status:403},{code:'42P01'},{code:'PGRST202'},{code:'NETWORK_ERROR'},{status:0}]){
+   const message=v20SafeError(locale,error);
+   assert.notEqual(message,generic);
+   assert.doesNotMatch(message,/42501|42P01|PGRST|NETWORK_ERROR|supabase/i);
+  }
+  assert.equal(v20SafeError(locale,{message:'password=secret',code:'unknown'}),generic);
+ }
+ assert.equal(v20ErrorCategory({code:'42501'}),'access');
+ assert.equal(v20ErrorCategory({code:'42P01'}),'schema');
+ assert.equal(v20ErrorCategory({code:'FETCH_ERROR'}),'network');
+ assert.equal(v20ErrorCategory({message:'permission denied'}),'generic');
 });
