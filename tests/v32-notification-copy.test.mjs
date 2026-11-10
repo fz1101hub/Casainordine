@@ -85,3 +85,10 @@ test('pt-PT reminder uses a natural preposition before the localized date',()=>{
  assert.match(text,/A fatura Água vence em 31/);
  assert.doesNotMatch(text,/vence a 31/);
 });
+
+test('reminder rejects non-string names instead of exposing object coercion',()=>{
+ for(const name of [42,0,true,{},['Invoice'],{toString(){throw new Error('should not execute');}}]){
+  assert.throws(()=>billReminderCopy({language:'en',name,dueDate:'2026-11-04'}),TypeError);
+ }
+ assert.match(billReminderCopy({language:'en',name:'Invoice 42',dueDate:'2026-11-04'}).text,/Invoice 42/);
+});
