@@ -8,15 +8,22 @@ export default function PushSettings({client,onNotify}){
  const {t,language}=useLanguage();
  const [enabled,setEnabled]=useState(false),[busy,setBusy]=useState(false),[supported,setSupported]=useState(false);
  const key=process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+ // Attive solo se l'iscrizione di questo browser appartiene all'account corrente (su un
+ // dispositivo condiviso potrebbe essere rimasta quella di un altro account).
+ async function ownedSubscription(subscription){
+  if(!subscription)return false;
+  const {subscriptions=[]}=await api('GET').catch(()=>({}));
+  return subscriptions.some(x=>x.endpoint===subscription.endpoint);
+ }
  useEffect(()=>{setSupported('serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window&&location.protocol==='https:');
-   if('serviceWorker' in navigator)navigator.serviceWorker.ready.then(r=>r.pushManager.getSubscription()).then(s=>setEnabled(!!s)).catch(()=>{});
+   if('serviceWorker' in navigator)navigator.serviceWorker.ready.then(r=>r.pushManager.getSubscription()).then(ownedSubscription).then(setEnabled).catch(()=>{});
  },[]);
- async function api(method,body){const {data:{session}}=await client.auth.getSession();const r=await fetch('/api/push/subscribe',{method,headers:{'Authorization':`Bearer ${session?.access_token||''}`,'Content-Type':'application/json'},body:JSON.stringify(body)});const p=await r.json().catch(()=>({}));if(!r.ok)throw new Error(p.error?localizeSettingsApiError(p.error,language):t('push.configError'));return p;}
+ async function api(method,body){const {data:{session}}=await client.auth.getSession();const r=await fetch('/api/push/subscribe',{method,headers:{'Authorization':`Bearer ${session?.access_token||''}`,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});const p=await r.json().catch(()=>({}));if(!r.ok)throw new Error(p.error?localizeSettingsApiError(p.error,language):t('push.configError'));return p;}
  async function toggle(){setBusy(true);try{
   const reg=await navigator.serviceWorker.ready;
   const existing=await reg.pushManager.getSubscription();
-  if(existing){await api('DELETE',{endpoint:existing.endpoint});await existing.unsubscribe();setEnabled(false);onNotify(t('push.disabled'));}
-  else{const permission=await Notification.requestPermission();if(permission!=='granted')throw new Error(t('push.permissionDenied'));
+  if(existing&&enabled){await api('DELETE',{endpoint:existing.endpoint});await existing.unsubscribe();setEnabled(false);onNotify(t('push.disabled'));}
+  else{if(existing)await existing.unsubscribe().catch(()=>{});const permission=await Notification.requestPermission();if(permission!=='granted')throw new Error(t('push.permissionDenied'));
   const subscription=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:toBytes(key)});try{await api('POST',subscription.toJSON());}catch(e){await subscription.unsubscribe();throw e;}
   setEnabled(true);onNotify(t('push.enabled'));}
  }catch(e){onNotify(e.message);}finally{setBusy(false);}}

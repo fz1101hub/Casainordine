@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   LayoutDashboard, ReceiptText, PlugZap, House, UploadCloud, Settings, Bell,
   Plus, Search, CheckCircle2, CalendarDays, LogOut, ArrowUpRight, TrendingDown,
@@ -10,11 +10,12 @@ import {
 import { db } from '../lib/supabase-browser';
 import { addDaysISO, nextRecurringDue, todayRome, normalizeDate, euro } from '../lib/dates.mjs';
 import { parseBillsCsv } from '../lib/csv.mjs';
-import { parseRatePlanText } from '../lib/rate-plan.mjs';
+import { parseRatePlanText, rateItemsWithKeys } from '../lib/rate-plan.mjs';
 import { extractBillFields } from '../lib/document-import.mjs';
 import MailImporter from './MailImporter';
 import HouseholdHub from './HouseholdHub';
 import PushSettings from './PushSettings';
+import { ForgotPasswordButton, PasswordRecoveryDialog, DeleteAccountPanel } from './AccountSecurity';
 import CalendarFeed from './CalendarFeed';
 import HomeExtra from './HomeExtra';
 import V20Hub from './V20Hub';
@@ -103,7 +104,7 @@ function Auth({client}) {
   const {t}=useLanguage();
   const [signup,setSignup] = useState(false);
   const [email,setEmail] = useState(''); const [password,setPassword] = useState('');
-  const [error,setError] = useState(''); const [pending,setPending] = useState(false);
+  const [error,setError] = useState(''); const [pending,setPending] = useState(false); const [info,setInfo] = useState('');
   async function submit(e) {
     e.preventDefault(); setError(''); setPending(true);
     const {data,error:err} = signup ? await client.auth.signUp({email,password}) : await client.auth.signInWithPassword({email,password});
@@ -119,11 +120,15 @@ function Auth({client}) {
   }
   return <div className="auth-wrap"><div className="auth-decoration"><span className="auth-logo"><House size={23}/></span><p>{t('auth.brandLine')}</p><h1>{t('auth.tagline')}</h1><p className="auth-intro">{t('auth.intro')}</p><div className="auth-quote"><Bell size={21}/> {t('auth.reminder')}</div></div>
     <div className="auth-card"><LanguageSelector id="auth-language" className="auth-language" label={true}/><div className="brand auth-mobile"><span className="brand-icon"><House size={22}/></span><b>Casa<span>inOrdine</span></b></div><div className="eyebrow">{t('v32.notifications.authEyebrow')}</div><h2>{t(signup?'auth.signupTitle':'auth.title')}</h2><p className="muted">{t(signup?'auth.signupHelp':'auth.loginHelp')}</p>
-      <form onSubmit={submit}><label>{t('auth.email')}<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="tu@esempio.it"/></label><label>{t('auth.password')}<input type="password" minLength={6} required value={password} onChange={e=>setPassword(e.target.value)} placeholder={t('auth.passwordHint')}/></label><button className="btn btn-primary full" disabled={pending}>{t(pending?'auth.signingIn':signup?'auth.signUp':'auth.signIn')}<ChevronRight size={17}/></button></form>
+      <form onSubmit={submit}><label>{t('auth.email')}<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="tu@esempio.it"/></label><label>{t('auth.password')}<input type="password" minLength={6} required value={password} onChange={e=>setPassword(e.target.value)} placeholder={t('auth.passwordHint')}/></label>{!signup&&<ForgotPasswordButton client={client} email={email} t={t} onMessage={message=>{setError('');setInfo(message);}}/>}<button className="btn btn-primary full" disabled={pending}>{t(pending?'auth.signingIn':signup?'auth.signUp':'auth.signIn')}<ChevronRight size={17}/></button></form>
       <div className="auth-separator">{t('auth.or')}</div><a className="btn btn-soft full" href="/prova" style={{textDecoration:'none',justifyContent:'center'}}><House size={18}/> {t('auth.demo')}</a><button className="btn btn-soft full" onClick={google}><span className="google-dot">G</span> {t('auth.google')}</button>
-      {error&&<p className="auth-error">{error}</p>}<p className="auth-switch">{t(signup?'auth.hasAccount':'auth.noAccount')} <button onClick={()=>{setSignup(!signup);setError('');}}>{t(signup?'auth.signIn':'auth.signUp')}</button></p><p className="privacy-line"><LockKeyhole size={13}/> {t('auth.privacy')}</p>
+      {error&&<p className="auth-error">{error}</p>}{info&&!error&&<p className="auth-info" role="status">{info}</p>}<p className="auth-switch">{t(signup?'auth.hasAccount':'auth.noAccount')} <button onClick={()=>{setSignup(!signup);setError('');}}>{t(signup?'auth.signIn':'auth.signUp')}</button></p><p className="privacy-line"><LockKeyhole size={13}/> {t('auth.privacy')}</p>
     </div></div>;
 }
+
+// Esiti del ritorno da Google/Microsoft (app/api/mail/callback/route.js).
+const MAIL_STATUS={connected:'Casella email collegata! Ora puoi cercare le bollette.',denied:'Autorizzazione annullata: la casella non è stata collegata.',expired:'Il collegamento è scaduto: riprova.',other_browser:'Per sicurezza il collegamento va completato nello stesso browser in cui l’hai avviato. Riprova dall’app; se usi l’app dalla schermata Home di iPhone e il problema continua, avvia il collegamento da Safari.',no_refresh:'Il provider non ha concesso l’accesso continuativo: rimuovi Casa in Ordine dalle app autorizzate del tuo account email e riprova.'};
+function mailStatusMessage(status){return MAIL_STATUS[status]||'Collegamento della casella non riuscito: riprova più tardi.';}
 
 export default function Page() {
   const {t:tr,money,locale}=useLanguage();
@@ -143,12 +148,16 @@ export default function Page() {
   const [documentState,setDocumentState] = useState({busy:false,message:''});
   const [mailRefresh,setMailRefresh]=useState(0);
   const [supplierForm,setSupplierForm]=useState({name:'',category:'Luce',sender_email:''});
+  const [recovery,setRecovery]=useState(false);
   const [ratePlan,setRatePlan]=useState(null), [ratePaste,setRatePaste]=useState(''), [rateUnit,setRateUnit]=useState(''), [rateSupplier,setRateSupplier]=useState('Condominio'), [billPaste,setBillPaste]=useState('');
 
   const notify = txt=>{setToast(txt);};
+  const homesSeq=useRef(0), dataSeq=useRef(0), dataHome=useRef(undefined);
   const reloadHomes=useCallback(async()=>{
     if(!client)return;
+    const seq=++homesSeq.current;
     const {data:membership,error}=await client.from('home_members').select('home_id,role,homes(id,name,owner_id)').order('joined_at');
+    if(seq!==homesSeq.current)return;
     if(error){if(error.code!=='42P01')notify(tr('v32.flow.homesError',{error:error.message}));return;}
     const allowed=membership||[];
     setHomes(allowed);
@@ -156,6 +165,7 @@ export default function Page() {
   },[client]);
   const reload = useCallback(async()=>{
     if (!client) return;
+    const seq=++dataSeq.current;
     const scope=q=>activeHomeId?q.eq('home_id',activeHomeId):q.is('home_id',null);
     const [b,u,t,p,r,sp,sm] = await Promise.all([
       scope(client.from('bills').select('*')).order('due_date',{ascending:true}),
@@ -166,16 +176,37 @@ export default function Page() {
       client.from('user_suppliers').select('*').order('created_at',{ascending:true}),
       client.from('bill_summaries').select('*').order('summary_date',{ascending:false}).limit(12)
     ]);
+    // Cambiando casa in fretta può arrivare per ultima la risposta della casa precedente: si scarta,
+    // altrimenti le sue bollette comparirebbero (e si segnerebbero pagate) sotto la casa nuova.
+    if (seq!==dataSeq.current) return;
     const err = [b,u,t,p,r,sp,sm].find(x=>x.error);
-    if (err) notify(tr('v32.flow.loadError',{error:err.error.message}));
+    // Con un errore (per esempio rete assente) restano i dati già mostrati della STESSA casa: le
+    // liste vuote farebbero credere che non ci sia nessuna bolletta da pagare. Quelli di un'altra
+    // casa invece non devono restare sotto il nome di questa.
+    if (err) {
+      notify(tr('v32.flow.loadError',{error:err.error.message}));
+      if (dataHome.current===(activeHomeId||null)) return;
+    }
+    dataHome.current=err?undefined:(activeHomeId||null);
     setData({bills:b.data||[],utilities:u.data||[],tasks:t.data||[],suppliers:sp.data||[],summaries:sm.data||[],profile:p.data||null,
       reminders:(r.data||[]).filter(item=>item.bills&&!item.bills.paid_at&&item.bills.home_id===activeHomeId)});
   },[client,activeHomeId]);
+  // Cambio di casa: si ricaricano solo i dati, senza rifare la sottoscrizione all'autenticazione
+  // (prima ogni cambio la rifaceva e i dati venivano caricati due volte).
+  const reloadRef=useRef(reload), reloadHomesRef=useRef(reloadHomes), firstHome=useRef(true);
+  reloadRef.current=reload; reloadHomesRef.current=reloadHomes;
+  useEffect(()=>{
+    if(firstHome.current){firstHome.current=false;return;}
+    if(!demo&&client&&user)reload();
+  },[reload]);
   useEffect(()=>{
     if(!client||!activeHomeId){setHomeMembers([]);return;}
+    let current=true;
     client.from('home_members').select('user_id,email,role').eq('home_id',activeHomeId).then(({data,error})=>{
+      if(!current)return;
       if(error)notify(error.message);else setHomeMembers(data||[]);
     });
+    return ()=>{current=false;};
   },[client,activeHomeId,homes]);
 
   useEffect(()=>{
@@ -184,13 +215,59 @@ export default function Page() {
       catch {setData(fakeData());}
       return;
     }
-    client.auth.getSession().then(({data:{session}})=>{setUser(session?.user||null);setInitializing(false);if(session){reload();reloadHomes();}});
-    const {data:{subscription}} = client.auth.onAuthStateChange((_event,session)=>{
-      setUser(session?.user||null); if(session) {setTimeout(()=>{reload();reloadHomes();},0);} else {setHomes([]);setActiveHomeId(null);setData({bills:[],utilities:[],tasks:[],suppliers:[],summaries:[],profile:null,reminders:[]});}
+    client.auth.getSession().then(({data:{session}})=>{setUser(session?.user||null);setInitializing(false);if(session){reloadRef.current();reloadHomesRef.current();}});
+    const {data:{subscription}} = client.auth.onAuthStateChange((event,session)=>{
+      // Dopo un'uscita (anche per sessione scaduta) si ricarica la pagina: nello stato React
+      // restano altrimenti chiave d'integrazione, testi incollati e moduli dell'account precedente.
+      if(event==='SIGNED_OUT'){window.location.replace('/');return;}
+      // Ritorno dal link 'Password dimenticata?': si chiede subito la nuova password.
+      if(event==='PASSWORD_RECOVERY')setRecovery(true);
+      setUser(session?.user||null);
+      // Il rinnovo del token (circa ogni ora) non richiede di ricaricare tutto.
+      if(session) {if(event!=='TOKEN_REFRESHED')setTimeout(()=>{reloadRef.current();reloadHomesRef.current();},0);} else {setHomes([]);setActiveHomeId(null);setData({bills:[],utilities:[],tasks:[],suppliers:[],summaries:[],profile:null,reminders:[]});}
     });
     return ()=>subscription.unsubscribe();
-  },[demo,client,reload,reloadHomes]);
+  },[demo,client]);
 
+  // Finestre: il focus entra nella finestra all'apertura e torna dov'era alla chiusura; Esc chiude.
+  // Una bolletta letta da un documento non si chiude con Esc o col tocco sullo sfondo: si perderebbe
+  // quanto estratto; resta il pulsante di chiusura.
+  const dialogRef=useRef(null), dialogState=useRef({});
+  dialogState.current={ratePlan:Boolean(ratePlan),documentBill:form.source==='document'};
+  const dialogOpen=Boolean(modal||ratePlan);
+  // L'ultimo elemento con il focus fuori dalle finestre: i campi con autoFocus prendono il focus
+  // prima degli effetti, quindi activeElement all'apertura è già dentro la finestra.
+  const lastFocus=useRef(null);
+  useEffect(()=>{
+    const onFocus=e=>{if(!e.target?.closest?.('.modal'))lastFocus.current=e.target;};
+    document.addEventListener('focusin',onFocus);
+    return ()=>document.removeEventListener('focusin',onFocus);
+  },[]);
+  useEffect(()=>{
+    if(!dialogOpen)return;
+    const previous=lastFocus.current;
+    if(dialogRef.current&&!dialogRef.current.contains(document.activeElement))dialogRef.current.focus();
+    const onKey=e=>{if(e.key!=='Escape')return;if(dialogState.current.ratePlan)setRatePlan(null);else if(!dialogState.current.documentBill)setModal(null);};
+    document.addEventListener('keydown',onKey);
+    return ()=>{document.removeEventListener('keydown',onKey);if(previous?.isConnected&&typeof previous.focus==='function')previous.focus();};
+  },[dialogOpen]);
+  async function signOut(){
+    // Questo dispositivo smette di ricevere le notifiche dell'account che esce.
+    try{
+      const registration='serviceWorker' in navigator?await Promise.race([navigator.serviceWorker.ready,new Promise(done=>setTimeout(()=>done(null),1500))]):null;
+      const subscription=await registration?.pushManager?.getSubscription();
+      if(subscription){
+        const {data:{session}}=await client.auth.getSession();
+        await fetch('/api/push/subscribe',{method:'DELETE',headers:{Authorization:`Bearer ${session?.access_token||''}`,'Content-Type':'application/json'},body:JSON.stringify({endpoint:subscription.endpoint})}).catch(()=>{});
+        await subscription.unsubscribe().catch(()=>{});
+      }
+    }catch{}
+    // Solo questo dispositivo (prima l'uscita chiudeva la sessione su tutti). Senza rete
+    // signOut restituisce un errore e lascia la sessione salvata: la si cancella comunque.
+    const {error}=await client.auth.signOut({scope:'local'}).catch(e=>({error:e}));
+    if(error){try{Object.keys(localStorage).filter(k=>/^sb-.+-auth-token/.test(k)).forEach(k=>localStorage.removeItem(k));}catch{}}
+    window.location.replace('/');
+  }
   function writeDemo(next) {setData(next);localStorage.setItem('casainordine-demo-v1',JSON.stringify(next));}
   function localUpdate(key,fn) {writeDemo({...data,[key]:fn(data[key])});}
   async function updateRow(table,id,patch,key=table) {
@@ -208,8 +285,8 @@ export default function Page() {
   }
   async function saveBill(e) {
     e.preventDefault();if(!canWrite)return notify(tr('v32.feedback.3'));
-    if(form.source==='document'&&['ricevuta','sollecito'].includes(form.import_document_type)){
-      const label=form.import_document_type==='ricevuta'?tr('v32.flow.receiptLabel'):tr('v32.flow.reminderLabel');
+    if(form.source==='document'&&['ricevuta','sollecito','nota_credito'].includes(form.import_document_type)){
+      const label=form.import_document_type==='ricevuta'?tr('v32.flow.receiptLabel'):form.import_document_type==='nota_credito'?tr('v32.flow.creditNoteLabel'):tr('v32.flow.reminderLabel');
       if(!window.confirm(tr('v32.flow.documentConfirm',{kind:label})))return;
     }
     setBusy(true);
@@ -308,11 +385,13 @@ export default function Page() {
     if(selected.length>120){notify(tr('v32.feedback.18'));return;}
     const supplier=rateSupplier.trim()||'Condominio';
     if(selected.some(r=>!r.title.trim()||!normalizeDate(r.due_date)||!Number.isFinite(Number(r.amount))||Number(r.amount)<=0)){notify(tr('v32.feedback.19'));return;}
-    const unique=new Set(selected.map(r=>`${r.due_date}:${Number(r.amount)}`));
+    // Only rows that are identical in everything (title, date, amount) are duplicates.
+    const unique=new Set(selected.map(r=>`${r.title.trim().toLowerCase()}:${r.due_date}:${Number(r.amount)}`));
     if(unique.size!==selected.length){notify(tr('v32.feedback.20'));return;}
-    // Same imported rate is identified by source + date + amount; repeat uploads are idempotent.
-    const items=selected.map(r=>({title:r.title.trim(),supplier,category:'Condominio',amount:Number(r.amount),due_date:r.due_date,paid_at:null,source:'document',is_estimate:false,
-      external_id:`rate:${supplier.toLowerCase().slice(0,60)}:${r.due_date}:${Number(r.amount).toFixed(2)}`}));
+    // A rate is identified by supplier + date + amount, plus its position among rates with the same
+    // date and amount (e.g. 'Rata 1 ordinaria' and 'Rata 1 straordinaria'): both are saved, and
+    // importing the same plan again stays idempotent.
+    const items=rateItemsWithKeys(selected,supplier);
     setBusy(true);
     try{
       const existing=new Set((data.bills||[]).filter(b=>b.source==='document'&&b.external_id?.startsWith('rate:')).map(b=>b.external_id));
@@ -414,7 +493,7 @@ export default function Page() {
   }
   useEffect(()=>{if(tab==='connect'&&!demo&&user)loadIntegration();},[tab,user?.id]);
   useEffect(()=>{if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('/sw.js').catch(()=>{});},[]);
-  useEffect(()=>{if(new URLSearchParams(window.location.search).has('invite')||sessionStorage.getItem('pending_house_invite'))setTab('household');const mail=new URLSearchParams(window.location.search).get('mail');if(mail){setTab('connect');notify(mail==='connected'?'Gmail collegata! Ora puoi cercare le bollette.':mail==='denied'?'Autorizzazione Gmail annullata.':'Collegamento Gmail non riuscito: verifica le impostazioni OAuth.');window.history.replaceState({},'',window.location.pathname);}},[]);
+  useEffect(()=>{if(new URLSearchParams(window.location.search).has('invite')||sessionStorage.getItem('pending_house_invite'))setTab('household');const mail=new URLSearchParams(window.location.search).get('mail');if(mail){setTab('connect');notify(mailStatusMessage(mail));window.history.replaceState({},'',window.location.pathname);}},[]);
 
   const today=todayRome(), soon=addDaysISO(today,7);
   const bills=data.bills||[], utilities=data.utilities||[],tasks=data.tasks||[],suppliers=data.suppliers||[];
@@ -441,14 +520,17 @@ export default function Page() {
   function switchHome(id){setActiveHomeId(id||null);setTab(id?'dashboard':'household');setData(old=>({...old,bills:[],utilities:[],tasks:[],reminders:[]}));}
   // QR codes contain only the asset UUID. Resolve its home via RLS after login.
   // Never bypass the user's membership permissions or infer an inaccessible home.
+  const assetHandled=useRef(false);
   useEffect(()=>{
-    if(!client||!user)return;
+    if(!client||!user||assetHandled.current)return;
     const ref=new URLSearchParams(window.location.search).get('asset');
     if(!ref||!/^[0-9a-f-]{36}$/i.test(ref))return;
     let current=true;
     client.from('maintenance_assets').select('home_id').eq('id',ref).maybeSingle().then(({data:asset,error})=>{
       if(!current||error||!asset)return;
       if(asset.home_id&& !homes.some(h=>h.home_id===asset.home_id))return;
+      // Una volta sola: prima ogni ricarica delle case riportava l'utente sulla scheda QR.
+      assetHandled.current=true;
       if((asset.home_id||null)!==(activeHomeId||null)){
         setActiveHomeId(asset.home_id||null);
         setData(old=>({...old,bills:[],utilities:[],tasks:[],reminders:[]}));
@@ -465,9 +547,9 @@ export default function Page() {
     {mobile&&<button className="mobile-backdrop" onClick={()=>setMobile(false)} aria-label={tr('ui.closeMenu')}/>}
     <aside className={`sidebar ${mobile?'sidebar-show':''}`}>
       <div className="brand"><span className="brand-icon"><House size={22}/></span><b>Casa<span>inOrdine</span></b></div>
-      <div className="sidebar-label">{activeHomeId?homeMembership?.homes?.name||"CASA CONDIVISA":"SPAZIO PERSONALE"}</div><nav className="nav">{menu.map(({id,title,icon:Icon})=><button key={id} className={`nav-item ${tab===id?'active':''}`} onClick={()=>changePage(id)}><Icon size={19}/><span>{tr('nav.'+id)}</span>{tab===id&&<span className="nav-active-indicator"/>}</button>)}</nav>
+      <div className="sidebar-label">{activeHomeId?homeMembership?.homes?.name||tr('v32.overview.sharedHome').toUpperCase():tr('v32.overview.personalSpace').toUpperCase()}</div><nav className="nav">{menu.map(({id,title,icon:Icon})=><button key={id} className={`nav-item ${tab===id?'active':''}`} onClick={()=>changePage(id)}><Icon size={19}/><span>{tr('nav.'+id)}</span>{tab===id&&<span className="nav-active-indicator"/>}</button>)}</nav>
       <div className="sidebar-spacer"/><div className="sidebar-info"><div className="sidebar-info-icon"><Bell size={18}/></div><b>{tr('v32.shell.reminderTitle')}</b><p>{tr('v32.shell.reminderHelp')}</p></div>
-      <div className="sidebar-profile"><span className="avatar"><UserRound size={18}/></span><div className="profile-copy"><b>{demo?tr('v32.overview.demoMode'):user?.email?.split('@')[0]}</b><small>{demo?tr('v32.overview.localData'):tr('v32.overview.privateSpace')}</small></div>{!demo&&<button title={tr('ui.signOut')} className="icon-button" onClick={()=>client.auth.signOut()}><LogOut size={17}/></button>}</div>
+      <div className="sidebar-profile"><span className="avatar"><UserRound size={18}/></span><div className="profile-copy"><b>{demo?tr('v32.overview.demoMode'):user?.email?.split('@')[0]}</b><small>{demo?tr('v32.overview.localData'):tr('v32.overview.privateSpace')}</small></div>{!demo&&<button title={tr('ui.signOut')} className="icon-button" onClick={signOut}><LogOut size={17}/></button>}</div>
     </aside>
     <main className="main">
       <header className="topbar"><button className="icon-button burger" onClick={()=>setMobile(true)} aria-label={tr('ui.openMenu')}><Menu size={23}/></button><div className="crumb"><span>{activeHomeId?homeMembership?.homes?.name||tr('v32.overview.sharedHome'):tr('v32.overview.personalSpace')}</span><ChevronRight size={15}/><b>{tr('nav.'+tab)}</b></div>
@@ -477,7 +559,7 @@ export default function Page() {
         {activeHomeId&&!canWrite&&<div className="informative"><ShieldCheck size={17}/><p>{tr('v32.shell.readOnly')}</p></div>}
         {demo&&<div className="demo-banner"><Info size={17}/><div><b>{tr('v32.batch.demoTitle')}</b> {tr('v32.batch.demoHelp')}</div><button onClick={()=>{localStorage.removeItem('casainordine-demo-v1');setData(fakeData());notify(tr('v32.batch.demoResetDone'));}} >{tr('v32.batch.demoReset')}</button></div>}
         {['insights','archive','properties','maintenance','contracts','payments','alerts'].includes(tab)&&<HomeExtra client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} bills={bills} utilities={utilities} tab={tab} onNotify={notify} onRefresh={reload}/>}
-        {['tags','sos','radar','simulator','passport','vacation','inventory','decisions','briefing'].includes(tab)&&<V21Hub client={client} user={user} homeId={activeHomeId} canWrite={canWrite} demo={demo} bills={bills} tasks={tasks} tab={tab} onNotify={notify}/>}
+        {['tags','sos','radar','simulator','passport','vacation','inventory','decisions','briefing'].includes(tab)&&<V21Hub client={client} user={user} homeId={activeHomeId} homeName={homeMembership?.homes?.name||''} canWrite={canWrite} demo={demo} bills={bills} tasks={tasks} tab={tab} onNotify={notify}/>}
         {['monitor','fraud','pagopa','history','moving','savings','offline'].includes(tab)&&<V20Hub client={client} user={user} homeId={activeHomeId} canWrite={canWrite} demo={demo} bills={bills} utilities={utilities} tab={tab} onNotify={notify} onRefresh={reload}/>}
         {tab==='dashboard'&&<PersonalizedHome client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} bills={bills} tasks={tasks} displayName={displayName} onNavigate={changePage} onNewBill={()=>openModal('bill')} onNewTask={()=>openModal('task')} onPay={pay} onToggleTask={toggleTask} onRefresh={reload} onNotify={notify}/>}
         {tab==='overview'&&<>
@@ -539,14 +621,15 @@ export default function Page() {
             {data.profile?.summary_frequency==='monthly'&&<label>{tr('settings.monthDay')}<input type="number" min="1" max="28" value={data.profile?.summary_month_day??1} onChange={e=>{const d=Number(e.target.value);if(d>=1&&d<=28)updateSummaryPrefs({summary_month_day:d});}}/></label>}
             <small>{tr('settings.summaryNote')}</small></div>
             {!demo&&<><PushSettings client={client} onNotify={notify}/><CalendarFeed client={client} onNotify={notify}/></>}<div className="summary-settings"><h3>{tr('settings.phoneCalendar')}</h3><p>{tr('settings.exportHelp')}</p><button className="btn btn-soft" onClick={()=>downloadCalendar(bills.filter(b=>!b.paid_at),activeHomeId?'scadenze-casa':'scadenze-personali')}><CalendarDays size={16}/> {tr('settings.exportCalendar')}</button></div><div className="setting-row"><div><b>{tr('settings.autoPayment')}</b><small>{tr('settings.autoPaymentHelp')}</small></div><button className={`toggle ${data.profile?.auto_confirm_payments?'on':''}`} onClick={toggleAutoPayment} aria-label={tr('settings.autoPaymentToggle')} aria-pressed={!!data.profile?.auto_confirm_payments}><span/></button></div></section>
-          <section className="panel settings-panel"><div className="settings-heading"><span className="settings-icon"><LockKeyhole size={20}/></span><div><h2>{tr('settings.privacyHeading')}</h2><p>{tr('settings.privacyHelp')}</p></div></div><div className="setting-row"><div><b>{tr('settings.account')}</b><small>{demo?tr('settings.demoLocal'):user?.email||tr('settings.personalAccount')}</small></div><ShieldCheck size={20} className="subtle-green"/></div><div className="setting-row"><div><b>{tr('settings.sharing')}</b><small>{tr('settings.sharingHelp')}</small></div><button className="btn btn-soft" onClick={()=>changePage('household')}>{tr('settings.manageHomes')}</button></div>{!demo&&<button className="btn btn-soft" onClick={()=>client.auth.signOut()}><LogOut size={17}/> {tr('settings.signout')}</button>}</section></div></>}
+          <section className="panel settings-panel"><div className="settings-heading"><span className="settings-icon"><LockKeyhole size={20}/></span><div><h2>{tr('settings.privacyHeading')}</h2><p>{tr('settings.privacyHelp')}</p></div></div><div className="setting-row"><div><b>{tr('settings.account')}</b><small>{demo?tr('settings.demoLocal'):user?.email||tr('settings.personalAccount')}</small></div><ShieldCheck size={20} className="subtle-green"/></div><div className="setting-row"><div><b>{tr('settings.sharing')}</b><small>{tr('settings.sharingHelp')}</small></div><button className="btn btn-soft" onClick={()=>changePage('household')}>{tr('settings.manageHomes')}</button></div>{!demo&&<button className="btn btn-soft" onClick={signOut}><LogOut size={17}/> {tr('settings.signout')}</button>}</section></div>{!demo&&user&&<DeleteAccountPanel client={client} user={user} t={tr} onNotify={notify}/>}</>}
       </div>
     </main>
-    {ratePlan&&<div className="modal-overlay"><div className="modal rate-modal"><div className="modal-head"><div><div className="eyebrow">{tr('rates.eyebrow')}</div><h2>{tr('rates.count',{count:ratePlan.rows.length})}</h2></div><button className="icon-button" onClick={()=>setRatePlan(null)} aria-label={t('ui.close')}><X size={20}/></button></div>
+    {recovery&&<PasswordRecoveryDialog client={client} t={tr} onDone={message=>{setRecovery(false);notify(message);}}/>}
+    {ratePlan&&<div className="modal-overlay"><div className="modal rate-modal" role="dialog" aria-modal="true" aria-labelledby="rate-modal-title" tabIndex={-1} ref={dialogRef}><div className="modal-head"><div><div className="eyebrow">{tr('rates.eyebrow')}</div><h2 id="rate-modal-title">{tr('rates.count',{count:ratePlan.rows.length})}</h2></div><button className="icon-button" onClick={()=>setRatePlan(null)} aria-label={tr('ui.close')}><X size={20}/></button></div>
       <div className="rate-modal-body"><p>{tr('rates.source',{source:ratePlan.source})}</p>{ratePlan.warnings.map((w,i)=><p className="rate-warning" key={i}><AlertCircle size={15}/> {w}</p>)}
       <div className="table-scroll"><table className="bills-table"><thead><tr><th>{tr('rates.use')}</th><th>{tr('rates.description')}</th><th>{tr('rates.due')}</th><th>{tr('rates.amount')}</th></tr></thead><tbody>{ratePlan.rows.map((r,i)=><tr key={i}><td><input type="checkbox" checked={r.selected} onChange={e=>setRatePlan({...ratePlan,rows:ratePlan.rows.map((x,j)=>j===i?{...x,selected:e.target.checked}:x)})}/></td><td><input aria-label={tr('rates.itemDescription',{number:i+1})} value={r.title} onChange={e=>setRatePlan({...ratePlan,rows:ratePlan.rows.map((x,j)=>j===i?{...x,title:e.target.value}:x)})}/></td><td><input type="date" aria-label={tr('rates.itemDate',{number:i+1})} value={r.due_date} onChange={e=>setRatePlan({...ratePlan,rows:ratePlan.rows.map((x,j)=>j===i?{...x,due_date:e.target.value}:x)})}/></td><td><input type="number" min="0.01" step="0.01" aria-label={tr('rates.itemAmount',{number:i+1})} value={r.amount} onChange={e=>setRatePlan({...ratePlan,rows:ratePlan.rows.map((x,j)=>j===i?{...x,amount:e.target.value}:x)})}/></td></tr>)}</tbody></table></div>
       <div className="modal-actions"><button className="btn btn-soft" onClick={()=>setRatePlan(null)}>{tr('general.cancel')}</button><button className="btn btn-primary" disabled={busy} onClick={saveRatePlan}>{busy?tr('form.saving'):tr('rates.saveSelected')} <Check size={16}/></button></div></div></div></div>}
-    {modal&&<div className="modal-overlay" onMouseDown={e=>{if(e.target===e.currentTarget)setModal(null);}}><div className="modal"><div className="modal-head"><div><div className="eyebrow">{tr(modal==='bill'?(form.source==='document'?'form.eyebrowDocument':'form.eyebrowBill'):modal==='utility'?'form.eyebrowUtility':'form.eyebrowTask')}</div><h2>{tr(modal==='bill'?(form.source==='document'?'form.reviewBill':'form.addBill'):modal==='utility'?'form.connectUtility':'form.addTask')}</h2></div><button className="icon-button" onClick={()=>setModal(null)}><X size={21}/></button></div>
+    {modal&&<div className="modal-overlay" onMouseDown={e=>{if(e.target===e.currentTarget&&form.source!=='document')setModal(null);}}><div className="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabIndex={-1} ref={dialogRef}><div className="modal-head"><div><div className="eyebrow">{tr(modal==='bill'?(form.source==='document'?'form.eyebrowDocument':'form.eyebrowBill'):modal==='utility'?'form.eyebrowUtility':'form.eyebrowTask')}</div><h2 id="modal-title">{tr(modal==='bill'?(form.source==='document'?'form.reviewBill':'form.addBill'):modal==='utility'?'form.connectUtility':'form.addTask')}</h2></div><button className="icon-button" onClick={()=>setModal(null)} aria-label={tr('ui.close')}><X size={21}/></button></div>
       <form onSubmit={modal==='bill'?saveBill:modal==='utility'?saveUtility:saveTask} className="modal-form">
         {modal==='bill'&&<>{form.source==='document'&&<div className="document-review"><div className="document-review-head"><FileText size={19}/><div><b>{tr('form.documentRead',{name:form.import_file})}</b><small>{tr('form.ocrHelp')}</small></div></div>{form.import_warnings?.length>0&&<ul>{form.import_warnings.map((warning,index)=><li key={index}>{warning}</li>)}</ul>}</div>}<label>{tr('form.description')} <input required maxLength={180} autoFocus value={form.title||''} onChange={e=>setForm({...form,title:e.target.value})} placeholder={tr('form.billPlaceholder')}/></label><label>{tr('form.supplier')} <input maxLength={120} value={form.supplier||''} onChange={e=>setForm({...form,supplier:e.target.value})} placeholder={tr('form.supplierPlaceholder')}/></label><div className="form-row"><label>{tr('form.category')} <select value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>{categories.map(c=><option key={c} value={c}>{tr('billCategory.'+c)}</option>)}</select></label><label>{tr('form.amount')} <input required type="number" min="0" step="0.01" value={form.amount} onChange={e=>setForm({...form,amount:e.target.value})} placeholder={new Intl.NumberFormat(locale,{minimumFractionDigits:2,maximumFractionDigits:2}).format(0)}/></label></div><label>{tr('form.dueDate')} <input type="date" required value={form.due_date} onChange={e=>setForm({...form,due_date:e.target.value})}/></label><label className="checkbox-label"><input type="checkbox" checked={!!form.paid} onChange={e=>setForm({...form,paid:e.target.checked})}/> {tr('form.paid')}</label></>}
         {modal==='utility'&&<><label>{tr('form.supplierName')} <input autoFocus required maxLength={120} value={form.supplier||''} onChange={e=>setForm({...form,supplier:e.target.value})} placeholder={tr('form.internetPlaceholder')}/></label><div className="form-row"><label>{tr('form.category')}<select value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>{categories.map(c=><option key={c} value={c}>{tr('billCategory.'+c)}</option>)}</select></label><label>{tr('form.estimatedAmount')}<input required type="number" step="0.01" min="0" value={form.estimated_amount} onChange={e=>setForm({...form,estimated_amount:e.target.value})} placeholder={new Intl.NumberFormat(locale,{minimumFractionDigits:2,maximumFractionDigits:2}).format(0)}/></label></div><label>{tr('form.accountReference')}<input maxLength={120} value={form.account_reference||''} onChange={e=>setForm({...form,account_reference:e.target.value})} placeholder={tr('form.passwordWarning')}/></label><div className="form-row"><label>{tr('form.frequency')}<select value={form.frequency} onChange={e=>setForm({...form,frequency:e.target.value})}>{frequencies.map(f=><option key={f.value} value={f.value}>{tr('billFrequency.'+f.value)}</option>)}</select></label><label>{tr('form.firstDue')}<input type="date" required value={form.next_due_date} onChange={e=>setForm({...form,next_due_date:e.target.value})}/></label></div><p className="helper-text"><Info size={15}/> {tr('form.estimateHelp')}</p></>}

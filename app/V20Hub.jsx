@@ -1,5 +1,5 @@
 'use client';
-import {useCallback,useEffect,useMemo,useState} from 'react';
+import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {AlertTriangle,Check,Download,History,House,MailWarning,Plus,ShieldAlert,Trash2,WifiOff,RefreshCw,Wallet,ScanLine,Car,FileText} from 'lucide-react';
 import {todayRome} from '../lib/dates.mjs';
 import {useLanguage} from './LanguageProvider';
@@ -28,21 +28,28 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
  const [selectedBill,setSelectedBill]=useState(''),[sender,setSender]=useState(''),[auth,setAuth]=useState('unknown'),[iban,setIban]=useState('');
  const [riskPreview,setRiskPreview]=useState(null),[drafts,setDrafts]=useState([]),[offlineError,setOfflineError]=useState('');
  const scope=(q)=>homeId?q.eq('home_id',homeId):q.is('home_id',null);
+ const loadSeq=useRef(0);
  const load=useCallback(async()=>{
+  const seq=++loadSeq.current;
   if(!client){setLoading(false);return;}setLoading(true);
   const specs=[['goals','home_savings_goals'],['moves','home_move_plans'],['steps','home_move_steps'],['notices','pagopa_notices'],['risk','bill_security_reviews'],['audit','home_audit_log'],['recycle','home_recycle_bin']];
   const res=await Promise.all([...specs.map(([k,t])=>scope(client.from(t).select('*')).order(k==='audit'?'created_at':k==='recycle'?'deleted_at':'created_at',{ascending:false}).limit(k==='audit'?200:400)),
     client.from('user_alerts').select('*').eq('user_id',user.id).in('kind',['missing_bill','mail_sync','fraud','move','savings']).order('created_at',{ascending:false}).limit(100),
-    client.from('mail_connections').select('id,provider,email_address,status,last_sync_at,last_error').eq('user_id',user.id).limit(100),
+    // mail_connections contiene credenziali cifrate e non è leggibile dal browser: si passa dall'API.
+    client.auth.getSession().then(({data:{session}})=>fetch('/api/mail/connections',{headers:{Authorization:`Bearer ${session?.access_token||''}`}}))
+      .then(async r=>{const body=await r.json().catch(()=>({}));return r.ok?{data:body.connections||[],error:null}:{data:[],error:{message:body.error||`HTTP ${r.status}`}};})
+      .catch(e=>({data:[],error:{message:e.message}})),
     client.from('user_alert_preferences').select('user_id,push_monitor').eq('user_id',user.id).maybeSingle()
   ]);
+  // Cambiando casa in fretta può arrivare per ultima la risposta della casa precedente: si scarta.
+  if(seq!==loadSeq.current)return;
   const error=res.find(r=>r.error);if(error)onNotify(ui.migrationRequired+v20SafeError(language,error.error));
   const next={};for(let i=0;i<specs.length;i++)next[specs[i][0]]=res[i].data||[];
   next.alerts=res[specs.length].data||[];next.connections=res[specs.length+1].data||[];next.preferences=res[specs.length+2].data||null;
   setRows(next);setLoading(false);
  },[client,homeId,user?.id,language]);
  useEffect(()=>{load();},[load]);
- useEffect(()=>{if(tab==='offline'){listDrafts().then(setDrafts).catch(e=>setOfflineError(v20SafeError(language)));}},[tab]);
+  useEffect(()=>{if(tab==='offline'){listDrafts(user?.id).then(setDrafts).catch(e=>setOfflineError(v20SafeError(language)));}},[tab,user?.id]);
  const common={user_id:user?.id,home_id:homeId||null};
  async function save(table,content,message,options={}){if(!client||!canWrite)return onNotify(ui.editPermissionRequired);setWorking(true);try{
   const {data,error}=await client.from(table).insert({...common,...content}).select('*').single();if(error)throw error;onNotify(message);await load();if(options.parent)onRefresh();return data;
@@ -80,8 +87,8 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   if(createBill&&!window.confirm(ui.confirmNoticeOriginal))return;
   setWorking(true);try{const {error}=await client.rpc('v20_register_pagopa',{p_home_id:homeId||null,p_notice_code:code,p_creditor_code:notice.creditor_code||null,p_creditor_name:notice.creditor_name,p_amount:notice.amount===''?null:Number(notice.amount),p_due_on:notice.due_on||null,p_create_bill:createBill});if(error)throw error;
    onNotify(createBill?ui.noticeAndReminderSaved:ui.noticeSaved);setNotice({notice_code:'',creditor_code:'',creditor_name:'',amount:'',due_on:''});setRawNotice('');await load();onRefresh();}
-  catch(e){onNotify(v20SafeError(language,e))}finally{setWorking(false)}}
- async function refreshDrafts(){try{setDrafts(await listDrafts());setOfflineError('')}catch(e){setOfflineError(v20SafeError(language))}}
+   catch(e){onNotify(v20SafeError(language,e))}finally{setWorking(false)}}
+  async function refreshDrafts(){try{setDrafts(await listDrafts(user?.id));setOfflineError('')}catch(e){setOfflineError(v20SafeError(language))}}
  async function importDraft(d){if(!client||!user)return onNotify(ui.signInToImport);if(d.type==='document')return;
   if(d.type==='shopping'&&(!homeId||!canWrite))return onNotify(ui.selectWritableHome);
   if(d.type==='shopping'&&!window.confirm(ui.confirmAddShopping))return;

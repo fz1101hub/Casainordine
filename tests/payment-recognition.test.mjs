@@ -85,7 +85,7 @@ test('Auto-confirmation requires BOTH opt-in AND trust for the exact sender and 
         then(done){return Promise.resolve({error:null}).then(done);}
       };return q;
     }};
-    const outcome=await processPaymentMessage(admin,{id:'connection1',user_id:'user1'},{...receipt,messageId:'different-message'});
+    const outcome=await processPaymentMessage(admin,{id:'connection1',user_id:'user1'},{...receipt,messageId:'different-message',senderAuth:'reported_pass'});
     return {outcome,events};
   }
   const withoutOptIn=await run(false,true);
@@ -102,7 +102,8 @@ test('a subject claiming payment does not turn a request-to-pay into evidence',(
   assert.equal(extractPaymentEvidence({...receipt,text}),null);
 });
 test('a subject-only receipt is not eligible for auto-payment without body confirmation',()=>{
-  const x=extractPaymentEvidence({...receipt,text:'La tua bolletta Enel Energia è disponibile. Importo € 87,50.'});
+  // A body announcing a new bill ("La tua bolletta … è disponibile") is never evidence: see v33-audit-logic.
+  const x=extractPaymentEvidence({...receipt,text:'Gentile cliente, ti scriviamo in merito alla bolletta Enel Energia. Importo € 87,50.'});
   assert.ok(x);assert.equal(x.autoEligible,false);
 });
 test('an explicit confirmation in the body can qualify for opt-in automatic reconciliation',()=>{

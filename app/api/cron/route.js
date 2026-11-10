@@ -1,5 +1,7 @@
-import { getAdmin, json } from '../../../lib/server.mjs';
+import { getAdmin, json, scheduledCallAuthorized } from '../../../lib/server.mjs';
+import { isHomeMember } from '../../../lib/home-access.mjs';
 import { addDaysISO, nextRecurringDue, todayRome, euro } from '../../../lib/dates.mjs';
+import { reminderWindow, daysUntil, firstRecurringFrom } from '../../../lib/reminder-window.mjs';
 import { shouldSendSummary, monthEndISO, upcomingSummaryBills } from '../../../lib/summary-schedule.mjs';
 import { sendPush, configuredPush } from '../../../lib/push.mjs';
 import { processExtraAlerts, pushAllowed } from '../../../lib/extra-alerts.mjs';
@@ -59,6 +61,10 @@ async function notifyPushForBill(admin,bill,today,counts){
     const {data:devices,error}=await admin.from('push_subscriptions').select('id,endpoint,p256dh,auth_secret').eq('user_id',userId).limit(10);
     if(error){counts.errors.push(`Push utente ${userId}: ${error.message}`);continue;}
     if(!devices?.length)continue;
+    // Una sola notifica per bolletta e persona, anche se la bolletta resta nella finestra più giorni.
+    const {data:earlier,error:earlierErr}=await admin.from('push_delivery_log').select('reminder_date').eq('bill_id',bill.id).eq('user_id',userId).not('sent_at','is',null).neq('reminder_date',today).limit(1);
+    if(earlierErr){counts.errors.push(`Log push ${bill.id}: ${earlierErr.message}`);continue;}
+    if(earlier?.length)continue;
     const {data:created,error:logErr}=await admin.from('push_delivery_log').upsert({bill_id:bill.id,user_id:userId,reminder_date:today},
       {onConflict:'bill_id,user_id,reminder_date',ignoreDuplicates:true}).select('sent_at').maybeSingle();
     if(logErr){counts.errors.push(`Log push ${bill.id}: ${logErr.message}`);continue;}
@@ -68,7 +74,7 @@ async function notifyPushForBill(admin,bill,today,counts){
     }
     const {data:languagePreference,error:languageError}=await admin.from('user_language_preferences').select('language').eq('user_id',userId).maybeSingle();
     if(languageError){counts.errors.push(`Lingua push ${userId}: ${languageError.message}`);continue;}
-    const pushCopy=billDuePushCopy({language:languagePreference?.language||'it',name:bill.title});
+    const pushCopy=billDuePushCopy({language:languagePreference?.language||'it',name:bill.title,days:daysUntil(today,bill.due_date)});
     let successful=false;
     for(const device of devices){
       try{
@@ -84,11 +90,13 @@ async function notifyPushForBill(admin,bill,today,counts){
 }
 
 export async function GET(request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return json({error:'CRON_SECRET non impostato'},503);
-  if (request.headers.get('authorization') !== `Bearer ${secret}`) return json({error:'Non autorizzato'},401);
-  const admin = getAdmin();
-  const today = todayRome(), horizon = addDaysISO(today, 45), target = addDaysISO(today, 3);
+  // Chiamato una volta al giorno da Vercel Cron e da Supabase Cron: ogni invio è registrato per
+  // data (promemoria, notifiche, riepilogo), quindi una seconda chiamata nello stesso giorno non
+  // manda nulla due volte.
+  let admin;
+  try { admin = getAdmin(); } catch { return json({error:'Configurazione del database incompleta'},503); }
+  if (!(await scheduledCallAuthorized(request, admin))) return json({error:'Non autorizzato'},401);
+  const today = todayRome(), horizon = addDaysISO(today, 45), reminderRange = reminderWindow(today);
   const counts = {recurring_created:0, notifications_created:0, emails_sent:0, summaries_created:0, summary_emails_sent:0, push_sent:0, summary_push_sent:0, errors:[]};
   try {
     // Fetch at most 1000 in one run; for larger installations, add keyset pagination.
@@ -96,8 +104,10 @@ export async function GET(request) {
       .eq('active',true).neq('frequency','none').lte('next_due_date',horizon).order('next_due_date').limit(1000);
     if (utilityError) throw utilityError;
     for (const u of utilities || []) {
-      let date = u.next_due_date, n = 0;
-      while (date <= horizon && n < 30) {
+      // Nessuna stima per scadenze già passate (utenza inserita con una prima data vecchia, o cron
+      // fermo per giorni): si parte dalla prima scadenza da oggi in poi.
+      let date = firstRecurringFrom(u.next_due_date,today,u.frequency,u.billing_day), n = 0;
+      while (date && date <= horizon && n < 30) {
         // Existing manually imported invoices for the same provider/date can be reviewed by users.
         const {error} = await admin.from('bills').upsert({
           user_id:u.user_id,home_id:u.home_id||null,utility_id:u.id,title:`${u.category} · ${u.supplier}`,
@@ -115,13 +125,25 @@ export async function GET(request) {
         if (error) counts.errors.push(`Aggiornamento utenza ${u.id} non riuscito`);
       }
     }
+    // Finestra da oggi a 3 giorni: se il cron salta un giorno, o la bolletta arriva con meno di
+    // 3 giorni di anticipo, il promemoria parte lo stesso (una sola volta per bolletta).
     const {data:bills,error:billError} = await admin.from('bills').select('id,user_id,home_id,title,supplier,amount,due_date')
-      .eq('due_date',target).is('paid_at',null).limit(1000);
+      .gte('due_date',reminderRange.from).lte('due_date',reminderRange.to).is('paid_at',null).order('due_date').limit(1000);
     if (billError) throw billError;
+    const billIds=(bills||[]).map(b=>b.id);
+    const {data:previous,error:previousError}=billIds.length?await admin.from('reminders').select('bill_id').in('bill_id',billIds).neq('reminder_date',today).limit(5000):{data:[],error:null};
+    if (previousError) throw previousError;
+    const alreadyReminded=new Set((previous||[]).map(r=>r.bill_id));
     for (const bill of bills || []) {
+      if (alreadyReminded.has(bill.id)) continue;
       await notifyPushForBill(admin,bill,today,counts);
       const {data:profile,error:pError} = await admin.from('profiles').select('email,reminders_enabled').eq('id',bill.user_id).maybeSingle();
       if (pError || !profile?.reminders_enabled) continue;
+      // Chi ha creato la bolletta di una casa e poi ne è uscito non riceve più l'email.
+      if (bill.home_id) {
+        const member = await isHomeMember(admin,bill.home_id,bill.user_id).catch(e=>{counts.errors.push(`Membri casa ${bill.home_id}: ${String(e.message).slice(0,80)}`);return null;});
+        if (!member) continue;
+      }
       const {data:reminder,error:remErr} = await admin.from('reminders').upsert({
         user_id:bill.user_id,bill_id:bill.id,reminder_date:today
       },{onConflict:'bill_id,reminder_date',ignoreDuplicates:true}).select('id,email_sent_at').maybeSingle();
@@ -205,6 +227,6 @@ export async function GET(request) {
     // Limit retention of recoverable deleted rows and household audit records.
     await admin.from('home_recycle_bin').delete().lt('deleted_at',new Date(Date.now()-30*86400000).toISOString());
     await admin.from('home_audit_log').delete().lt('created_at',new Date(Date.now()-365*86400000).toISOString());
-    return json({ok:!counts.errors.length,date:today,three_days_before:target,...counts},counts.errors.length?207:200);
+    return json({ok:!counts.errors.length,date:today,reminder_window:reminderRange,...counts},counts.errors.length?207:200);
   } catch(e) {return json({error:'Elaborazione non riuscita',detail:String(e.message).slice(0,160),...counts},500);}
 }

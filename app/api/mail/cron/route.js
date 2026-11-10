@@ -1,19 +1,36 @@
-import { getAdmin,json } from '../../../../lib/server.mjs';
+import { getAdmin,json,scheduledCallAuthorized } from '../../../../lib/server.mjs';
 import { syncConnection } from '../../../../lib/mail-sync.mjs';
 import { MAIL_BUCKET } from '../../../../lib/mail-core.mjs';
 export const runtime='nodejs';
-export const maxDuration=60;
+// Piano Hobby di Vercel: funzioni fino a 300 secondi e cron una sola volta al giorno.
+export const maxDuration=300;
 export async function GET(request){
-  if(!process.env.CRON_SECRET)return json({error:'CRON_SECRET mancante'},503);
-  if(request.headers.get('authorization')!==`Bearer ${process.env.CRON_SECRET}`)return json({error:'Non autorizzato'},401);
-  const admin=getAdmin();
-  // Fairness: process the least recently synced mailboxes first (bounded run).
-  const {data,error}=await admin.from('mail_connections').select('*').neq('status','reconnect').order('last_sync_at',{ascending:true,nullsFirst:true}).limit(8);
-  if(error)return json({error:error.message},500);
+  // Vercel Cron (una volta al giorno) e Supabase Cron (ogni 3 ore): ogni casella si legge al
+  // massimo una volta ogni 20 ore, le chiamate in più servono a raggiungere tutte le caselle.
+  let admin;
+  try{admin=getAdmin();}catch{return json({error:'Configurazione del database incompleta'},503);}
+  if(!(await scheduledCallAuthorized(request,admin)))return json({error:'Non autorizzato'},401);
+  const started=Date.now();
+  // Equità: si parte dalle caselle tentate meno di recente (last_attempt_at, migrazione v3.3).
+  // Prima l'ordine era sull'ultima sincronizzazione RIUSCITA, quindi poche caselle sempre in
+  // errore occupavano tutti i posti e le altre non venivano mai lette.
+  let {data,error}=await admin.from('mail_connections').select('*').neq('status','reconnect').order('last_attempt_at',{ascending:true,nullsFirst:true}).limit(150);
+  const attemptColumn=!error;
+  if(error){
+    // Migrazione v3.3 non ancora eseguita: comportamento precedente.
+    ({data,error}=await admin.from('mail_connections').select('*').neq('status','reconnect').order('last_sync_at',{ascending:true,nullsFirst:true}).limit(8));
+  }
+  if(error)return json({error:'Impossibile leggere le caselle collegate.'},500);
   const results=[];
   for(const c of data||[]){
-    if(c.last_sync_at&&Date.now()-new Date(c.last_sync_at).getTime()<20*60*60_000)continue;
-    results.push({id:c.id,...await syncConnection(admin,c,{messageLimit:12,docLimit:3})});
+    // Il cron gira una volta al giorno: si elaborano più caselle possibile lasciando un minuto
+    // di margine sotto il limite di 300 secondi (una sincronizzazione lenta può durare decine di secondi).
+    if(Date.now()-started>240_000)break;
+    const last=attemptColumn?(c.last_attempt_at||c.last_sync_at):c.last_sync_at;
+    if(last&&Date.now()-new Date(last).getTime()<20*60*60_000)continue;
+    if(attemptColumn)await admin.from('mail_connections').update({last_attempt_at:new Date().toISOString()}).eq('id',c.id);
+    try{results.push({id:c.id,...await syncConnection(admin,c,{messageLimit:12,docLimit:3})});}
+    catch{results.push({id:c.id,error:true,imported:0});}
   }
   // Expire OAuth states and clear abandoned private attachments after 45 days.
   await admin.from('mail_oauth_states').delete().lt('expires_at',new Date().toISOString());

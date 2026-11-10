@@ -10,7 +10,10 @@ export async function POST(request){
   const {data,error}=await admin.from('mail_connections').select('*').eq('id',id).eq('user_id',user.id).maybeSingle();
   if(error||!data)return json({error:'Casella non trovata'},404);
   if(data.status==='reconnect')return json({error:'Ricollega l’account prima di sincronizzare.'},409);
-  if(data.last_sync_at && Date.now()-new Date(data.last_sync_at).getTime()<5*60_000)return json({error:'Sincronizzazione già eseguita recentemente. Riprova tra 5 minuti.'},429);
+  // Anche i tentativi falliti contano (last_attempt_at, v3.3): niente richieste ripetute al provider.
+  const last=[data.last_sync_at,data.last_attempt_at].filter(Boolean).map(x=>new Date(x).getTime()).sort((a,b)=>b-a)[0];
+  if(last && Date.now()-last<5*60_000)return json({error:'Sincronizzazione già eseguita recentemente. Riprova tra 5 minuti.'},429);
+  if('last_attempt_at' in data)await admin.from('mail_connections').update({last_attempt_at:new Date().toISOString()}).eq('id',data.id).eq('user_id',user.id);
   const result=await syncConnection(admin,data,{messageLimit:25,docLimit:5});
   return json(result,result.error?502:200);
 }
