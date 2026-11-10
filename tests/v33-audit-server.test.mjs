@@ -110,7 +110,7 @@ test('Cron: segreto confrontato a tempo costante su entrambe le route',()=>{
   assert.equal(cronAuthorized(req('Bearer '),''),false);
   for(const path of ['app/api/cron/route.js','app/api/mail/cron/route.js']){
     const s=source(path);
-    assert.match(s,/cronAuthorized\(request/,path);
+    assert.match(s,/scheduledCallAuthorized\(request,\s*admin\)/,path);
     assert.doesNotMatch(s,/authorization'\)\s*!==/,path);
   }
 });
