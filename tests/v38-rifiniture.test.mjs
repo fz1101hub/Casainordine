@@ -25,3 +25,17 @@ test('v38: indici per tutte le chiavi esterne composte segnalate da Supabase', (
   for(const [table,cols] of [['bills','utility_id, user_id'],['mail_documents','connection_id, user_id'],['mail_payment_evidence','bill_id, user_id'],['mail_payment_evidence','connection_id, user_id'],['reminders','bill_id, user_id']])
     assert.match(code,new RegExp(`create index if not exists idx_v38_\\w+ on public\\.${table}\\(${cols}\\);`),`${table}(${cols})`);
 });
+
+test('v39: nella lista della spesa si cambiano solo testo, quantità e spunta', () => {
+  const v39=readFileSync(new URL('../supabase/migrate_v39_lista_spesa.sql',import.meta.url),'utf8').replace(/--[^\n]*/g,'');
+  assert.match(v39,/^begin;/m); assert.match(v39,/^commit;/m);
+  assert.match(v39,/revoke update on public\.home_shopping from anon, authenticated;/);
+  assert.match(v39,/grant update \(title, quantity, checked\) on public\.home_shopping to authenticated;/);
+  assert.doesNotMatch(v39,/grant update \([^)]*(created_by|home_id)/);
+  // L'app modifica solo la spunta: nessun update su altre colonne della lista spesa.
+  for(const file of ['app/HouseholdHub.jsx','app/PersonalizedHome.jsx']){
+    const src=readFileSync(new URL(`../${file}`,import.meta.url),'utf8');
+    for(const m of src.matchAll(/from\('home_shopping'\)\.update\(\{([^}]*)\}/g))
+      for(const key of m[1].split(',').map(p=>p.split(':')[0].trim()))assert.ok(['title','quantity','checked'].includes(key),`${file}: ${key}`);
+  }
+});
