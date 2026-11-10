@@ -1,4 +1,4 @@
-import { getAdmin, json, cronAuthorized } from '../../../lib/server.mjs';
+import { getAdmin, json, scheduledCallAuthorized } from '../../../lib/server.mjs';
 import { isHomeMember } from '../../../lib/home-access.mjs';
 import { addDaysISO, nextRecurringDue, todayRome, euro } from '../../../lib/dates.mjs';
 import { shouldSendSummary, monthEndISO, upcomingSummaryBills } from '../../../lib/summary-schedule.mjs';
@@ -85,10 +85,12 @@ async function notifyPushForBill(admin,bill,today,counts){
 }
 
 export async function GET(request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return json({error:'CRON_SECRET non impostato'},503);
-  if (!cronAuthorized(request, secret)) return json({error:'Non autorizzato'},401);
-  const admin = getAdmin();
+  // Chiamato una volta al giorno da Vercel Cron e da Supabase Cron: ogni invio è registrato per
+  // data (promemoria, notifiche, riepilogo), quindi una seconda chiamata nello stesso giorno non
+  // manda nulla due volte.
+  let admin;
+  try { admin = getAdmin(); } catch { return json({error:'Configurazione del database incompleta'},503); }
+  if (!(await scheduledCallAuthorized(request, admin))) return json({error:'Non autorizzato'},401);
   const today = todayRome(), horizon = addDaysISO(today, 45), target = addDaysISO(today, 3);
   const counts = {recurring_created:0, notifications_created:0, emails_sent:0, summaries_created:0, summary_emails_sent:0, push_sent:0, summary_push_sent:0, errors:[]};
   try {

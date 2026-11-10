@@ -11,6 +11,19 @@ Cosa cambia per chi usa l'app:
 
 Ordine completo di installazione su un database nuovo: `schema.sql`, `migrate_v19.sql`, `migrate_v20.sql`, `migrate_v21.sql`, `migrate_v30.sql`, `migrate_v32_languages.sql`, `harden_trigger_permissions.sql`, `migrate_v33_audit.sql`, `migrate_v34_saldi.sql` (saldi tra coinquilini calcolati nel database; finché non è eseguita l'app usa il calcolo precedente sulle ultime 250 spese), `migrate_v36_quota.sql` (200 MB di documenti per utente; il numero si cambia in `v36_storage_quota_bytes()`).
 
+
+### Controlli programmati con Supabase Cron
+
+I promemoria (`/api/cron`) e la lettura delle caselle email (`/api/mail/cron`) possono partire dal database invece che solo da Vercel: con il piano Hobby Vercel li esegue una volta al giorno, con un margine di un'ora. Supabase Cron è compreso nel piano gratuito di Supabase.
+
+1. Pubblica su Vercel la versione dell'app che accetta l'intestazione `x-casa-cron-token`.
+2. Esegui `supabase/migrate_v35_cron.sql` nel SQL Editor. Lo script attiva `pg_cron` e `pg_net`, genera una chiave nel Vault (non va copiata su Vercel) e programma tre job:
+   - promemoria ogni giorno alle 07:07 UTC;
+   - caselle email ogni 3 ore (ogni casella si legge comunque al massimo una volta ogni 20 ore);
+   - pulizia della cronologia.
+3. Controlla le esecuzioni con `select * from cron.job_run_details order by start_time desc limit 20;`.
+
+I cron di `vercel.json` restano come riserva: una seconda chiamata nello stesso giorno non manda nulla due volte. Se l'indirizzo dell'app non è `https://casainordine.vercel.app`, aggiorna il segreto `casa_app_url` (istruzioni in testa al file SQL).
 ---
 ## Provare Casa in Ordine con dati di esempio
 

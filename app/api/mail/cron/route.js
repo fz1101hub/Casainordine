@@ -1,13 +1,15 @@
-import { getAdmin,json,cronAuthorized } from '../../../../lib/server.mjs';
+import { getAdmin,json,scheduledCallAuthorized } from '../../../../lib/server.mjs';
 import { syncConnection } from '../../../../lib/mail-sync.mjs';
 import { MAIL_BUCKET } from '../../../../lib/mail-core.mjs';
 export const runtime='nodejs';
 // Piano Hobby di Vercel: funzioni fino a 300 secondi e cron una sola volta al giorno.
 export const maxDuration=300;
 export async function GET(request){
-  if(!process.env.CRON_SECRET)return json({error:'CRON_SECRET mancante'},503);
-  if(!cronAuthorized(request))return json({error:'Non autorizzato'},401);
-  const admin=getAdmin();
+  // Vercel Cron (una volta al giorno) e Supabase Cron (ogni 3 ore): ogni casella si legge al
+  // massimo una volta ogni 20 ore, le chiamate in più servono a raggiungere tutte le caselle.
+  let admin;
+  try{admin=getAdmin();}catch{return json({error:'Configurazione del database incompleta'},503);}
+  if(!(await scheduledCallAuthorized(request,admin)))return json({error:'Non autorizzato'},401);
   const started=Date.now();
   // Equità: si parte dalle caselle tentate meno di recente (last_attempt_at, migrazione v3.3).
   // Prima l'ordine era sull'ultima sincronizzazione RIUSCITA, quindi poche caselle sempre in
