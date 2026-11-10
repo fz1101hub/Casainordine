@@ -10,7 +10,7 @@ import {
 import { db } from '../lib/supabase-browser';
 import { addDaysISO, nextRecurringDue, todayRome, normalizeDate, euro } from '../lib/dates.mjs';
 import { parseBillsCsv } from '../lib/csv.mjs';
-import { parseRatePlanText } from '../lib/rate-plan.mjs';
+import { parseRatePlanText, rateItemsWithKeys } from '../lib/rate-plan.mjs';
 import { extractBillFields } from '../lib/document-import.mjs';
 import MailImporter from './MailImporter';
 import HouseholdHub from './HouseholdHub';
@@ -354,11 +354,13 @@ export default function Page() {
     if(selected.length>120){notify(tr('v32.feedback.18'));return;}
     const supplier=rateSupplier.trim()||'Condominio';
     if(selected.some(r=>!r.title.trim()||!normalizeDate(r.due_date)||!Number.isFinite(Number(r.amount))||Number(r.amount)<=0)){notify(tr('v32.feedback.19'));return;}
-    const unique=new Set(selected.map(r=>`${r.due_date}:${Number(r.amount)}`));
+    // Only rows that are identical in everything (title, date, amount) are duplicates.
+    const unique=new Set(selected.map(r=>`${r.title.trim().toLowerCase()}:${r.due_date}:${Number(r.amount)}`));
     if(unique.size!==selected.length){notify(tr('v32.feedback.20'));return;}
-    // Same imported rate is identified by source + date + amount; repeat uploads are idempotent.
-    const items=selected.map(r=>({title:r.title.trim(),supplier,category:'Condominio',amount:Number(r.amount),due_date:r.due_date,paid_at:null,source:'document',is_estimate:false,
-      external_id:`rate:${supplier.toLowerCase().slice(0,60)}:${r.due_date}:${Number(r.amount).toFixed(2)}`}));
+    // A rate is identified by supplier + date + amount, plus its position among rates with the same
+    // date and amount (e.g. 'Rata 1 ordinaria' and 'Rata 1 straordinaria'): both are saved, and
+    // importing the same plan again stays idempotent.
+    const items=rateItemsWithKeys(selected,supplier);
     setBusy(true);
     try{
       const existing=new Set((data.bills||[]).filter(b=>b.source==='document'&&b.external_id?.startsWith('rate:')).map(b=>b.external_id));
