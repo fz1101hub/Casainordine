@@ -1,6 +1,6 @@
 // Only static app assets and the offline capture page are cached. No user/API data.
 // Cambiare il nome quando cambiano i file in STATIC: i telefoni li servono dalla cache.
-const CACHE='casa-shell-v33';const STATIC=['/offline.html','/offline-standalone.js','/sos-private.js','/icon-192.png','/icon-512.png'];
+const CACHE='casa-shell-v40';const STATIC=['/offline.html','/offline-standalone.js','/sos-private.js','/sos-vault.js','/icon-192.png','/icon-512.png'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(c=>c.addAll(STATIC)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(Promise.all([self.clients.claim(),caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))])));
 self.addEventListener('fetch',event=>{
