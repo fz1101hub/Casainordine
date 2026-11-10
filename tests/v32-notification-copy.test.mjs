@@ -121,3 +121,17 @@ test('reminder names remove soft hyphen, Arabic letter mark and invisible separa
   assert.throws(()=>billReminderCopy({language:'en',name:invisible,dueDate:'2026-11-04'}),TypeError);
  }
 });
+
+
+test('user-supplied template tokens remain literal and cannot replace the actual due date',()=>{
+ for(const language of ['it','en','es','fr','de','pt']){
+  const name='Energia {date} {name}';
+  const dueDate='2026-12-31';
+  const {text}=billReminderCopy({language,name,dueDate});
+  const locale={it:'it-IT',en:'en-GB',es:'es-ES',fr:'fr-FR',de:'de-DE',pt:'pt-PT'}[language];
+  const date=new Intl.DateTimeFormat(locale,{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date('2026-12-31T12:00:00Z'));
+  assert.ok(text.includes('Energia {date} {name}'),language);
+  assert.ok(text.includes(date),language);
+  assert.equal(text.split(date).length-1,1,language);
+ }
+});
