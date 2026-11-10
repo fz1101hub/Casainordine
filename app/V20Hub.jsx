@@ -49,7 +49,7 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   setRows(next);setLoading(false);
  },[client,homeId,user?.id,language]);
  useEffect(()=>{load();},[load]);
- useEffect(()=>{if(tab==='offline'){listDrafts().then(setDrafts).catch(e=>setOfflineError(v20SafeError(language)));}},[tab]);
+  useEffect(()=>{if(tab==='offline'){listDrafts(user?.id).then(setDrafts).catch(e=>setOfflineError(v20SafeError(language)));}},[tab,user?.id]);
  const common={user_id:user?.id,home_id:homeId||null};
  async function save(table,content,message,options={}){if(!client||!canWrite)return onNotify(ui.editPermissionRequired);setWorking(true);try{
   const {data,error}=await client.from(table).insert({...common,...content}).select('*').single();if(error)throw error;onNotify(message);await load();if(options.parent)onRefresh();return data;
@@ -87,8 +87,8 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   if(createBill&&!window.confirm(ui.confirmNoticeOriginal))return;
   setWorking(true);try{const {error}=await client.rpc('v20_register_pagopa',{p_home_id:homeId||null,p_notice_code:code,p_creditor_code:notice.creditor_code||null,p_creditor_name:notice.creditor_name,p_amount:notice.amount===''?null:Number(notice.amount),p_due_on:notice.due_on||null,p_create_bill:createBill});if(error)throw error;
    onNotify(createBill?ui.noticeAndReminderSaved:ui.noticeSaved);setNotice({notice_code:'',creditor_code:'',creditor_name:'',amount:'',due_on:''});setRawNotice('');await load();onRefresh();}
-  catch(e){onNotify(v20SafeError(language,e))}finally{setWorking(false)}}
- async function refreshDrafts(){try{setDrafts(await listDrafts());setOfflineError('')}catch(e){setOfflineError(v20SafeError(language))}}
+   catch(e){onNotify(v20SafeError(language,e))}finally{setWorking(false)}}
+  async function refreshDrafts(){try{setDrafts(await listDrafts(user?.id));setOfflineError('')}catch(e){setOfflineError(v20SafeError(language))}}
  async function importDraft(d){if(!client||!user)return onNotify(ui.signInToImport);if(d.type==='document')return;
   if(d.type==='shopping'&&(!homeId||!canWrite))return onNotify(ui.selectWritableHome);
   if(d.type==='shopping'&&!window.confirm(ui.confirmAddShopping))return;
