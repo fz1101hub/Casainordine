@@ -144,3 +144,17 @@ test('V20 missing records (404/410) show safe localized recovery guidance',()=>{
  }
  assert.equal(translations.size,6);
 });
+
+test('V20 HTTP 503 service outages have safe, distinct localized retry guidance',()=>{
+ const translations=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const message=v20SafeError(locale,{status:503,message:'provider secret token=abc'});
+  translations.add(message);
+  assert.equal(v20ErrorCategory({status:503}),'unavailable');
+  assert.notEqual(message,v20SafeError(locale));
+  assert.notEqual(message,v20SafeError(locale,{status:504}));
+  assert.doesNotMatch(message,/provider|secret|token|503|supabase/i);
+  assert.equal(v20SafeError(locale,{status:'503'}),v20SafeError(locale));
+ }
+ assert.equal(translations.size,6);
+});
