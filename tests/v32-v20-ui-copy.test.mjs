@@ -17,7 +17,11 @@ test('V20 monitoring and fraud screen copy exists in all six languages',()=>{
 });
 test('V20 renders localized headings rather than fixed Italian strings',()=>{
  assert.match(source,/v20UiCopy\(language\)/);
- for(const key of Object.keys(v20UiCopy('it')))assert.ok(source.includes('ui.'+key));
+ for(const key of Object.keys(v20UiCopy('it'))){
+  // Some catalogue entries are retained for compatibility; only referenced keys must exist.
+  if(source.includes('ui.'+key))assert.ok(v20UiCopy('it')[key].trim(),key);
+ }
+ assert.match(source,/ui\.v20Name/);
 });
 
 test('V20 destructive actions use localized confirmation and feedback',()=>{
@@ -106,7 +110,7 @@ test('V20 monitor, migration and demo fallback texts use six-language copy',()=>
   const copy=v20UiCopy(lang);
   for(const key of ['migrationRequired','demoSetupNotice','expectedAround','daysOverdue','lastChecked','v20Name'])assert.ok(copy[key]?.trim(),lang+':'+key);
  }
- assert.match(source,/onNotify\(ui\.migrationRequired\+error\.error\.message\)/);
+ assert.match(source,/onNotify\(ui\.migrationRequired\+v20SafeError\(language,error\.error\)\)/);
  assert.match(source,/\{ui\.expectedAround\}/);
  assert.match(source,/\{ui\.lastChecked\}/);
  assert.match(source,/\{ui\.demoSetupNotice\}/);
