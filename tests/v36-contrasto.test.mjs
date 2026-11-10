@@ -25,8 +25,14 @@ test('Contrasto: nessun grigio chiaro rimasto come colore del testo sugli sfondi
   for(const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)){
     const sel=m[1],c=m[2].match(/(?<![-\w])color:(#[0-9a-fA-F]{3,6})\b/)?.[1];
     if(!c||/auth-decoration|auth-intro|auth-quote|task-check|testdrive|::placeholder/.test(sel))continue;
+    // Se la regola ha un proprio sfondo (pulsanti colorati), il testo si misura su quello.
+    const bg=m[2].match(/background(?:-color)?:(#[0-9a-fA-F]{3,6})\b/)?.[1]||'#ffffff';
     const [r,g,b]=rgb(c);
-    if(Math.max(r,g,b)-Math.min(r,g,b)<40&&r+g+b>300&&ratio(c,'#ffffff')<4.5)offenders.push(sel.trim()+' '+c);
+    if(Math.max(r,g,b)-Math.min(r,g,b)<40&&r+g+b>300&&ratio(c,bg)<4.5)offenders.push(sel.trim()+' '+c);
   }
   assert.deepEqual(offenders,[]);
+});
+test('Contrasto: il bianco su un pulsante scuro non è un grigio chiaro, su uno chiaro sì',()=>{
+  assert.ok(ratio('#fff','#b34a3a')>=4.5);
+  assert.ok(ratio('#fff','#f2f6f3')<4.5);
 });
