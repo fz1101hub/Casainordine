@@ -37,7 +37,7 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
     client.from('user_alerts').select('*').eq('user_id',user.id).in('kind',['missing_bill','mail_sync','fraud','move','savings']).order('created_at',{ascending:false}).limit(100),
     // mail_connections contiene credenziali cifrate e non è leggibile dal browser: si passa dall'API.
     client.auth.getSession().then(({data:{session}})=>fetch('/api/mail/connections',{headers:{Authorization:`Bearer ${session?.access_token||''}`}}))
-      .then(async r=>{const body=await r.json().catch(()=>({}));return r.ok?{data:body.connections||[],error:null}:{data:[],error:{message:body.error||`HTTP ${r.status}`}};})
+      .then(async r=>{const body=await r.json().catch(()=>({}));return r.ok?{data:body.connections||[],error:null}:{data:[],error:{status:r.status}};})
       .catch(e=>({data:[],error:{message:e.message}})),
     client.from('user_alert_preferences').select('user_id,push_monitor').eq('user_id',user.id).maybeSingle()
   ]);
