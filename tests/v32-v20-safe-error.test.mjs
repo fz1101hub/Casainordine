@@ -144,3 +144,62 @@ test('V20 missing records (404/410) show safe localized recovery guidance',()=>{
  }
  assert.equal(translations.size,6);
 });
+
+test('V20 HTTP 503 service outages have safe, distinct localized retry guidance',()=>{
+ const translations=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const message=v20SafeError(locale,{status:503,message:'provider secret token=abc'});
+  translations.add(message);
+  assert.equal(v20ErrorCategory({status:503}),'unavailable');
+  assert.notEqual(message,v20SafeError(locale));
+  assert.notEqual(message,v20SafeError(locale,{status:504}));
+  assert.doesNotMatch(message,/provider|secret|token|503|supabase/i);
+  assert.equal(v20SafeError(locale,{status:'503'}),v20SafeError(locale));
+ }
+ assert.equal(translations.size,6);
+});
+
+
+test('V20 HTTP 502 upstream gateway failures use safe six-language service feedback',()=>{
+ const translations=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const message=v20SafeError(locale,{status:502,message:'upstream secret token=abc'});
+  translations.add(message);
+  assert.equal(v20ErrorCategory({status:502}),'unavailable');
+  assert.equal(message,v20SafeError(locale,{status:503}));
+  assert.notEqual(message,v20SafeError(locale,{status:504}));
+  assert.doesNotMatch(message,/upstream|secret|token|502|supabase/i);
+  assert.equal(v20SafeError(locale,{status:'502'}),v20SafeError(locale));
+ }
+ assert.equal(translations.size,6);
+});
+
+test('V20 HTTP 401 requests sign-in, distinct from 403 permissions, in six languages',()=>{
+ const translated=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const auth=v20SafeError(locale,{status:401,message:'private session token=secret'});
+  translated.add(auth);
+  assert.equal(v20ErrorCategory({status:401}),'auth');
+  assert.notEqual(auth,v20SafeError(locale,{status:403}));
+  assert.notEqual(auth,v20SafeError(locale));
+  assert.doesNotMatch(auth,/private|token|secret|401|supabase/i);
+  assert.equal(v20SafeError(locale,{status:'401'}),v20SafeError(locale));
+ }
+ assert.equal(translated.size,6);
+ assert.equal(v20ErrorCategory({status:401,code:'42501'}),'auth');
+ assert.equal(v20ErrorCategory({status:403,code:'42501'}),'access');
+});
+
+
+test('V20 HTTP 400 invalid requests reuse localized validation guidance safely',()=>{
+ const translations=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const message=v20SafeError(locale,{status:400,message:'private data token=secret'});
+  translations.add(message);
+  assert.equal(v20ErrorCategory({status:400}),'validation');
+  assert.equal(message,v20SafeError(locale,{status:422}));
+  assert.doesNotMatch(message,/private|token|secret|400|supabase/i);
+  assert.equal(v20SafeError(locale,{status:'400'}),v20SafeError(locale));
+ }
+ assert.equal(translations.size,6);
+});
