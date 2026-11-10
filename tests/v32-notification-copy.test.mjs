@@ -109,3 +109,15 @@ test('reminder bounds oversized inputs before normalization without mutating sou
  assert.throws(()=>billReminderCopy({language:'en',name:oversized,dueDate:'2026-11-04'}),/Bill name too long/);
  assert.equal(oversized.length,32769);
 });
+
+
+test('reminder names remove soft hyphen, Arabic letter mark and invisible separators',()=>{
+ const name='Ener\u00adgia\u061c \u034f\u180eLuce';
+ const {text}=billReminderCopy({language:'it',name,dueDate:'2026-11-04'});
+ assert.doesNotMatch(text,/[\u00ad\u061c\u034f\u180e]/u);
+ assert.match(text,/Ener gia Luce/);
+ assert.equal(name.includes('\u061c'),true);
+ for(const invisible of ['\u00ad','\u061c','\u034f','\u180e']){
+  assert.throws(()=>billReminderCopy({language:'en',name:invisible,dueDate:'2026-11-04'}),TypeError);
+ }
+});
