@@ -1,3 +1,42 @@
+## Versione 3.3 — correzioni dell'audit di novembre 2026
+
+**Prima di pubblicare questa versione** esegui una volta, nel SQL Editor di Supabase, `supabase/migrate_v33_audit.sql`, dopo tutte le migrazioni precedenti (v3.2 compresa) e dopo `harden_trigger_permissions.sql`. Lo script è in una sola transazione e si può rieseguire. Senza questa migrazione non si può salvare nessuna bolletta, utenza o documento (difetto dei trigger della v1.9) e i file del bucket `house-documents` sono leggibili da qualsiasi utente registrato.
+
+Cosa cambia per chi usa l'app:
+
+- **Esci** chiude la sessione solo su questo dispositivo, funziona anche senza rete e stacca il dispositivo dalle notifiche dell'account che esce.
+- Il collegamento di Gmail o Outlook va completato nello stesso browser in cui è stato avviato. Se il browser non conserva il cookie (per esempio la web app sulla schermata Home di iPhone che apre l'accesso in Safari), si può collegare solo la casella con lo stesso indirizzo, già verificato, dell'account.
+- La **conferma automatica dei pagamenti** richiede anche che Gmail o Outlook riportino DMARC superato per il dominio del mittente; con le caselle IMAP la conferma resta sempre manuale. In una casa condivisa serve il ruolo di proprietario o editor.
+- Un membro rimosso da una casa non può più aprire né cancellare i file che vi aveva caricato.
+
+Ordine completo di installazione su un database nuovo, in quest'ordine:
+
+1. `schema.sql`, `migrate_v19.sql`, `migrate_v20.sql`, `migrate_v21.sql`, `migrate_v30.sql`, `migrate_v32_languages.sql`, `harden_trigger_permissions.sql`;
+2. `migrate_v33_audit.sql`;
+3. `migrate_v34_saldi.sql`: saldi tra coinquilini calcolati nel database. Finché non è eseguita, l'app usa il calcolo precedente sulle ultime 250 spese;
+4. `migrate_v35_cron.sql`: controlli programmati con Supabase Cron. Va eseguita solo dopo che il codice è online (vedi sotto);
+5. `migrate_v36_quota.sql`: 200 MB di documenti per utente. Il numero si cambia in `v36_storage_quota_bytes()`;
+6. `migrate_v37_account.sql`: cancellazione dell'account. Le spese condivise restano senza nome;
+7. `migrate_v38_rifiniture.sql`: la ricerca dei documenti condivisi esce dall'API e si aggiungono indici;
+8. `migrate_v39_lista_spesa.sql`: nella lista della spesa si cambiano solo testo, quantità e spunta.
+9. `migrate_v40_sos_cifrate.sql`: schede SOS cifrate con una frase della casa, scelta da chi la gestisce.
+
+Ogni script è in una sola transazione e si può rieseguire.
+
+
+### Controlli programmati con Supabase Cron
+
+I promemoria (`/api/cron`) e la lettura delle caselle email (`/api/mail/cron`) possono partire dal database invece che solo da Vercel: con il piano Hobby Vercel li esegue una volta al giorno, con un margine di un'ora. Supabase Cron è compreso nel piano gratuito di Supabase.
+
+1. Pubblica su Vercel la versione dell'app che accetta l'intestazione `x-casa-cron-token`.
+2. Esegui `supabase/migrate_v35_cron.sql` nel SQL Editor. Lo script attiva `pg_cron` e `pg_net`, genera una chiave nel Vault (non va copiata su Vercel) e programma tre job:
+   - promemoria ogni giorno alle 07:07 UTC;
+   - caselle email ogni 3 ore (ogni casella si legge comunque al massimo una volta ogni 20 ore);
+   - pulizia della cronologia.
+3. Controlla le esecuzioni con `select * from cron.job_run_details order by start_time desc limit 20;`.
+
+I cron di `vercel.json` restano come riserva: una seconda chiamata nello stesso giorno non manda nulla due volte. Se l'indirizzo dell'app non è `https://casainordine.vercel.app`, aggiorna il segreto `casa_app_url` (istruzioni in testa al file SQL).
+---
 ## Provare Casa in Ordine con dati di esempio
 
 **Prova immediata senza account**: apri `/prova` per una modalità completamente isolata dal database Supabase, con bollette, attività, lista della spesa, manutenzioni e dashboard personalizzabile. Le azioni sono simulazioni salvate solo nel browser e puoi ripristinare i dati quando vuoi. Nessuna autenticazione, pagamento, invio email o chiamata API al database viene eseguita in questo percorso.
@@ -15,7 +54,7 @@ Apri **La mia Home → Personalizza** per mostrare/nascondere i quattro moduli, 
 
 È sempre disponibile la vecchia dashboard completa, ora sotto **Panoramica completa**.
 
-**Database:** su un'installazione 2.1 esegui la migrazione `supabase/migrate_v30.sql` (additiva) prima di abilitare la personalizzazione agli utenti. Su una nuova installazione completa, installa prima `schema.sql`, poi le migrazioni v1.9, v2.0, v2.1 e v3.0. Verifica RLS con due utenti distinti e il build Next.js.
+**Database:** su un'installazione 2.1 esegui la migrazione `supabase/migrate_v30.sql` (additiva) prima di abilitare la personalizzazione agli utenti. Su una nuova installazione completa segui l'ordine indicato nella sezione v3.3 in cima a questo file. Verifica RLS con due utenti distinti e il build Next.js.
 
 **Nota:** la lista della spesa è condivisa in una casa e quindi si visualizza quando selezioni una casa; i widget personalizzati e le loro preferenze sono invece personali. In demo il layout viene memorizzato solo nel browser. La pagina “La casa in 5 minuti” mostra riepiloghi indicativi calcolati dai dati, non pagamenti automatici.
 
@@ -288,7 +327,7 @@ Si usa l'API Microsoft Graph in sola lettura e, nella prima versione, si cercano
 5. Solo se selezioni la casella **Autorizza questo mittente** al momento della conferma, e attivi **Impostazioni → Conferma automatica dei pagamenti**, i futuri messaggi da *quell'indirizzo* e per *quel fornitore* possono registrare un pagamento senza ulteriori clic, **se viene trovata una sola bolletta corrispondente**. Di default questa opzione è **disattivata**.
 6. Puoi revocare ogni autorizzazione in **Importa e collega → Mittenti autorizzati** e spegnere l'automazione in qualsiasi momento dalle Impostazioni. Un pagamento riconosciuto impedisce la creazione del futuro promemoria a 3 giorni per quella bolletta, se il cron lo vede già registrato.
 
-**Limiti e sicurezza importanti**: una email non equivale a una prova bancaria e il nome mittente può essere falsificato. Il sistema **non verifica DKIM/SPF/DMARC né il saldo bancario**, quindi anche l'autoconferma con mittente autorizzato comporta un rischio di errore o spoofing. Per la maggiore affidabilità, tieni l'opzione spenta e verifica ogni proposta. Non vengono eseguiti pagamenti né richieste al conto corrente. Le conferme PDF *allegate* non vengono lette come prova di pagamento in questa versione: il riconoscimento riguarda il testo/HTML dell'email. Oggetto, indirizzo mittente, importo, data e stato sono conservati nell'app per deduplicazione e revisione, **non** il corpo completo dell'email. I candidati non verificati vengono cancellati dopo 120 giorni e la cronologia delle decisioni dopo 365 giorni, se il job giornaliero è attivo. Le regole sono euristiche: non possono garantire di individuare tutte le conferme.
+**Limiti e sicurezza importanti**: una email non equivale a una prova bancaria e il nome mittente può essere falsificato. Dalla v3.3 l'autoconferma avviene solo se Gmail o Outlook riportano DMARC superato per il dominio del mittente (mai con IMAP); il sistema **non verifica il saldo bancario**, quindi anche l'autoconferma con mittente autorizzato comporta un rischio di errore. Per la maggiore affidabilità, tieni l'opzione spenta e verifica ogni proposta. Non vengono eseguiti pagamenti né richieste al conto corrente. Le conferme PDF *allegate* non vengono lette come prova di pagamento in questa versione: il riconoscimento riguarda il testo/HTML dell'email. Oggetto, indirizzo mittente, importo, data e stato sono conservati nell'app per deduplicazione e revisione, **non** il corpo completo dell'email. I candidati non verificati vengono cancellati dopo 120 giorni e la cronologia delle decisioni dopo 365 giorni, se il job giornaliero è attivo. Le regole sono euristiche: non possono garantire di individuare tutte le conferme.
 
 ### Documenti, scansioni e notifiche
 
@@ -360,11 +399,11 @@ curl -X POST 'https://TUO-DOMINIO.it/api/ingest' \
 
 ## Verifiche
 
-`npm test` esegue 52 test automatici su date italiane, rinnovi, CSV, estrazione dei campi, OAuth Google/Microsoft (state/PKCE), validazione provider IMAP, cifratura credenziali, sicurezza degli allegati, riconoscimento prudente delle conferme di pagamento e apprendimento isolato dei mittenti. L’OCR reale va provato in un browser con file di esempio; il riconoscimento è probabilistico.
+`npm test` esegue oltre 400 test automatici (novembre 2026) su date italiane, rinnovi, CSV, estrazione dei campi, OAuth Google/Microsoft (state/PKCE), validazione provider IMAP, cifratura credenziali, sicurezza degli allegati, riconoscimento prudente delle conferme di pagamento e apprendimento isolato dei mittenti. L’OCR reale va provato in un browser con file di esempio; il riconoscimento è probabilistico.
 
 ## Verifica e stato attuale
 
-I test automatici con `npm test` passano. La **compilazione completa** e il collaudo end-to-end con caselle reali restano da effettuare: in questo ambiente le dipendenze non sono installate e `npm run build` termina con `next: not found`. Per procedere su una macchina con accesso a npm, esegui `npm install`, poi `npm run build`. Il sistema non è già in produzione: per attivare scansioni e notifiche è necessario pubblicarlo, configurare le credenziali e controllare i log dei cron.
+I test automatici con `npm test` passano e `npm run build` compila (verificato a novembre 2026; la stessa verifica gira su GitHub a ogni push, `.github/workflows/tests.yml`). Il collaudo end-to-end con caselle reali, telefoni veri e Supabase resta da effettuare. Il sistema non è già in produzione: per attivare scansioni e notifiche è necessario pubblicarlo, configurare le credenziali e controllare i log dei cron.
 
 ## Stack
 

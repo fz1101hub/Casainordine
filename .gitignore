@@ -25,3 +25,7 @@ npm-debug.log*
 coverage/
 .tmp/
 tmp/
+
+# Copiati da node_modules in postinstall (scripts/copy-pdf-worker.mjs)
+public/pdf.worker.min.mjs
+public/ocr/
