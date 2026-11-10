@@ -100,3 +100,12 @@ test('long reminder names are capped without changing the source',()=>{
  assert.equal(name.length,20000);
  assert.equal(rendered,'🧾'.repeat(160));
 });
+
+
+test('reminder bounds oversized inputs before normalization without mutating source',()=>{
+ const maxName='A'.repeat(32768);
+ assert.match(billReminderCopy({language:'en',name:maxName,dueDate:'2026-11-04'}).text,/The bill A/);
+ const oversized='B'.repeat(32769);
+ assert.throws(()=>billReminderCopy({language:'en',name:oversized,dueDate:'2026-11-04'}),/Bill name too long/);
+ assert.equal(oversized.length,32769);
+});
