@@ -102,3 +102,17 @@ test('V20 HTTP 415 unsupported format feedback is safe and translated',()=>{
  }
  assert.equal(translations.size,6);
 });
+
+
+test('V20 HTTP 409 conflict protects concurrent edits in six languages',()=>{
+ const translations=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const message=v20SafeError(locale,{status:409,message:'private record token=secret'});
+  translations.add(message);
+  assert.equal(v20ErrorCategory({status:409}),'conflict');
+  assert.notEqual(message,v20SafeError(locale));
+  assert.doesNotMatch(message,/private|token|secret|409|supabase/i);
+  assert.equal(v20SafeError(locale,{status:'409'}),v20SafeError(locale));
+ }
+ assert.equal(translations.size,6);
+});
