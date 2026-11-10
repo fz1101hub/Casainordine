@@ -26,7 +26,7 @@ test('Contrasto: nessun grigio chiaro rimasto come colore del testo sugli sfondi
     const sel=m[1],c=m[2].match(/(?<![-\w])color:(#[0-9a-fA-F]{3,6})\b/)?.[1];
     if(!c||/auth-decoration|auth-intro|auth-quote|task-check|testdrive|::placeholder/.test(sel))continue;
     // Se la regola ha un proprio sfondo (pulsanti colorati), il testo si misura su quello.
-    const bg=m[2].match(/background(?:-color)?:(#[0-9a-fA-F]{3,6})\b/)?.[1]||'#ffffff';
+    const bg=m[2].match(/background(?:-color)?:(#[0-9a-fA-F]{3,6})\b/)?.[1]||(/btn-primary/.test(sel)?'#16776b':'#ffffff');
     const [r,g,b]=rgb(c);
     if(Math.max(r,g,b)-Math.min(r,g,b)<40&&r+g+b>300&&ratio(c,bg)<4.5)offenders.push(sel.trim()+' '+c);
   }
@@ -35,4 +35,14 @@ test('Contrasto: nessun grigio chiaro rimasto come colore del testo sugli sfondi
 test('Contrasto: il bianco su un pulsante scuro non è un grigio chiaro, su uno chiaro sì',()=>{
   assert.ok(ratio('#fff','#b34a3a')>=4.5);
   assert.ok(ratio('#fff','#f2f6f3')<4.5);
+});
+
+test('Contrasto: etichette colorate, pastiglia del grafico e pulsanti leggibili (almeno 4,5:1)',()=>{
+  for(const sel of ['.tag-green','.tag-amber','.chart-pill','.demo-banner button','.rate-import-controls label.btn-primary']){
+    const r=rule(sel);
+    const fg=r.match(/(?<![-\w])color:(#[0-9a-fA-F]{3,6})/)[1];
+    const bg=r.match(/background:(#[0-9a-fA-F]{3,6})/)?.[1]||(sel==='.demo-banner button'?'#fcfbea':'#16776b');
+    assert.ok(ratio(fg,bg)>=4.5,`${sel}: ${fg} su ${bg} = ${ratio(fg,bg).toFixed(2)}`);
+    for(const m of r.matchAll(/font-size:([0-9.]+)px/g))assert.ok(Number(m[1])>=12,`${sel}: ${m[1]}px`);
+  }
 });
