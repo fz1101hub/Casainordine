@@ -144,26 +144,31 @@ end $$;
 -- La ricerca del documento ignora le regole di riga (security definer): così un membro
 -- rimosso non può più usare il ramo "cartella mia" per i file che ha caricato in una casa.
 -- ---------------------------------------------------------------------------------------
-create or replace function public.v33_shared_document_home(path text) returns uuid
+-- La funzione sta nello schema "private", che l'API non espone (come in migrate_v38_rifiniture.sql):
+-- così rieseguire questo script non la rende di nuovo chiamabile con /rest/v1/rpc.
+create schema if not exists private;
+revoke all on schema private from public, anon, authenticated;
+drop policy if exists v19_download_allowed on storage.objects;
+drop policy if exists v19_delete_allowed on storage.objects;
+drop function if exists public.v33_shared_document_home(text);
+create or replace function private.v33_shared_document_home(path text) returns uuid
 language sql stable security definer set search_path='' as $$
  select d.home_id from public.home_documents d where d.storage_path=path and d.home_id is not null limit 1
 $$;
-revoke all on function public.v33_shared_document_home(text) from public, anon;
-grant execute on function public.v33_shared_document_home(text) to authenticated;
+revoke all on function private.v33_shared_document_home(text) from public, anon;
+grant execute on function private.v33_shared_document_home(text) to authenticated;
 
-drop policy if exists v19_download_allowed on storage.objects;
 create policy v19_download_allowed on storage.objects for select to authenticated
 using(bucket_id='house-documents' and (
-  case when public.v33_shared_document_home(objects.name) is not null
-       then public.is_home_member(public.v33_shared_document_home(objects.name))
+  case when private.v33_shared_document_home(objects.name) is not null
+       then public.is_home_member(private.v33_shared_document_home(objects.name))
        else (storage.foldername(objects.name))[1]=(select auth.uid())::text
   end
 ));
-drop policy if exists v19_delete_allowed on storage.objects;
 create policy v19_delete_allowed on storage.objects for delete to authenticated
 using(bucket_id='house-documents' and (
-  case when public.v33_shared_document_home(objects.name) is not null
-       then public.can_edit_home(public.v33_shared_document_home(objects.name))
+  case when private.v33_shared_document_home(objects.name) is not null
+       then public.can_edit_home(private.v33_shared_document_home(objects.name))
        else (storage.foldername(objects.name))[1]=(select auth.uid())::text
   end
 ));

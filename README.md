@@ -9,7 +9,18 @@ Cosa cambia per chi usa l'app:
 - La **conferma automatica dei pagamenti** richiede anche che Gmail o Outlook riportino DMARC superato per il dominio del mittente; con le caselle IMAP la conferma resta sempre manuale. In una casa condivisa serve il ruolo di proprietario o editor.
 - Un membro rimosso da una casa non può più aprire né cancellare i file che vi aveva caricato.
 
-Ordine completo di installazione su un database nuovo: `schema.sql`, `migrate_v19.sql`, `migrate_v20.sql`, `migrate_v21.sql`, `migrate_v30.sql`, `migrate_v32_languages.sql`, `harden_trigger_permissions.sql`, `migrate_v33_audit.sql`, `migrate_v34_saldi.sql` (saldi tra coinquilini calcolati nel database; finché non è eseguita l'app usa il calcolo precedente sulle ultime 250 spese), `migrate_v36_quota.sql` (200 MB di documenti per utente; il numero si cambia in `v36_storage_quota_bytes()`).
+Ordine completo di installazione su un database nuovo, in quest'ordine:
+
+1. `schema.sql`, `migrate_v19.sql`, `migrate_v20.sql`, `migrate_v21.sql`, `migrate_v30.sql`, `migrate_v32_languages.sql`, `harden_trigger_permissions.sql`;
+2. `migrate_v33_audit.sql`;
+3. `migrate_v34_saldi.sql`: saldi tra coinquilini calcolati nel database. Finché non è eseguita, l'app usa il calcolo precedente sulle ultime 250 spese;
+4. `migrate_v35_cron.sql`: controlli programmati con Supabase Cron. Va eseguita solo dopo che il codice è online (vedi sotto);
+5. `migrate_v36_quota.sql`: 200 MB di documenti per utente. Il numero si cambia in `v36_storage_quota_bytes()`;
+6. `migrate_v37_account.sql`: cancellazione dell'account. Le spese condivise restano senza nome;
+7. `migrate_v38_rifiniture.sql`: la ricerca dei documenti condivisi esce dall'API e si aggiungono indici;
+8. `migrate_v39_lista_spesa.sql`: nella lista della spesa si cambiano solo testo, quantità e spunta.
+
+Ogni script è in una sola transazione e si può rieseguire.
 
 
 ### Controlli programmati con Supabase Cron

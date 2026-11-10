@@ -39,3 +39,14 @@ test('v39: nella lista della spesa si cambiano solo testo, quantità e spunta', 
       for(const key of m[1].split(',').map(p=>p.split(':')[0].trim()))assert.ok(['title','quantity','checked'].includes(key),`${file}: ${key}`);
   }
 });
+
+test('v33 rieseguita dopo la v38 non rimette la funzione dei documenti nell API', () => {
+  const v33=readFileSync(new URL('../supabase/migrate_v33_audit.sql',import.meta.url),'utf8').replace(/--[^\n]*/g,'');
+  assert.match(v33,/create or replace function private\.v33_shared_document_home\(path text\)/);
+  assert.doesNotMatch(v33,/create or replace function public\.v33_shared_document_home/);
+  assert.doesNotMatch(v33,/grant usage on schema private/);
+  for(const policy of ['v19_download_allowed','v19_delete_allowed']){
+    const body=v33.split(`create policy ${policy}`)[1].split(';')[0];
+    assert.match(body,/private\.v33_shared_document_home\(objects\.name\)/);
+  }
+});
