@@ -189,3 +189,17 @@ test('V20 HTTP 401 requests sign-in, distinct from 403 permissions, in six langu
  assert.equal(v20ErrorCategory({status:401,code:'42501'}),'auth');
  assert.equal(v20ErrorCategory({status:403,code:'42501'}),'access');
 });
+
+
+test('V20 HTTP 400 invalid requests reuse localized validation guidance safely',()=>{
+ const translations=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const message=v20SafeError(locale,{status:400,message:'private data token=secret'});
+  translations.add(message);
+  assert.equal(v20ErrorCategory({status:400}),'validation');
+  assert.equal(message,v20SafeError(locale,{status:422}));
+  assert.doesNotMatch(message,/private|token|secret|400|supabase/i);
+  assert.equal(v20SafeError(locale,{status:'400'}),v20SafeError(locale));
+ }
+ assert.equal(translations.size,6);
+});
