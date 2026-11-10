@@ -77,6 +77,11 @@ export default function HomeExtra({client,demo,user,homeId,canWrite,bills=[],uti
     if(rows.documents.some(d=>d.sha256===sha256)){onNotify(tr('extra.archive.duplicate'));return;}
     path=`${user.id}/${uid()}.${file.type==='application/pdf'?'pdf':file.type==='image/jpeg'?'jpg':file.type==='image/png'?'png':file.type==='image/webp'?'webp':'txt'}`;
     const uploaded=await client.storage.from('house-documents').upload(path,file,{contentType:file.type,upsert:false,cacheControl:'3600'});
+    // Spazio per utente (supabase/migrate_v36_quota.sql): la regola di accesso rifiuta il file.
+    if(uploaded.error&&/row-level security|violates|unauthorized|403/i.test(`${uploaded.error.message||''} ${uploaded.error.statusCode||''}`)){
+     const {data:used}=await client.rpc('v36_my_storage_used');
+     if(Number(used)>=200*1024*1024){onNotify(tr('extra.archive.quotaFull'));return;}
+    }
     if(uploaded.error)throw uploaded.error;
     const saved=await client.from('home_documents').insert({...common,property_id:doc.property_id||null,bill_id:doc.bill_id||null,doc_type:doc.type,notes:doc.notes,name:file.name.slice(0,200),mime_type:file.type,file_size:file.size,storage_path:path,sha256});
     if(saved.error){await client.storage.from('house-documents').remove([path]);throw saved.error;}
