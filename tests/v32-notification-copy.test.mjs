@@ -130,6 +130,6 @@ test('user-supplied placeholder text never changes the localized due date',()=>{
   assert.ok(text.includes(name),language+' should preserve literal name');
   assert.equal(text.split('{date}').length-1,1,language+' should keep one literal placeholder');
   assert.equal(text.split('{name}').length-1,1,language+' should keep one literal placeholder');
-  assert.equal(text.split('\\n').length,3);
+  assert.equal(text.split('\n').length,3);
  }
 });
