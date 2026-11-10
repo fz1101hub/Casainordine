@@ -85,3 +85,39 @@ test('pt-PT reminder uses a natural preposition before the localized date',()=>{
  assert.match(text,/A fatura Água vence em 31/);
  assert.doesNotMatch(text,/vence a 31/);
 });
+
+test('reminder rejects non-string names instead of exposing object coercion',()=>{
+ for(const name of [42,0,true,{},['Invoice'],{toString(){throw new Error('should not execute');}}]){
+  assert.throws(()=>billReminderCopy({language:'en',name,dueDate:'2026-11-04'}),TypeError);
+ }
+ assert.match(billReminderCopy({language:'en',name:'Invoice 42',dueDate:'2026-11-04'}).text,/Invoice 42/);
+});
+
+test('long reminder names are capped without changing the source',()=>{
+ const name='🧾'.repeat(10000);
+ const rendered=billReminderCopy({language:'en',name,dueDate:'2026-11-04'}).text.split(' is due')[0].replace('The bill ','');
+ assert.equal(Array.from(rendered).length,160);
+ assert.equal(name.length,20000);
+ assert.equal(rendered,'🧾'.repeat(160));
+});
+
+
+test('reminder bounds oversized inputs before normalization without mutating source',()=>{
+ const maxName='A'.repeat(32768);
+ assert.match(billReminderCopy({language:'en',name:maxName,dueDate:'2026-11-04'}).text,/The bill A/);
+ const oversized='B'.repeat(32769);
+ assert.throws(()=>billReminderCopy({language:'en',name:oversized,dueDate:'2026-11-04'}),/Bill name too long/);
+ assert.equal(oversized.length,32769);
+});
+
+
+test('reminder names remove soft hyphen, Arabic letter mark and invisible separators',()=>{
+ const name='Ener\u00adgia\u061c \u034f\u180eLuce';
+ const {text}=billReminderCopy({language:'it',name,dueDate:'2026-11-04'});
+ assert.doesNotMatch(text,/[\u00ad\u061c\u034f\u180e]/u);
+ assert.match(text,/Ener gia Luce/);
+ assert.equal(name.includes('\u061c'),true);
+ for(const invisible of ['\u00ad','\u061c','\u034f','\u180e']){
+  assert.throws(()=>billReminderCopy({language:'en',name:invisible,dueDate:'2026-11-04'}),TypeError);
+ }
+});
