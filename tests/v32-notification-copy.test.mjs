@@ -121,3 +121,15 @@ test('reminder names remove soft hyphen, Arabic letter mark and invisible separa
   assert.throws(()=>billReminderCopy({language:'en',name:invisible,dueDate:'2026-11-04'}),TypeError);
  }
 });
+
+test('user-supplied placeholder text never changes the localized due date',()=>{
+ for(const language of ['it','en','es','fr','de','pt']){
+  const dueDate='2026-12-31';
+  const name='Luce {date} {name}';
+  const text=billReminderCopy({language,name,dueDate}).text;
+  assert.ok(text.includes(name),language+' should preserve literal name');
+  assert.equal(text.split('{date}').length-1,1,language+' should keep one literal placeholder');
+  assert.equal(text.split('{name}').length-1,1,language+' should keep one literal placeholder');
+  assert.equal(text.split('\\n').length,3);
+ }
+});
