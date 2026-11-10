@@ -300,3 +300,13 @@
 .toast button::after{content:'';position:absolute;inset:-12px}
 .modal:focus-visible{outline:3px solid var(--green);outline-offset:2px}
 @media (max-width:760px){input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]),select,textarea{font-size:16px}}
+/* Account: password dimenticata, nuova password, eliminazione (audit 2026-11). */
+.link-button{background:none;border:0;padding:4px 0;margin:-4px 0 10px;color:var(--green);font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;text-align:left}
+.link-button:disabled{opacity:.6;cursor:wait}
+.auth-info{background:#eef7f2;color:#1f5f4e;padding:12px;border-radius:9px;font-size:12px;line-height:1.5}
+.danger-panel{margin-top:22px;border:1px solid #f0d6cf}
+.delete-account-form{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+.delete-account-form label{flex:1 1 240px;display:flex;flex-direction:column;gap:6px;font-size:12.5px;font-weight:700}
+.delete-account-form input{padding:11px 12px;border:1px solid #dde4df;border-radius:10px;font:inherit}
+.btn-danger{background:#b34a3a;color:#fff;border:0}
+.btn-danger:disabled{opacity:.45;cursor:not-allowed}
