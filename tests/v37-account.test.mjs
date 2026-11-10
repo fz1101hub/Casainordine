@@ -52,3 +52,12 @@ test('Password dimenticata e nuova password: collegati all’app e tradotti',()=
   for(const key of ['account.forgot','account.resetSent','account.newPasswordTitle','account.deleteTitle','account.deleteHelp','account.deleteOwner','account.deleteFailed'])
     for(const {code} of LANGUAGES){const v=translate(code,key);assert.ok(v&&v!==key,`${code}: ${key}`);}
 });
+
+test('le spese di chi ha cancellato l account mostrano «ex membro» nella lingua scelta', () => {
+  const hub=source('app/HouseholdHub.jsx');
+  assert.doesNotMatch(hub,/\|\| 'Membro'/);
+  assert.match(hub,/nameOf=m=>fmtName\(m,tr\('family\.formerMember'\)\)/);
+  assert.doesNotMatch(hub.replace(/const fmtName = [^\n]*\n/,'').replace(/nameOf=m=>fmtName/,''),/fmtName\(/);
+  assert.equal(translate('it','family.formerMember'),'ex membro');
+  for(const {code} of LANGUAGES){const v=translate(code,'family.formerMember');assert.ok(v&&v!=='family.formerMember',code);}
+});
