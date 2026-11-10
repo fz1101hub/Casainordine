@@ -45,3 +45,17 @@ test('V20 errors ignore untrusted free-text and malformed status fields',()=>{
  assert.equal(v20ErrorCategory(null),'generic');
  assert.equal(v20ErrorCategory(undefined),'generic');
 });
+
+
+test('V20 HTTP 429 rate limits have localized safe retry feedback',()=>{
+ const messages=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const rate=v20SafeError(locale,{status:429,message:'secret token from provider'});
+  messages.add(rate);
+  assert.equal(v20ErrorCategory({status:429}),'rate');
+  assert.notEqual(rate,v20SafeError(locale));
+  assert.doesNotMatch(rate,/secret|token|429|supabase/i);
+  assert.equal(v20SafeError(locale,{status:'429'}),v20SafeError(locale));
+ }
+ assert.equal(messages.size,6);
+});
