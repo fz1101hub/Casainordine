@@ -59,3 +59,18 @@ test('V20 HTTP 429 rate limits have localized safe retry feedback',()=>{
  }
  assert.equal(messages.size,6);
 });
+
+test('V20 HTTP timeouts 408/504 show localized retry advice without leaking details',()=>{
+ const translated=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const expected=v20SafeError(locale,{status:408});
+  translated.add(expected);
+  assert.equal(v20ErrorCategory({status:408}),'timeout');
+  assert.equal(v20ErrorCategory({status:504}),'timeout');
+  assert.equal(v20SafeError(locale,{status:504,message:'token=secret'}),expected);
+  assert.notEqual(expected,v20SafeError(locale));
+  assert.doesNotMatch(expected,/token|secret|408|504|supabase/i);
+  assert.equal(v20SafeError(locale,{status:'504'}),v20SafeError(locale));
+ }
+ assert.equal(translated.size,6);
+});
