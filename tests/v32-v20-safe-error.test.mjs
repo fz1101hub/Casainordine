@@ -173,3 +173,19 @@ test('V20 HTTP 502 upstream gateway failures use safe six-language service feedb
  }
  assert.equal(translations.size,6);
 });
+
+test('V20 HTTP 401 requests sign-in, distinct from 403 permissions, in six languages',()=>{
+ const translated=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const auth=v20SafeError(locale,{status:401,message:'private session token=secret'});
+  translated.add(auth);
+  assert.equal(v20ErrorCategory({status:401}),'auth');
+  assert.notEqual(auth,v20SafeError(locale,{status:403}));
+  assert.notEqual(auth,v20SafeError(locale));
+  assert.doesNotMatch(auth,/private|token|secret|401|supabase/i);
+  assert.equal(v20SafeError(locale,{status:'401'}),v20SafeError(locale));
+ }
+ assert.equal(translated.size,6);
+ assert.equal(v20ErrorCategory({status:401,code:'42501'}),'auth');
+ assert.equal(v20ErrorCategory({status:403,code:'42501'}),'access');
+});
