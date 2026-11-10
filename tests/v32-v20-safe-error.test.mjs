@@ -28,3 +28,20 @@ test('V20 structured provider codes produce safe localized categories',()=>{
  assert.equal(v20ErrorCategory({code:'FETCH_ERROR'}),'network');
  assert.equal(v20ErrorCategory({message:'permission denied'}),'generic');
 });
+
+test('V20 errors ignore untrusted free-text and malformed status fields',()=>{
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const generic=v20SafeError(locale);
+  for(const error of [
+   {message:'permission denied',status:'403'},
+   {message:'relation does not exist',code:'42P01 '},
+   {message:'Failed to fetch',status:'0'},
+   {message:'password=secret',code:42501},
+   {message:'SQLSTATE 42501',status:500},
+   {details:'PGRST202',hint:'schema missing'}
+  ]) assert.equal(v20SafeError(locale,error),generic);
+  assert.equal(v20SafeError(locale,{code:'42501',message:'password=secret'}),v20SafeError(locale,{code:'42501'}));
+ }
+ assert.equal(v20ErrorCategory(null),'generic');
+ assert.equal(v20ErrorCategory(undefined),'generic');
+});
