@@ -18,8 +18,10 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
-      - name: Installa dipendenze
-        run: npm install --no-audit --no-fund
+      - name: Installa dipendenze (versioni bloccate da package-lock.json)
+        run: npm ci --no-audit --no-fund
+      - name: Controlla vulnerabilità note delle dipendenze dell'app
+        run: npm audit --omit=dev --audit-level=high
       - name: Esegui i test di logica
         run: npm test
       - name: Verifica build Next.js

@@ -2,7 +2,8 @@ import { getAdmin,json,cronAuthorized } from '../../../../lib/server.mjs';
 import { syncConnection } from '../../../../lib/mail-sync.mjs';
 import { MAIL_BUCKET } from '../../../../lib/mail-core.mjs';
 export const runtime='nodejs';
-export const maxDuration=60;
+// Piano Hobby di Vercel: funzioni fino a 300 secondi e cron una sola volta al giorno.
+export const maxDuration=300;
 export async function GET(request){
   if(!process.env.CRON_SECRET)return json({error:'CRON_SECRET mancante'},503);
   if(!cronAuthorized(request))return json({error:'Non autorizzato'},401);
@@ -11,7 +12,7 @@ export async function GET(request){
   // Equità: si parte dalle caselle tentate meno di recente (last_attempt_at, migrazione v3.3).
   // Prima l'ordine era sull'ultima sincronizzazione RIUSCITA, quindi poche caselle sempre in
   // errore occupavano tutti i posti e le altre non venivano mai lette.
-  let {data,error}=await admin.from('mail_connections').select('*').neq('status','reconnect').order('last_attempt_at',{ascending:true,nullsFirst:true}).limit(30);
+  let {data,error}=await admin.from('mail_connections').select('*').neq('status','reconnect').order('last_attempt_at',{ascending:true,nullsFirst:true}).limit(150);
   const attemptColumn=!error;
   if(error){
     // Migrazione v3.3 non ancora eseguita: comportamento precedente.
@@ -20,8 +21,9 @@ export async function GET(request){
   if(error)return json({error:'Impossibile leggere le caselle collegate.'},500);
   const results=[];
   for(const c of data||[]){
-    // Il cron gira una volta al giorno: entro 60 secondi si elaborano più caselle possibile.
-    if(Date.now()-started>40_000)break;
+    // Il cron gira una volta al giorno: si elaborano più caselle possibile lasciando un minuto
+    // di margine sotto il limite di 300 secondi (una sincronizzazione lenta può durare decine di secondi).
+    if(Date.now()-started>240_000)break;
     const last=attemptColumn?(c.last_attempt_at||c.last_sync_at):c.last_sync_at;
     if(last&&Date.now()-new Date(last).getTime()<20*60*60_000)continue;
     if(attemptColumn)await admin.from('mail_connections').update({last_attempt_at:new Date().toISOString()}).eq('id',c.id);
