@@ -158,3 +158,18 @@ test('V20 HTTP 503 service outages have safe, distinct localized retry guidance'
  }
  assert.equal(translations.size,6);
 });
+
+
+test('V20 HTTP 502 upstream gateway failures use safe six-language service feedback',()=>{
+ const translations=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const message=v20SafeError(locale,{status:502,message:'upstream secret token=abc'});
+  translations.add(message);
+  assert.equal(v20ErrorCategory({status:502}),'unavailable');
+  assert.equal(message,v20SafeError(locale,{status:503}));
+  assert.notEqual(message,v20SafeError(locale,{status:504}));
+  assert.doesNotMatch(message,/upstream|secret|token|502|supabase/i);
+  assert.equal(v20SafeError(locale,{status:'502'}),v20SafeError(locale));
+ }
+ assert.equal(translations.size,6);
+});
