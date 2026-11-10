@@ -74,3 +74,17 @@ test('V20 HTTP timeouts 408/504 show localized retry advice without leaking deta
  }
  assert.equal(translated.size,6);
 });
+
+
+test('V20 HTTP 413 file size errors are localized without provider leakage',()=>{
+ const translations=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const message=v20SafeError(locale,{status:413,message:'secret upload URL'});
+  translations.add(message);
+  assert.equal(v20ErrorCategory({status:413}),'size');
+  assert.notEqual(message,v20SafeError(locale));
+  assert.doesNotMatch(message,/secret|upload URL|413|supabase/i);
+  assert.equal(v20SafeError(locale,{status:'413'}),v20SafeError(locale));
+ }
+ assert.equal(translations.size,6);
+});
