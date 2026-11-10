@@ -15,6 +15,7 @@ import { extractBillFields } from '../lib/document-import.mjs';
 import MailImporter from './MailImporter';
 import HouseholdHub from './HouseholdHub';
 import PushSettings from './PushSettings';
+import { ForgotPasswordButton, PasswordRecoveryDialog, DeleteAccountPanel } from './AccountSecurity';
 import CalendarFeed from './CalendarFeed';
 import HomeExtra from './HomeExtra';
 import V20Hub from './V20Hub';
@@ -103,7 +104,7 @@ function Auth({client}) {
   const {t}=useLanguage();
   const [signup,setSignup] = useState(false);
   const [email,setEmail] = useState(''); const [password,setPassword] = useState('');
-  const [error,setError] = useState(''); const [pending,setPending] = useState(false);
+  const [error,setError] = useState(''); const [pending,setPending] = useState(false); const [info,setInfo] = useState('');
   async function submit(e) {
     e.preventDefault(); setError(''); setPending(true);
     const {data,error:err} = signup ? await client.auth.signUp({email,password}) : await client.auth.signInWithPassword({email,password});
@@ -119,9 +120,9 @@ function Auth({client}) {
   }
   return <div className="auth-wrap"><div className="auth-decoration"><span className="auth-logo"><House size={23}/></span><p>{t('auth.brandLine')}</p><h1>{t('auth.tagline')}</h1><p className="auth-intro">{t('auth.intro')}</p><div className="auth-quote"><Bell size={21}/> {t('auth.reminder')}</div></div>
     <div className="auth-card"><LanguageSelector id="auth-language" className="auth-language" label={true}/><div className="brand auth-mobile"><span className="brand-icon"><House size={22}/></span><b>Casa<span>inOrdine</span></b></div><div className="eyebrow">{t('v32.notifications.authEyebrow')}</div><h2>{t(signup?'auth.signupTitle':'auth.title')}</h2><p className="muted">{t(signup?'auth.signupHelp':'auth.loginHelp')}</p>
-      <form onSubmit={submit}><label>{t('auth.email')}<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="tu@esempio.it"/></label><label>{t('auth.password')}<input type="password" minLength={6} required value={password} onChange={e=>setPassword(e.target.value)} placeholder={t('auth.passwordHint')}/></label><button className="btn btn-primary full" disabled={pending}>{t(pending?'auth.signingIn':signup?'auth.signUp':'auth.signIn')}<ChevronRight size={17}/></button></form>
+      <form onSubmit={submit}><label>{t('auth.email')}<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="tu@esempio.it"/></label><label>{t('auth.password')}<input type="password" minLength={6} required value={password} onChange={e=>setPassword(e.target.value)} placeholder={t('auth.passwordHint')}/></label>{!signup&&<ForgotPasswordButton client={client} email={email} t={t} onMessage={message=>{setError('');setInfo(message);}}/>}<button className="btn btn-primary full" disabled={pending}>{t(pending?'auth.signingIn':signup?'auth.signUp':'auth.signIn')}<ChevronRight size={17}/></button></form>
       <div className="auth-separator">{t('auth.or')}</div><a className="btn btn-soft full" href="/prova" style={{textDecoration:'none',justifyContent:'center'}}><House size={18}/> {t('auth.demo')}</a><button className="btn btn-soft full" onClick={google}><span className="google-dot">G</span> {t('auth.google')}</button>
-      {error&&<p className="auth-error">{error}</p>}<p className="auth-switch">{t(signup?'auth.hasAccount':'auth.noAccount')} <button onClick={()=>{setSignup(!signup);setError('');}}>{t(signup?'auth.signIn':'auth.signUp')}</button></p><p className="privacy-line"><LockKeyhole size={13}/> {t('auth.privacy')}</p>
+      {error&&<p className="auth-error">{error}</p>}{info&&!error&&<p className="auth-info" role="status">{info}</p>}<p className="auth-switch">{t(signup?'auth.hasAccount':'auth.noAccount')} <button onClick={()=>{setSignup(!signup);setError('');}}>{t(signup?'auth.signIn':'auth.signUp')}</button></p><p className="privacy-line"><LockKeyhole size={13}/> {t('auth.privacy')}</p>
     </div></div>;
 }
 
@@ -147,6 +148,7 @@ export default function Page() {
   const [documentState,setDocumentState] = useState({busy:false,message:''});
   const [mailRefresh,setMailRefresh]=useState(0);
   const [supplierForm,setSupplierForm]=useState({name:'',category:'Luce',sender_email:''});
+  const [recovery,setRecovery]=useState(false);
   const [ratePlan,setRatePlan]=useState(null), [ratePaste,setRatePaste]=useState(''), [rateUnit,setRateUnit]=useState(''), [rateSupplier,setRateSupplier]=useState('Condominio'), [billPaste,setBillPaste]=useState('');
 
   const notify = txt=>{setToast(txt);};
@@ -218,6 +220,8 @@ export default function Page() {
       // Dopo un'uscita (anche per sessione scaduta) si ricarica la pagina: nello stato React
       // restano altrimenti chiave d'integrazione, testi incollati e moduli dell'account precedente.
       if(event==='SIGNED_OUT'){window.location.replace('/');return;}
+      // Ritorno dal link 'Password dimenticata?': si chiede subito la nuova password.
+      if(event==='PASSWORD_RECOVERY')setRecovery(true);
       setUser(session?.user||null);
       // Il rinnovo del token (circa ogni ora) non richiede di ricaricare tutto.
       if(session) {if(event!=='TOKEN_REFRESHED')setTimeout(()=>{reloadRef.current();reloadHomesRef.current();},0);} else {setHomes([]);setActiveHomeId(null);setData({bills:[],utilities:[],tasks:[],suppliers:[],summaries:[],profile:null,reminders:[]});}
@@ -617,9 +621,10 @@ export default function Page() {
             {data.profile?.summary_frequency==='monthly'&&<label>{tr('settings.monthDay')}<input type="number" min="1" max="28" value={data.profile?.summary_month_day??1} onChange={e=>{const d=Number(e.target.value);if(d>=1&&d<=28)updateSummaryPrefs({summary_month_day:d});}}/></label>}
             <small>{tr('settings.summaryNote')}</small></div>
             {!demo&&<><PushSettings client={client} onNotify={notify}/><CalendarFeed client={client} onNotify={notify}/></>}<div className="summary-settings"><h3>{tr('settings.phoneCalendar')}</h3><p>{tr('settings.exportHelp')}</p><button className="btn btn-soft" onClick={()=>downloadCalendar(bills.filter(b=>!b.paid_at),activeHomeId?'scadenze-casa':'scadenze-personali')}><CalendarDays size={16}/> {tr('settings.exportCalendar')}</button></div><div className="setting-row"><div><b>{tr('settings.autoPayment')}</b><small>{tr('settings.autoPaymentHelp')}</small></div><button className={`toggle ${data.profile?.auto_confirm_payments?'on':''}`} onClick={toggleAutoPayment} aria-label={tr('settings.autoPaymentToggle')} aria-pressed={!!data.profile?.auto_confirm_payments}><span/></button></div></section>
-          <section className="panel settings-panel"><div className="settings-heading"><span className="settings-icon"><LockKeyhole size={20}/></span><div><h2>{tr('settings.privacyHeading')}</h2><p>{tr('settings.privacyHelp')}</p></div></div><div className="setting-row"><div><b>{tr('settings.account')}</b><small>{demo?tr('settings.demoLocal'):user?.email||tr('settings.personalAccount')}</small></div><ShieldCheck size={20} className="subtle-green"/></div><div className="setting-row"><div><b>{tr('settings.sharing')}</b><small>{tr('settings.sharingHelp')}</small></div><button className="btn btn-soft" onClick={()=>changePage('household')}>{tr('settings.manageHomes')}</button></div>{!demo&&<button className="btn btn-soft" onClick={signOut}><LogOut size={17}/> {tr('settings.signout')}</button>}</section></div></>}
+          <section className="panel settings-panel"><div className="settings-heading"><span className="settings-icon"><LockKeyhole size={20}/></span><div><h2>{tr('settings.privacyHeading')}</h2><p>{tr('settings.privacyHelp')}</p></div></div><div className="setting-row"><div><b>{tr('settings.account')}</b><small>{demo?tr('settings.demoLocal'):user?.email||tr('settings.personalAccount')}</small></div><ShieldCheck size={20} className="subtle-green"/></div><div className="setting-row"><div><b>{tr('settings.sharing')}</b><small>{tr('settings.sharingHelp')}</small></div><button className="btn btn-soft" onClick={()=>changePage('household')}>{tr('settings.manageHomes')}</button></div>{!demo&&<button className="btn btn-soft" onClick={signOut}><LogOut size={17}/> {tr('settings.signout')}</button>}</section></div>{!demo&&user&&<DeleteAccountPanel client={client} user={user} t={tr} onNotify={notify}/>}</>}
       </div>
     </main>
+    {recovery&&<PasswordRecoveryDialog client={client} t={tr} onDone={message=>{setRecovery(false);notify(message);}}/>}
     {ratePlan&&<div className="modal-overlay"><div className="modal rate-modal" role="dialog" aria-modal="true" aria-labelledby="rate-modal-title" tabIndex={-1} ref={dialogRef}><div className="modal-head"><div><div className="eyebrow">{tr('rates.eyebrow')}</div><h2 id="rate-modal-title">{tr('rates.count',{count:ratePlan.rows.length})}</h2></div><button className="icon-button" onClick={()=>setRatePlan(null)} aria-label={tr('ui.close')}><X size={20}/></button></div>
       <div className="rate-modal-body"><p>{tr('rates.source',{source:ratePlan.source})}</p>{ratePlan.warnings.map((w,i)=><p className="rate-warning" key={i}><AlertCircle size={15}/> {w}</p>)}
       <div className="table-scroll"><table className="bills-table"><thead><tr><th>{tr('rates.use')}</th><th>{tr('rates.description')}</th><th>{tr('rates.due')}</th><th>{tr('rates.amount')}</th></tr></thead><tbody>{ratePlan.rows.map((r,i)=><tr key={i}><td><input type="checkbox" checked={r.selected} onChange={e=>setRatePlan({...ratePlan,rows:ratePlan.rows.map((x,j)=>j===i?{...x,selected:e.target.checked}:x)})}/></td><td><input aria-label={tr('rates.itemDescription',{number:i+1})} value={r.title} onChange={e=>setRatePlan({...ratePlan,rows:ratePlan.rows.map((x,j)=>j===i?{...x,title:e.target.value}:x)})}/></td><td><input type="date" aria-label={tr('rates.itemDate',{number:i+1})} value={r.due_date} onChange={e=>setRatePlan({...ratePlan,rows:ratePlan.rows.map((x,j)=>j===i?{...x,due_date:e.target.value}:x)})}/></td><td><input type="number" min="0.01" step="0.01" aria-label={tr('rates.itemAmount',{number:i+1})} value={r.amount} onChange={e=>setRatePlan({...ratePlan,rows:ratePlan.rows.map((x,j)=>j===i?{...x,amount:e.target.value}:x)})}/></td></tr>)}</tbody></table></div>
