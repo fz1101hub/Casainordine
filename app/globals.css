@@ -310,3 +310,5 @@
 .delete-account-form input{padding:11px 12px;border:1px solid #dde4df;border-radius:10px;font:inherit}
 .btn-danger{background:#b34a3a;color:#fff;border:0}
 .btn-danger:disabled{opacity:.45;cursor:not-allowed}
+/* Schede SOS protette da una frase (v4.0) */
+.sos-protection{border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:12px 0 16px;background:var(--soft)}.sos-protection h3{display:flex;align-items:center;gap:7px;font-size:15px;margin:0 0 6px;color:var(--ink)}.sos-protection p{margin:4px 0 10px}.sos-protection .extra-form{margin:0}.sos-open{display:flex;align-items:center;flex-wrap:wrap;gap:10px}.sos-forgot{margin-top:10px}.sos-forgot summary{cursor:pointer;font-weight:600;color:var(--green-dark)}
