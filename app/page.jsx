@@ -150,9 +150,12 @@ export default function Page() {
   const [ratePlan,setRatePlan]=useState(null), [ratePaste,setRatePaste]=useState(''), [rateUnit,setRateUnit]=useState(''), [rateSupplier,setRateSupplier]=useState('Condominio'), [billPaste,setBillPaste]=useState('');
 
   const notify = txt=>{setToast(txt);};
+  const homesSeq=useRef(0), dataSeq=useRef(0), dataHome=useRef(undefined);
   const reloadHomes=useCallback(async()=>{
     if(!client)return;
+    const seq=++homesSeq.current;
     const {data:membership,error}=await client.from('home_members').select('home_id,role,homes(id,name,owner_id)').order('joined_at');
+    if(seq!==homesSeq.current)return;
     if(error){if(error.code!=='42P01')notify(tr('v32.flow.homesError',{error:error.message}));return;}
     const allowed=membership||[];
     setHomes(allowed);
@@ -160,6 +163,7 @@ export default function Page() {
   },[client]);
   const reload = useCallback(async()=>{
     if (!client) return;
+    const seq=++dataSeq.current;
     const scope=q=>activeHomeId?q.eq('home_id',activeHomeId):q.is('home_id',null);
     const [b,u,t,p,r,sp,sm] = await Promise.all([
       scope(client.from('bills').select('*')).order('due_date',{ascending:true}),
@@ -170,16 +174,37 @@ export default function Page() {
       client.from('user_suppliers').select('*').order('created_at',{ascending:true}),
       client.from('bill_summaries').select('*').order('summary_date',{ascending:false}).limit(12)
     ]);
+    // Cambiando casa in fretta può arrivare per ultima la risposta della casa precedente: si scarta,
+    // altrimenti le sue bollette comparirebbero (e si segnerebbero pagate) sotto la casa nuova.
+    if (seq!==dataSeq.current) return;
     const err = [b,u,t,p,r,sp,sm].find(x=>x.error);
-    if (err) notify(tr('v32.flow.loadError',{error:err.error.message}));
+    // Con un errore (per esempio rete assente) restano i dati già mostrati della STESSA casa: le
+    // liste vuote farebbero credere che non ci sia nessuna bolletta da pagare. Quelli di un'altra
+    // casa invece non devono restare sotto il nome di questa.
+    if (err) {
+      notify(tr('v32.flow.loadError',{error:err.error.message}));
+      if (dataHome.current===(activeHomeId||null)) return;
+    }
+    dataHome.current=err?undefined:(activeHomeId||null);
     setData({bills:b.data||[],utilities:u.data||[],tasks:t.data||[],suppliers:sp.data||[],summaries:sm.data||[],profile:p.data||null,
       reminders:(r.data||[]).filter(item=>item.bills&&!item.bills.paid_at&&item.bills.home_id===activeHomeId)});
   },[client,activeHomeId]);
+  // Cambio di casa: si ricaricano solo i dati, senza rifare la sottoscrizione all'autenticazione
+  // (prima ogni cambio la rifaceva e i dati venivano caricati due volte).
+  const reloadRef=useRef(reload), reloadHomesRef=useRef(reloadHomes), firstHome=useRef(true);
+  reloadRef.current=reload; reloadHomesRef.current=reloadHomes;
+  useEffect(()=>{
+    if(firstHome.current){firstHome.current=false;return;}
+    if(!demo&&client&&user)reload();
+  },[reload]);
   useEffect(()=>{
     if(!client||!activeHomeId){setHomeMembers([]);return;}
+    let current=true;
     client.from('home_members').select('user_id,email,role').eq('home_id',activeHomeId).then(({data,error})=>{
+      if(!current)return;
       if(error)notify(error.message);else setHomeMembers(data||[]);
     });
+    return ()=>{current=false;};
   },[client,activeHomeId,homes]);
 
   useEffect(()=>{
@@ -188,15 +213,17 @@ export default function Page() {
       catch {setData(fakeData());}
       return;
     }
-    client.auth.getSession().then(({data:{session}})=>{setUser(session?.user||null);setInitializing(false);if(session){reload();reloadHomes();}});
+    client.auth.getSession().then(({data:{session}})=>{setUser(session?.user||null);setInitializing(false);if(session){reloadRef.current();reloadHomesRef.current();}});
     const {data:{subscription}} = client.auth.onAuthStateChange((event,session)=>{
       // Dopo un'uscita (anche per sessione scaduta) si ricarica la pagina: nello stato React
       // restano altrimenti chiave d'integrazione, testi incollati e moduli dell'account precedente.
       if(event==='SIGNED_OUT'){window.location.replace('/');return;}
-      setUser(session?.user||null); if(session) {setTimeout(()=>{reload();reloadHomes();},0);} else {setHomes([]);setActiveHomeId(null);setData({bills:[],utilities:[],tasks:[],suppliers:[],summaries:[],profile:null,reminders:[]});}
+      setUser(session?.user||null);
+      // Il rinnovo del token (circa ogni ora) non richiede di ricaricare tutto.
+      if(session) {if(event!=='TOKEN_REFRESHED')setTimeout(()=>{reloadRef.current();reloadHomesRef.current();},0);} else {setHomes([]);setActiveHomeId(null);setData({bills:[],utilities:[],tasks:[],suppliers:[],summaries:[],profile:null,reminders:[]});}
     });
     return ()=>subscription.unsubscribe();
-  },[demo,client,reload,reloadHomes]);
+  },[demo,client]);
 
   async function signOut(){
     // Questo dispositivo smette di ricevere le notifiche dell'account che esce.

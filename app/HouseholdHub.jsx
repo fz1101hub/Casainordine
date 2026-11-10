@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Trash2, UserPlus, Copy, House, Car, Wallet, ShoppingBasket, Users, ShieldCheck, CheckCircle2, X } from 'lucide-react';
 import { todayRome} from '../lib/dates.mjs';
 import {useLanguage} from './LanguageProvider';
@@ -38,18 +38,24 @@ export default function HouseholdHub({client,demo,user,homes,homeId,role,onChang
   const canWrite=role==='owner'||role==='editor';
   const active=homes.find(h=>h.home_id===homeId);
   const inform = msg => onNotify(msg);
+  const loadSeq=useRef(0);
   const load=useCallback(async()=>{
+    const seq=++loadSeq.current;
     if(!client||!homeId){setRows(empty);return;}
-    const [m,i,e,s,b,sh,v,d]=await Promise.all([
+    const [m,i,e,b,sh,v,d]=await Promise.all([
       client.from('home_members').select('home_id,user_id,email,role').eq('home_id',homeId).order('joined_at'),
       client.from('home_invites').select('id,email,role,expires_at,claimed_at').eq('home_id',homeId),
       client.from('home_expenses').select('*').eq('home_id',homeId).order('incurred_on',{ascending:false}).limit(250),
-      client.from('home_expense_shares').select('expense_id,user_id,amount').limit(1000),
       client.from('home_budgets').select('*').eq('home_id',homeId).eq('month',month),
       client.from('home_shopping').select('*').eq('home_id',homeId).order('checked').order('created_at',{ascending:false}),
       client.from('home_vehicles').select('*').eq('home_id',homeId).order('created_at',{ascending:false}),
       client.from('home_vehicle_deadlines').select('*').eq('home_id',homeId).order('due_date')
     ]);
+    // Solo le quote delle spese di questa casa (prima: le prime 1000 di tutte le case visibili).
+    const expenseIds=(e.data||[]).map(x=>x.id);
+    const s=expenseIds.length?await client.from('home_expense_shares').select('expense_id,user_id,amount').in('expense_id',expenseIds).limit(5000):{data:[],error:null};
+    // Cambiando casa in fretta può arrivare per ultima la risposta della casa precedente: si scarta.
+    if(seq!==loadSeq.current)return;
     const err=[m,e,s,b,sh,v,d].find(x=>x.error);
     if(err)inform(err.error.message);
     setRows({members:m.data||[],invites:i.data||[],expenses:e.data||[],shares:s.data||[],budgets:b.data||[],shopping:sh.data||[],vehicles:v.data||[],deadlines:d.data||[]});

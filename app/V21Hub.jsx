@@ -46,7 +46,9 @@ export default function V21Hub({client,user,homeId,canWrite,demo,bills=[],tasks=
  const [propertyId,setPropertyId]=useState(''),[address,setAddress]=useState(false),[serials,setSerials]=useState(false);
  const [selectedAsset,setSelectedAsset]=useState(()=>typeof window!=='undefined'?new URLSearchParams(location.search).get('asset')||'':'');
  const scope=q=>homeId?q.eq('home_id',homeId):q.eq('user_id',user?.id).is('home_id',null);
+ const loadSeq=useRef(0);
  const load=useCallback(async()=>{
+  const seq=++loadSeq.current;
   if(!client){setLoading(false);return;}setLoading(true);
   const tables={assets:'maintenance_assets',properties:'home_properties',events:'maintenance_events',docs:'home_documents',contracts:'home_contracts',emergency:'home_emergency_cards',inventory:'home_inventory_items',vacations:'home_vacation_plans',decisions:'home_decisions',refunds:'home_refund_expectations'};
   const keys=Object.keys(tables);
@@ -56,6 +58,8 @@ export default function V21Hub({client,user,homeId,canWrite,demo,bills=[],tasks=
   const decisionIds=newRows.decisions.map(x=>x.id),planIds=newRows.vacations.map(x=>x.id);
   if(decisionIds.length){const v=await Promise.resolve(client.from('home_decision_votes').select('decision_id,user_id,choice,created_at').in('decision_id',decisionIds.slice(0,500)).limit(2000)).catch(()=>({data:[],error:true}));newRows.votes=v.data||[];if(v.error)errors.push(v);}
   if(planIds.length){const s=await Promise.resolve(client.from('home_vacation_shares').select('id,plan_id,expires_at,revoked_at,created_at').in('plan_id',planIds.slice(0,500)).order('created_at',{ascending:false}).limit(100)).catch(()=>({data:[],error:true}));newRows.shares=s.data||[];if(s.error)errors.push(s);}
+  // Cambiando casa in fretta può arrivare per ultima la risposta della casa precedente: si scarta.
+  if(seq!==loadSeq.current)return;
   setRows(newRows);setLoading(false);
   const errorKind=v21LoadErrorKind(errors);
   if(errorKind)onNotify(briefingCopy[errorKind]);
