@@ -7,6 +7,7 @@ import {
 import {todayRome} from '../lib/dates.mjs';
 import {useLanguage} from './LanguageProvider';
 import {buildFiveMinuteBriefing} from '../lib/v21-core.mjs';
+import {v21BriefingCopy} from '../lib/v21-briefing-copy.mjs';
 import {
   DEFAULT_HOME_PREFERENCES,HOME_WIDGETS,normalizeHomePreferences,
   moveHomeWidget,toggleHomeWidget
@@ -29,7 +30,7 @@ export default function PersonalizedHome({
  client,demo,user,homeId,canWrite,bills=[],tasks=[],displayName='',
  sampleExtras=null,onSampleShoppingChange=()=>{},onNavigate,onNewBill,onNewTask,onPay,onToggleTask,onRefresh,onNotify=()=>{}
 }){
- const {t:tr,money,date}=useLanguage();
+ const {t:tr,money,date,language}=useLanguage();
  const shortDate=iso=>date(iso,{day:'numeric',month:'short'});
  const [prefs,setPrefs]=useState(()=>normalizeHomePreferences(DEFAULT_HOME_PREFERENCES));
  const [savedPrefs,setSavedPrefs]=useState(()=>normalizeHomePreferences(DEFAULT_HOME_PREFERENCES));
@@ -93,8 +94,10 @@ export default function PersonalizedHome({
  const uncheckedShopping=extras.shopping.filter(x=>!x.checked);
  const briefing=useMemo(()=>buildFiveMinuteBriefing({
   bills,tasks,assets:extras.assets,contracts:extras.contracts,
-  decisions:extras.decisions,inventory:extras.inventory,today:todayRome()
- }),[bills,tasks,extras]);
+  decisions:extras.decisions,inventory:extras.inventory,today:todayRome(),
+  // Senza i testi della lingua scelta il riquadro usava quelli italiani di riserva.
+  copy:v21BriefingCopy(language)
+ }),[bills,tasks,extras,language]);
  const limit=expanded?5:3;
  const dueAmount=openBills.reduce((sum,b)=>sum+(Number(b.amount)||0),0);
  const urgent=openBills.filter(b=>b.due_date&&b.due_date<=todayRome()).length;
