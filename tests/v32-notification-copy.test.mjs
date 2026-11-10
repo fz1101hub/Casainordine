@@ -92,3 +92,11 @@ test('reminder rejects non-string names instead of exposing object coercion',()=
  }
  assert.match(billReminderCopy({language:'en',name:'Invoice 42',dueDate:'2026-11-04'}).text,/Invoice 42/);
 });
+
+test('long reminder names are capped without changing the source',()=>{
+ const name='🧾'.repeat(10000);
+ const rendered=billReminderCopy({language:'en',name,dueDate:'2026-11-04'}).text.split(' is due')[0].replace('The bill ','');
+ assert.equal(Array.from(rendered).length,160);
+ assert.equal(name.length,20000);
+ assert.equal(rendered,'🧾'.repeat(160));
+});
