@@ -10,3 +10,9 @@ Questo ramo aggiunge un test di regressione alla generazione delle email promemo
 ## Verifica successiva — commit `1878785729db282e8a1a20bec11d439bd9afef17`
 
 GitHub Actions «Test automatici», [run 43089429094](https://github.com/fz1101hub/Casainordine/actions/runs/43089429094): `completed/success`, associata al commit indicato. Il job `test` è `completed/success`: dipendenze da lockfile, controllo vulnerabilità note, test di logica (inclusi i nuovi casi regionali), build Next.js e prova Chromium dell'app compilata senza database hanno tutti esito `success`. Questa prova **non** verifica email reali, account distinti, RLS con database, IMAP in staging, traduzioni in browser/mobile o accessibilità. La PR #40 resta draft e la Fase 1 aperta. Nessuna autorizzazione al rilascio o all'avvio delle fasi successive deriva dalla sola CI.
+
+## Verifica CI e nuova regressione — 11 novembre 2026
+
+Sul commit `4e712fcecaccabd22f1f1dd003b1b3d30e875bf7`, GitHub Actions [run 43103042672](https://github.com/fz1101hub/Casainordine/actions/runs/43103042672) risulta `completed/success`. Questo esito non riguarda il commit successivo.
+
+Il commit `c66ae92a1a8c2dc6da0518b665220804a06bf6b5` aggiunge una regressione sulle sei varianti regionali dei promemoria: scadenze impossibili e date non valide devono essere rifiutate, mantenendo invariato il nome fornito dall'utente. **CI e build su questo nuovo commit non ancora verificate.** Restano aperti i gate di rilascio sopra indicati; Fase 1 non conclusa, Fasi 2 e 3 non avviate.
