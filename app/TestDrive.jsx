@@ -57,6 +57,8 @@ export default function TestDrive(){
  };
  const current=NAV.find(x=>x.id===screen);
  return <div className="testdrive">
+  {/* Intestazione: logo, lingua e pulsanti restano in una zona che i lettori di schermo riconoscono. */}
+  <header>
   <div className="testdrive-top">
    <div className="testdrive-brand"><span className="testdrive-logo"><House size={20}/></span>
      <div><b>Casa in Ordine</b><small>{tr('demo.environment')}</small></div>
@@ -67,6 +69,7 @@ export default function TestDrive(){
    </div>
   </div>
   <div className="testdrive-banner" role="note"><ShieldCheck size={19}/><span><b>{tr('demo.bannerStrong')}</b> {tr('demo.banner')}</span></div>
+  </header>
   <nav className="testdrive-navigation" aria-label={copy.navigation}>{NAV.map(({id,title,icon:Icon})=><button type="button" className={screen===id?'active':''} key={id} onClick={()=>nav(id)} aria-current={screen===id?'page':undefined}><Icon size={17}/>{tr('nav.'+id)}</button>)}</nav>
   {notice&&<div className="testdrive-notice" role="status"><CheckCircle2 size={17}/><span>{notice}</span><button type="button" aria-label={copy.dismiss} onClick={()=>setNotice('')}><X size={16}/></button></div>}
   <main className="testdrive-main">
