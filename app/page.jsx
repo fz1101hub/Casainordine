@@ -19,6 +19,7 @@ import { downloadCalendar } from '../lib/calendar.mjs';
 import { billFraudSignals } from '../lib/v20-core.mjs';
 import {localizeMainDemo} from '../lib/v32-demo-fixture-labels.mjs';
 import { friendlyError } from '../lib/friendly-error.mjs';
+import { localizeSettingsApiError } from '../lib/settings-api-errors.mjs';
 import dynamic from 'next/dynamic';
 
 // Le sezioni che non si vedono all'avvio si scaricano solo quando si aprono (secondo audit, A1):
@@ -482,7 +483,7 @@ export default function Page() {
   async function authApi(method='GET') {
     const {data:{session}}=await client.auth.getSession();
     const response=await fetch('/api/integration-key',{method,headers:{Authorization:`Bearer ${session?.access_token||''}`}});
-    const payload=await response.json();if(!response.ok)throw new Error(payload.error||'Errore');return payload;
+    const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error?localizeSettingsApiError(payload.error,language):tr('errors.generic'));return payload;
   }
   async function loadIntegration() {if(demo)return;try{setIntegration(await authApi());}catch(e){notify(e.message);}}
   async function generateToken() {try{const p=await authApi('POST');setNewToken(p.token);await loadIntegration();notify(tr('v32.feedback.28'));}catch(e){notify(e.message);}}
