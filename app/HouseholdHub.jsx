@@ -4,6 +4,7 @@ import { Plus, Trash2, UserPlus, Copy, House, Car, Wallet, ShoppingBasket, Users
 import { todayRome} from '../lib/dates.mjs';
 import {useLanguage} from './LanguageProvider';
 import {signedMemberBalance} from '../lib/house-core.mjs';
+import { friendlyError } from '../lib/friendly-error.mjs';
 
 const cats=['Spesa alimentare','Casa','Trasporti','Condominio','Tasse','Assicurazioni','Salute','Svago','Altro'];
 const categoryTranslationKeys={
@@ -62,7 +63,7 @@ export default function HouseholdHub({client,demo,user,homes,homeId,role,onChang
     // Cambiando casa in fretta può arrivare per ultima la risposta della casa precedente: si scarta.
     if(seq!==loadSeq.current)return;
     const err=[m,e,s,b,sh,v,d].find(x=>x.error);
-    if(err)inform(err.error.message);
+    if(err)inform(friendlyError(err.error,tr));
     const balanceCents=totals.error?null:Object.fromEntries((totals.data||[]).map(x=>[x.user_id,Number(x.balance_cents)]));
     setRows({members:m.data||[],invites:i.data||[],expenses:e.data||[],shares:s.data||[],budgets:b.data||[],shopping:sh.data||[],vehicles:v.data||[],deadlines:d.data||[],balanceCents});
   },[client,homeId,month]);
@@ -72,7 +73,7 @@ export default function HouseholdHub({client,demo,user,homes,homeId,role,onChang
   async function action(promise,success,{refreshHomes=false}={}){
     setBusy(true);
     try{const {data,error}=await promise;if(error)throw error;await load();if(refreshHomes)await onHomesReload();inform(success);return data;}
-    catch(e){inform(e.message||tr('family.emptyError'));return null;}
+    catch(e){inform(friendlyError(e,tr));return null;}
     finally{setBusy(false);}
   }
   async function createHome(event){event.preventDefault();const id=await action(client.rpc('create_home',{home_name:homeName.trim()}),tr('family.created'),{refreshHomes:true});if(id)onChangeHome(id);}

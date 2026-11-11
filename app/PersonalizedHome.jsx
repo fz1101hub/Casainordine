@@ -8,6 +8,7 @@ import {todayRome} from '../lib/dates.mjs';
 import {useLanguage} from './LanguageProvider';
 import {buildFiveMinuteBriefing} from '../lib/v21-core.mjs';
 import {v21BriefingCopy} from '../lib/v21-briefing-copy.mjs';
+import { friendlyError } from '../lib/friendly-error.mjs';
 import {
   DEFAULT_HOME_PREFERENCES,HOME_WIDGETS,normalizeHomePreferences,
   moveHomeWidget,toggleHomeWidget
@@ -62,7 +63,7 @@ export default function PersonalizedHome({
    } else if(client&&user?.id){
     const {data,error:loadError}=await client.from('user_home_preferences')
       .select('widget_order,layout').eq('user_id',user.id).maybeSingle();
-    if(loadError && active)setError(tr('home.loadError')+': '+loadError.message);
+    if(loadError && active)setError(tr('home.loadError')+': '+friendlyError(loadError,tr));
     else if(data)next=normalizeHomePreferences(data);
    }
    if(active){setPrefs(next);setSavedPrefs(next);setPrefsLoading(false);}
@@ -87,7 +88,7 @@ export default function PersonalizedHome({
   setExtras({shopping:results[0].data||[],assets:results[1].data||[],contracts:results[2].data||[],decisions:results[3].data||[],inventory:results[4].data||[]});
   setExtraLoading(false);
   const first=results.find(r=>r.error);
-  if(first)setExtraError('Alcuni dati non sono disponibili: '+first.error.message);
+  if(first){console.error('[home]',first.error?.message||first.error);setExtraError(tr('home.extraUnavailable'));}
  };run();return()=>{active=false};},[client,demo,homeId,refreshKey,sampleExtras]);
  const openBills=useMemo(()=>bills.filter(b=>!b.paid_at).slice().sort((a,b)=>(a.due_date||'9999').localeCompare(b.due_date||'9999')),[bills]);
  const openTasks=useMemo(()=>tasks.filter(t=>!t.done_at).slice().sort((a,b)=>(a.due_date||'9999').localeCompare(b.due_date||'9999')),[tasks]);
@@ -118,7 +119,7 @@ export default function PersonalizedHome({
    }
    setSavedPrefs(next);setPrefs(next);setEditing(false);setStatus(tr('home.editor.saved'));
    onNotify(tr('home.editor.saved'));
-  }catch(e){setError(tr('home.saveError')+': '+(e.message||tr('home.retry')));}
+  }catch(e){setError(tr('home.saveError')+': '+friendlyError(e,tr));}
   finally{setSaving(false);}
  };
  const refresh=()=>{setRefreshKey(x=>x+1);onRefresh?.();};
@@ -131,8 +132,8 @@ export default function PersonalizedHome({
    const {error:updateError}=await client.from('home_shopping').update({checked:!item.checked}).eq('id',item.id).eq('home_id',homeId);
    if(updateError)throw updateError;
    setExtras(old=>({...old,shopping:old.shopping.map(x=>x.id===item.id?{...x,checked:!item.checked}:x)}));
-   onNotify('Lista della spesa aggiornata.');
-  }catch(e){setExtraError(e.message||'Non è stato possibile aggiornare la lista.');}
+   onNotify(tr('home.shoppingUpdated'));
+  }catch(e){console.error('[home]',e?.message||e);setExtraError(tr('home.shoppingFailed'));}
   finally{setShoppingBusy(false);}
  };
  const cards={
@@ -183,7 +184,7 @@ export default function PersonalizedHome({
   </div>
   {status&&<p role="status" className="home3-success"><CheckCircle2 size={16}/>{status}</p>}
   {error&&<p role="alert" className="home3-warning">{error}</p>}
-  {editing&&<section className="panel home3-editor" id="home3-editor" aria-label="Modifica la tua Home">
+  {editing&&<section className="panel home3-editor" id="home3-editor" aria-label={tr('home.editor.title')}>
    <h2>{tr('home.editor.title')}</h2>
    <p>{tr('home.editor.help')}</p>
    <div className="home3-editor-list">
