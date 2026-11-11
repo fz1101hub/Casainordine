@@ -2,7 +2,7 @@ name: Test automatici
 
 on:
   push:
-    branches: [main, feat/i18n-sei-lingue-v32]
+    branches: [main]
   pull_request:
 
 permissions:
@@ -26,3 +26,10 @@ jobs:
         run: npm test
       - name: Verifica build Next.js
         run: npm run build
+      - name: Browser per la prova (Chromium, versione di package-lock.json)
+        run: npx playwright install --with-deps chromium
+      - name: Prova nel browser dell'app compilata (senza database)
+        run: |
+          npm start -- -p 3000 > next.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf -o /dev/null http://localhost:3000/ && break; sleep 1; done
+          node scripts/smoke-browser.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
