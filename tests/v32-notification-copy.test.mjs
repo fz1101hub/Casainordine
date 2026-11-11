@@ -203,3 +203,18 @@ test('regional reminder locales preserve date formatting and literal user tokens
   assert.equal(actual.text.split('\n').length,3,regional+' must not add unexpected lines');
  }
 });
+
+test('regional reminder variants reject impossible dates without changing source input',()=>{
+ const variants=['it-CH','en-US','es-MX','fr-CA','de-AT','pt-BR'];
+ for(const language of variants){
+  const name='Energia {date} $&';
+  for(const dueDate of ['2026-02-30','2025-02-29','2026-13-01','not-a-date']){
+   assert.throws(
+    ()=>billReminderCopy({language,name,dueDate}),
+    TypeError,
+    language+' must reject '+dueDate
+   );
+  }
+  assert.equal(name,'Energia {date} $&');
+ }
+});
