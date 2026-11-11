@@ -6,7 +6,8 @@ Fase attiva: **FASE 1**, non completata. FASI 2 e 3 non avviate.
 - Nuova PR draft #32, branch `test/i18n-v32-v21-interpolation-20261111`: verifica che i segnaposto dinamici di V21 coincidano tra italiano, inglese, spagnolo, francese, tedesco e portoghese; segnala anche token inattesi.
 - La presenza di token coerenti non garantisce una traduzione corretta né una interpolazione sicura al rendering.
 - **Verifica reale:** GitHub Actions run `43013196085` conclusa con `success` sul commit `ec4aeb7`; il job `test` include audit dipendenze, test di logica e build Next.js, tutti riusciti. Non equivale a E2E, revisione linguistica o prova di anteprima Vercel.
-- Commit successivo `1dfee55`: aggiunto controllo di regressione dei segnaposto e dei testi V21 con varianti regionali e codici lingua maiuscoli. **CI/build su questo nuovo commit ancora da verificare**; non attribuire al nuovo HEAD l'esito della CI precedente. Non eseguire merge o rilascio senza controlli.
+- Commit successivo `1dfee55`: aggiunto controllo di regressione dei segnaposto e dei testi V21 con varianti regionali e codici lingua maiuscoli.
+- **Verifica reale aggiornata (2026-11-11):** GitHub Actions run `43021906361` sul commit `d4bff8f07b569212bde028b5312994b0bdc8d984` conclusa con `success`; job `test` completato con successo. Passaggi riusciti: installazione dipendenze, controllo vulnerabilità note, test di logica e build Next.js. URL: https://github.com/fz1101hub/Casainordine/actions/runs/43021906361 . Il commit di questo aggiornamento documentale richiederà una propria verifica CI; non confondere i due HEAD. Non eseguire merge o rilascio senza collaudi adeguati.
 - Restano revisione linguistica, flussi browser/mobile e accessibilità, IMAP in staging e RLS multiaccount con due utenti reali; evitare dati personali nei log e screenshot.
 - Nessun deploy, invio email, migrazione o intervento distruttivo richiesto da questa PR.
 
