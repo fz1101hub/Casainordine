@@ -37,3 +37,14 @@ test('V20 copy returned to a consumer cannot mutate other requests or languages'
  assert.deepEqual(v20UiCopy('en'),englishBefore);
  assert.deepEqual(v20UiCopy('it'),italianBefore);
 });
+
+test('V20 critical privacy and payment warnings have localized text, not Italian fallback',()=>{
+ const keys=['fraudCheckDisclaimer','offlinePrivacyNotice','moveProviderDisclaimer','pagopaDebtWarning'];
+ const italian=v20UiCopy('it');
+ for(const language of LANGUAGES.filter(value=>value!=='it')){
+  const translated=v20UiCopy(language);
+  for(const key of keys){
+   assert.notEqual(translated[key],italian[key],language+': '+key+' must not fall back to Italian');
+  }
+ }
+});
