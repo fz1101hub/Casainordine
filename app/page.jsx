@@ -25,6 +25,7 @@ import {useLanguage,LanguageSelector} from './LanguageProvider';
 import SampleAccountSetup from './SampleAccountSetup';
 import { downloadCalendar } from '../lib/calendar.mjs';
 import { billFraudSignals } from '../lib/v20-core.mjs';
+import {localizeMainDemo} from '../lib/v32-demo-fixture-labels.mjs';
 
 const categories = ['Luce','Gas','Acqua','Internet','Telefono','Rifiuti','Condominio','Affitto / Mutuo','Assicurazione','Tasse','Auto','Altro'];
 const frequencies = [{value:'none',label:'Non ricorrente'},{value:'monthly',label:'Ogni mese'},{value:'bimonthly',label:'Ogni 2 mesi'},{value:'quarterly',label:'Ogni 3 mesi'},{value:'yearly',label:'Ogni anno'},{value:'biennial',label:'Ogni 2 anni'}];
@@ -131,7 +132,7 @@ const MAIL_STATUS={connected:'Casella email collegata! Ora puoi cercare le bolle
 function mailStatusMessage(status){return MAIL_STATUS[status]||'Collegamento della casella non riuscito: riprova più tardi.';}
 
 export default function Page() {
-  const {t:tr,money,locale}=useLanguage();
+  const {t:tr,money,locale,language}=useLanguage();
   const weekdayLabel=day=>new Intl.DateTimeFormat(locale,{weekday:'long',timeZone:'UTC'}).format(new Date(Date.UTC(2023,0,1+day)));
   const client = useMemo(()=>db(),[]), demo = !client;
   const [user,setUser] = useState(null), [initializing,setInitializing] = useState(!demo);
@@ -496,7 +497,9 @@ export default function Page() {
   useEffect(()=>{if(new URLSearchParams(window.location.search).has('invite')||sessionStorage.getItem('pending_house_invite'))setTab('household');const mail=new URLSearchParams(window.location.search).get('mail');if(mail){setTab('connect');notify(mailStatusMessage(mail));window.history.replaceState({},'',window.location.pathname);}},[]);
 
   const today=todayRome(), soon=addDaysISO(today,7);
-  const bills=data.bills||[], utilities=data.utilities||[],tasks=data.tasks||[],suppliers=data.suppliers||[];
+  // Nella prova senza account i dati di esempio si mostrano nella lingua scelta; quelli salvati restano invariati.
+  const shown=demo?localizeMainDemo(data,language):data;
+  const bills=shown.bills||[], utilities=shown.utilities||[],tasks=shown.tasks||[],suppliers=shown.suppliers||[];
   const open=bills.filter(b=>!b.paid_at), urgent=open.filter(b=>b.due_date<=soon);
   const currentMonth=today.slice(0,7), monthBills=bills.filter(b=>b.due_date.startsWith(currentMonth));
   const spent=monthBills.filter(b=>b.paid_at).reduce((a,b)=>a+Number(b.amount),0);
@@ -553,7 +556,7 @@ export default function Page() {
     </aside>
     <main className="main">
       <header className="topbar"><button className="icon-button burger" onClick={()=>setMobile(true)} aria-label={tr('ui.openMenu')}><Menu size={23}/></button><div className="crumb"><span>{activeHomeId?homeMembership?.homes?.name||tr('v32.overview.sharedHome'):tr('v32.overview.personalSpace')}</span><ChevronRight size={15}/><b>{tr('nav.'+tab)}</b></div>
-        <div className="topbar-right"><LanguageSelector id="topbar-language" className="topbar-language" label={false}/><select className="house-switch" aria-label={tr('ui.selectSpace')} value={activeHomeId||''} onChange={e=>switchHome(e.target.value||null)}><option value="">{tr('general.private')}</option>{homes.map(h=><option key={h.home_id} value={h.home_id}>{h.homes?.name||tr('general.house')}</option>)}</select><span className="today-label"><CalendarDays size={16}/> <DateText iso={today}/></span><div className="bell-parent"><button className="icon-button bell-button" onClick={()=>setBellOpen(!bellOpen)} aria-label={tr('ui.reminders')}><Bell size={20}/>{data.reminders.length>0&&<span className="notification-dot"/>}</button>{bellOpen&&<div className="bell-popover"><b>{tr('v32.notifications.reminderHeading')}</b>{data.reminders.length?data.reminders.slice(0,6).map(r=><div className="bell-entry" key={r.id}><p><Bell size={14}/> <span><strong>{tr('v32.notifications.reminderQuestion')}</strong><span>{r.bills?.title||tr('v32.notifications.billFallback')} · {tr('v32.notifications.dueOn')} <DateText iso={r.bills?.due_date||r.reminder_date}/></span></span></p>{r.bills&&!r.bills.paid_at&&<button className="text-link" onClick={()=>{const b=bills.find(x=>x.id===r.bills.id);if(b)pay(b);setBellOpen(false);}}>{tr('v32.notifications.markPaid')} <Check size={13}/></button>}</div>):<p>{tr('v32.notifications.noReminders')}</p>}</div>}</div><span className="top-avatar"><UserRound size={18}/></span></div>
+        <div className="topbar-right"><LanguageSelector id="topbar-language" className="topbar-language" label={false}/><select className="house-switch" aria-label={tr('ui.selectSpace')} value={activeHomeId||''} onChange={e=>switchHome(e.target.value||null)}><option value="">{tr('general.private')}</option>{homes.map(h=><option key={h.home_id} value={h.home_id}>{h.homes?.name||tr('general.house')}</option>)}</select><span className="today-label"><CalendarDays size={16}/> <DateText iso={today}/></span><div className="bell-parent"><button className="icon-button bell-button" onClick={()=>setBellOpen(!bellOpen)} aria-label={tr('ui.reminders')}><Bell size={20}/>{data.reminders.length>0&&<span className="notification-dot"/>}</button>{bellOpen&&<div className="bell-popover"><b>{tr('v32.notifications.reminderHeading')}</b>{shown.reminders.length?shown.reminders.slice(0,6).map(r=><div className="bell-entry" key={r.id}><p><Bell size={14}/> <span><strong>{tr('v32.notifications.reminderQuestion')}</strong><span>{r.bills?.title||tr('v32.notifications.billFallback')} · {tr('v32.notifications.dueOn')} <DateText iso={r.bills?.due_date||r.reminder_date}/></span></span></p>{r.bills&&!r.bills.paid_at&&<button className="text-link" onClick={()=>{const b=bills.find(x=>x.id===r.bills.id);if(b)pay(b);setBellOpen(false);}}>{tr('v32.notifications.markPaid')} <Check size={13}/></button>}</div>):<p>{tr('v32.notifications.noReminders')}</p>}</div>}</div><span className="top-avatar"><UserRound size={18}/></span></div>
       </header>
       <div className="content">
         {activeHomeId&&!canWrite&&<div className="informative"><ShieldCheck size={17}/><p>{tr('v32.shell.readOnly')}</p></div>}
