@@ -12,3 +12,10 @@ Fase attiva: **FASE 1**, non completata. FASI 2 e 3 non avviate.
 - Nessun deploy, invio email, migrazione o intervento distruttivo richiesto da questa PR.
 
 Fare riferimento anche a `docs/I18N_V32.md` per la roadmap completa.
+
+## Verifica aggiuntiva 2026-11-11 (HEAD `6406008`)
+
+- GitHub Actions [run 43030670110](https://github.com/fz1101hub/Casainordine/actions/runs/43030670110), associata al commit `640600863e9fab94e3fa7d3dd78e9d0bc4e90fdf`: stato `completed`, conclusione `success`. Job `test` riuscito; passaggi verificati: dipendenze, controllo vulnerabilità note, test di logica e build Next.js.
+- Il bot Vercel segnala un'anteprima **Ready** per la PR #32, aggiornata alle 13:37 UTC dell'11 novembre 2026: [deployment](https://vercel.com/fz1101hub-6215s-projects/casainordine/5MDFmuzWMQhsPFGMjt7uScgcxQzr). Stato del deployment non equivale a test E2E o prova funzionale dell'anteprima.
+- Questa registrazione modifica solo la documentazione; la CI sul commit documentale successivo resta da verificare.
+- Gate di rilascio invariato: revisione testi nelle sei lingue, E2E/browser/mobile/accessibilità, IMAP staging e RLS con due account; nessun passaggio alla Fase 2 e nessun audit di Fase 3.
