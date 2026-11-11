@@ -43,3 +43,15 @@ test('V21 unsupported language falls back to Italian without sharing mutable sta
  assert.deepEqual(v21BriefingCopy('fr').permissionNotice=== 'modified',false);
  assert.deepEqual(v21BriefingCopy('it'),original);
 });
+
+
+test('V21 accepts regional locale variants and case without changing canonical copies',()=>{
+ for(const lang of locales){
+  const expected=v21BriefingCopy(lang);
+  for(const variant of [lang.toUpperCase(),lang+'-'+(lang==='en'?'GB':'PT'),lang.toUpperCase()+'_XX',' '+lang+' ']){
+   assert.deepEqual(v21BriefingCopy(variant),expected,variant);
+  }
+ }
+ assert.deepEqual(v21BriefingCopy(null),v21BriefingCopy('it'));
+ assert.deepEqual(v21BriefingCopy('zz-ZZ'),v21BriefingCopy('it'));
+});
