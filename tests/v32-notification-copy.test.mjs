@@ -189,3 +189,17 @@ test('regional recipient locale variants preserve the six reminder languages',()
   }
  }
 });
+
+
+test('regional reminder locales preserve date formatting and literal user tokens',()=>{
+ const variants={it:'it-CH',en:'en-US',es:'es-MX',fr:'fr-CA',de:'de-AT',pt:'pt-BR'};
+ for(const [language,regional] of Object.entries(variants)){
+  const name='Energia {date} $&';
+  const dueDate='2026-12-31';
+  const base=billReminderCopy({language,name,dueDate});
+  const actual=billReminderCopy({language:regional,name,dueDate});
+  assert.deepEqual(actual,base,regional+' must preserve the recipient language and its date policy');
+  assert.ok(actual.text.includes(name),regional+' must preserve literal user tokens');
+  assert.equal(actual.text.split('\n').length,3,regional+' must not add unexpected lines');
+ }
+});
