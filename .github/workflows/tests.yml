@@ -27,8 +27,12 @@ jobs:
       - name: Verifica build Next.js
         run: npm run build
       - name: Browser per la prova (Chromium, versione di package-lock.json)
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 10
+        # Le librerie di sistema arrivano da apt: se i mirror non rispondono (capita), si prova con
+        # quelle già presenti nell'immagine di GitHub, che di solito bastano.
+        run: npx playwright install --with-deps chromium || npx playwright install chromium
       - name: Prova nel browser dell'app compilata (senza database)
+        timeout-minutes: 5
         run: |
           npm start -- -p 3000 > next.log 2>&1 &
           for i in $(seq 1 60); do curl -sf -o /dev/null http://localhost:3000/ && break; sleep 1; done
