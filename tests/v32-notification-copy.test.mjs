@@ -168,3 +168,24 @@ test('i simboli di sostituzione nel nome restano testo (revisione 11 novembre)',
   }
  }
 });
+
+test('regional recipient locale variants preserve the six reminder languages',()=>{
+ const variants={
+  it:['it-IT','IT_it'],
+  en:['en-GB','EN_gb'],
+  es:['es-ES','ES_es'],
+  fr:['fr-FR','FR_fr'],
+  de:['de-DE','DE_de'],
+  pt:['pt-PT','PT_pt']
+ };
+ for(const [language,inputs] of Object.entries(variants)){
+  const expected=billReminderCopy({language,name:'Energia',dueDate:'2026-12-31'});
+  for(const variant of inputs){
+   assert.deepEqual(
+    billReminderCopy({language:variant,name:'Energia',dueDate:'2026-12-31'}),
+    expected,
+    variant+' must not silently fall back to another recipient language'
+   );
+  }
+ }
+});
