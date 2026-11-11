@@ -133,3 +133,12 @@ test('user-supplied placeholder text never changes the localized due date',()=>{
   assert.equal(text.split('\n').length,3);
  }
 });
+
+test('reminder replaces isolated UTF-16 surrogates but retains valid emoji',()=>{
+ const name='Gas \uD800 urgent \uDC00 😀';
+ const text=billReminderCopy({language:'en',name,dueDate:'2026-11-04'}).text;
+ assert.match(text,/Gas urgent 😀/);
+ assert.equal(Array.from(text).filter(char=>char==='\uFFFD').length,0);
+ assert.equal(name.includes('\uD800'),true);
+ for(const invalid of ['\uD800','\uDC00'])assert.throws(()=>billReminderCopy({language:'en',name:invalid,dueDate:'2026-11-04'}),TypeError);
+});
