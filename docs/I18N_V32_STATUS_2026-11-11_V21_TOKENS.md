@@ -19,3 +19,9 @@ Fare riferimento anche a `docs/I18N_V32.md` per la roadmap completa.
 - Il bot Vercel segnala un'anteprima **Ready** per la PR #32, aggiornata alle 13:37 UTC dell'11 novembre 2026: [deployment](https://vercel.com/fz1101hub-6215s-projects/casainordine/5MDFmuzWMQhsPFGMjt7uScgcxQzr). Stato del deployment non equivale a test E2E o prova funzionale dell'anteprima.
 - Questa registrazione modifica solo la documentazione; la CI sul commit documentale successivo resta da verificare.
 - Gate di rilascio invariato: revisione testi nelle sei lingue, E2E/browser/mobile/accessibilità, IMAP staging e RLS con due account; nessun passaggio alla Fase 2 e nessun audit di Fase 3.
+
+## Verifica CI del commit `b8eb94b` — 11 novembre 2026
+
+- GitHub Actions run [43040100891](https://github.com/fz1101hub/Casainordine/actions/runs/43040100891) associata al commit `b8eb94b730ee86efa54355e3f5c3b8588ed98804`: `status=completed`, `conclusion=success`, workflow «Test automatici». Il risultato conferma il workflow configurato, non la revisione manuale né gli E2E.
+- **Gate ancora aperti:** (1) revisione manuale dei sei cataloghi e dei messaggi di errore; (2) test dei flussi con browser e mobile in tutte le lingue, inclusa accessibilità; (3) IMAP con account di staging senza dati personali; (4) isolamento RLS con due account reali e preferenze diverse; (5) verifica CI/build sul commit finale candidato al rilascio.
+- Nessun merge o rilascio autorizzato da questa verifica. Fase 1 aperta; Fasi 2 e 3 non avviate.
