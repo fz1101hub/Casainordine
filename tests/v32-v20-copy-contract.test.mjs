@@ -27,3 +27,13 @@ test('V20 UI locale variants and unknown languages are deterministic',()=>{
   assert.deepEqual(v20UiCopy(language),v20UiCopy('it'));
  }
 });
+
+test('V20 copy returned to a consumer cannot mutate other requests or languages',()=>{
+ const italianBefore=v20UiCopy('it');
+ const englishBefore=v20UiCopy('en');
+ const first=v20UiCopy('en');
+ first.monitorTitle='modified by a consumer';
+ delete first.fraudTitle;
+ assert.deepEqual(v20UiCopy('en'),englishBefore);
+ assert.deepEqual(v20UiCopy('it'),italianBefore);
+});
