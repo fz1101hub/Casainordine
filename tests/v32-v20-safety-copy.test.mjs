@@ -31,3 +31,18 @@ test('V20 notices never promise an actual payment, provider switch or automatic 
   }
  }
 });
+
+test('V20 safety notices are stable across locale variants and isolated from caller mutations',()=>{
+ for(const lang of ['it',...languages]){
+  const baseline=v20UiCopy(lang);
+  for(const variant of [lang.toUpperCase()+'-XX',' '+lang+'_XX ']){
+   const localized=v20UiCopy(variant);
+   for(const key of safetyKeys){
+    assert.equal(localized[key],baseline[key],variant+': '+key);
+   }
+  }
+  const mutable=v20UiCopy(lang);
+  mutable.offlinePrivacyNotice='changed by caller';
+  assert.equal(v20UiCopy(lang).offlinePrivacyNotice,baseline.offlinePrivacyNotice,lang);
+ }
+});
