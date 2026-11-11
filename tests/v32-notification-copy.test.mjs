@@ -121,3 +121,50 @@ test('reminder names remove soft hyphen, Arabic letter mark and invisible separa
   assert.throws(()=>billReminderCopy({language:'en',name:invisible,dueDate:'2026-11-04'}),TypeError);
  }
 });
+
+test('user-supplied placeholder text never changes the localized due date',()=>{
+ for(const language of ['it','en','es','fr','de','pt']){
+  const dueDate='2026-12-31';
+  const name='Luce {date} {name}';
+  const text=billReminderCopy({language,name,dueDate}).text;
+  assert.ok(text.includes(name),language+' should preserve literal name');
+  assert.equal(text.split('{date}').length-1,1,language+' should keep one literal placeholder');
+  assert.equal(text.split('{name}').length-1,1,language+' should keep one literal placeholder');
+  assert.equal(text.split('\n').length,3);
+ }
+});
+
+test('user-supplied template tokens remain literal and cannot replace the actual due date',()=>{
+ for(const language of ['it','en','es','fr','de','pt']){
+  const name='Energia {date} {name}';
+  const dueDate='2026-12-31';
+  const {text}=billReminderCopy({language,name,dueDate});
+  const locale={it:'it-IT',en:'en-GB',es:'es-ES',fr:'fr-FR',de:'de-DE',pt:'pt-PT'}[language];
+  const date=new Intl.DateTimeFormat(locale,{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date('2026-12-31T12:00:00Z'));
+  assert.ok(text.includes('Energia {date} {name}'),language);
+  assert.ok(text.includes(date),language);
+  assert.equal(text.split(date).length-1,1,language);
+ }
+});
+
+
+test('malformed UTF-16 cannot leak isolated surrogates into localized email text',()=>{
+ for(const language of ['it','en','es','fr','de','pt']){
+  const name='Acqua\uD800 bolletta\uDC00 😀';
+  const {text}=billReminderCopy({language,name,dueDate:'2026-12-31'});
+  assert.match(text,/Acqua bolletta 😀/);
+  assert.doesNotMatch(text,/(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+  assert.equal(name.charCodeAt(5),0xD800);
+  assert.throws(()=>billReminderCopy({language,name:'\uD800',dueDate:'2026-12-31'}),TypeError);
+ }
+});
+
+test('i simboli di sostituzione nel nome restano testo (revisione 11 novembre)',()=>{
+ for(const language of ['it','en','es','fr','de','pt']){
+  for(const name of ['Rata $& luce','Gas $$ casa',"Acqua $` $' fine",'Rifiuti $1 $<x>']){
+   const {text}=billReminderCopy({language,name,dueDate:'2026-12-31'});
+   assert.ok(text.includes(name),`${language}: ${name}`);
+   assert.doesNotMatch(text,/\{name\}|\{date\}/,`${language}: ${name}`);
+  }
+ }
+});
