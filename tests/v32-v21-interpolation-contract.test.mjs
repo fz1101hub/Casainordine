@@ -28,3 +28,17 @@ test('V21 translated copy has no stray interpolation tokens',()=>{
   }
  }
 });
+
+test('V21 interpolation tokens survive regional locale normalization',()=>{
+ const variants={it:['it-IT','IT_it'],en:['en-GB','EN_gb'],es:['es-ES','ES_es'],fr:['fr-FR','FR_fr'],de:['de-DE','DE_de'],pt:['pt-PT','PT_pt']};
+ for(const [lang,inputs] of Object.entries(variants)){
+  const expected=v21BriefingCopy(lang);
+  for(const input of inputs){
+   const actual=v21BriefingCopy(input);
+   for(const key of Object.keys(expected)){
+    assert.deepEqual(tokens(actual[key]),tokens(expected[key]),input+': '+key);
+    assert.equal(actual[key],expected[key],input+': '+key+' should use the requested language');
+   }
+  }
+ }
+});
