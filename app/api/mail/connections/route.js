@@ -1,4 +1,4 @@
-import { authenticatedUser, getAdmin, json } from '../../../../lib/server.mjs';
+import { authenticatedUser, getAdmin, json, failure, publicError } from '../../../../lib/server.mjs';
 import {decryptSecret,encryptSecret} from '../../../../lib/mail-core.mjs';
 import {verifyImapCredentials} from '../../../../lib/mail-imap.mjs';
 import {isImapProvider} from '../../../../lib/mail-providers.mjs';
@@ -7,7 +7,7 @@ export const maxDuration=30;
 export async function GET(request){
   const user=await authenticatedUser(request);if(!user)return json({error:'Non autorizzato'},401);
   const {data,error}=await getAdmin().from('mail_connections').select('id,provider,email_address,status,last_error,last_sync_at,created_at').eq('user_id',user.id).order('created_at',{ascending:false});
-  return error?json({error:error.message},500):json({connections:data||[]});
+  return error?failure(error,'Impossibile caricare le caselle collegate.',500,'mail/connections'):json({connections:data||[]});
 }
 export async function POST(request){
   const user=await authenticatedUser(request);if(!user)return json({error:'Non autorizzato'},401);
@@ -28,9 +28,9 @@ export async function POST(request){
       user_id:user.id,provider:valid.provider,email_address:valid.email_address,imap_login:valid.imap_login,
       refresh_token_enc:encryptSecret(valid.password),status:'active',last_error:null
     },{onConflict:'user_id,provider,email_address'});
-    if(error)throw new Error('Impossibile salvare la connessione.');
+    if(error)throw publicError('Impossibile salvare la connessione.');
     return json({ok:true});
-  }catch(e){return json({error:String(e.message).slice(0,180)},400);}
+  }catch(e){return failure(e,'Impossibile collegare la casella: riprova più tardi.',500,'mail/connections');}
 }
 export async function DELETE(request){
   const user=await authenticatedUser(request);if(!user)return json({error:'Non autorizzato'},401);
@@ -38,7 +38,7 @@ export async function DELETE(request){
   if(!/^[0-9a-f-]{36}$/i.test(String(id)))return json({error:'ID non valido'},400);
   const admin=getAdmin();
   const {data,error}=await admin.from('mail_connections').delete().eq('user_id',user.id).eq('id',id).select('id,provider,refresh_token_enc').maybeSingle();
-  if(error)return json({error:error.message},500);
+  if(error)return failure(error,'Impossibile scollegare la casella.',500,'mail/connections');
   if(!data)return json({error:'Casella non trovata'},404);
   if(data.provider==='gmail'){
     let revoked=false;

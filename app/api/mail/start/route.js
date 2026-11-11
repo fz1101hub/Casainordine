@@ -1,4 +1,4 @@
-import { authenticatedUser, getAdmin, json } from '../../../../lib/server.mjs';
+import { authenticatedUser, getAdmin, json, failure } from '../../../../lib/server.mjs';
 import { newOAuthState, hashState, newCodeVerifier, googleConsentUrl, encryptSecret } from '../../../../lib/mail-core.mjs';
 import { microsoftConsentUrl } from '../../../../lib/mail-microsoft.mjs';
 import { oauthStateCookie } from '../../../../lib/oauth-binding.mjs';
@@ -19,5 +19,5 @@ export async function POST(request){
     if(error)throw error;
     // Il cookie lega il ritorno da Google/Microsoft a questo browser (vedi lib/oauth-binding.mjs).
     return Response.json({url},{headers:{'Cache-Control':'no-store','Set-Cookie':oauthStateCookie(state)}});
-  }catch(e){return json({error:String(e.message).slice(0,180)},500);}
+  }catch(e){return failure(e,'Impossibile avviare il collegamento della casella: riprova più tardi.',500,'mail/start');}
 }

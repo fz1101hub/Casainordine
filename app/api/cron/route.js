@@ -1,4 +1,4 @@
-import { getAdmin, json, scheduledCallAuthorized } from '../../../lib/server.mjs';
+import { getAdmin, json, scheduledCallAuthorized, publicAppUrl } from '../../../lib/server.mjs';
 import { isHomeMember } from '../../../lib/home-access.mjs';
 import { addDaysISO, nextRecurringDue, todayRome, euro } from '../../../lib/dates.mjs';
 import { reminderWindow, daysUntil, firstRecurringFrom } from '../../../lib/reminder-window.mjs';
@@ -14,10 +14,9 @@ export const maxDuration = 60;
 
 const htmlEscape = text => String(text || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-async function emailReminder(recipient, bill, language='it') {
+async function emailReminder(recipient, bill, language='it', appUrl=publicAppUrl()) {
   const apiKey = process.env.RESEND_API_KEY, from = process.env.RESEND_FROM;
   if (!apiKey || !from) return {skipped:true};
-  const appUrl = process.env.APP_URL?.startsWith('https://') ? process.env.APP_URL : 'http://localhost:3000';
   const copy = billReminderCopy({language,name:bill.title,dueDate:bill.due_date});
   const response = await fetch('https://api.resend.com/emails', {
     method:'POST', headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},
@@ -31,10 +30,9 @@ async function emailReminder(recipient, bill, language='it') {
   return {sent:true};
 }
 
-async function emailSummary(recipient,bills,today,language='it'){
+async function emailSummary(recipient,bills,today,language='it',appUrl=publicAppUrl()){
   const key=process.env.RESEND_API_KEY,from=process.env.RESEND_FROM;
   if(!key||!from)return {skipped:true};
-  const appUrl=process.env.APP_URL?.startsWith('https://')?process.env.APP_URL:'http://localhost:3000';
   const copy=billSummaryCopy({language,today,bills});
   const rows=copy.rows.map(b=>`<li>${htmlEscape(b.title)} (${htmlEscape(b.supplier)}) — ${htmlEscape(b.date)} — ${htmlEscape(b.amount)}</li>`).join('');
   const response=await fetch('https://api.resend.com/emails',{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},
@@ -97,6 +95,8 @@ export async function GET(request) {
   try { admin = getAdmin(); } catch { return json({error:'Configurazione del database incompleta'},503); }
   if (!(await scheduledCallAuthorized(request, admin))) return json({error:'Non autorizzato'},401);
   const today = todayRome(), horizon = addDaysISO(today, 45), reminderRange = reminderWindow(today);
+  // Il pulsante delle email porta all'app vera anche se APP_URL manca (prima: http://localhost:3000).
+  const appUrl = publicAppUrl(request);
   const counts = {recurring_created:0, notifications_created:0, emails_sent:0, summaries_created:0, summary_emails_sent:0, push_sent:0, summary_push_sent:0, errors:[]};
   try {
     // Fetch at most 1000 in one run; for larger installations, add keyset pagination.
@@ -155,7 +155,7 @@ export async function GET(request) {
           // Language is personal; a shared home's language must never override it.
           const {data:languagePreference,error:languageError}=await admin.from('user_language_preferences').select('language').eq('user_id',bill.user_id).maybeSingle();
           if(languageError)throw languageError; // fail closed rather than silently send the wrong language
-          const res = await emailReminder(profile.email,bill,languagePreference?.language||'it');
+          const res = await emailReminder(profile.email,bill,languagePreference?.language||'it',appUrl);
           if (res.sent) {
             await admin.from('reminders').update({email_sent_at:new Date().toISOString(),email_error:null}).eq('id',reminder.id);
             counts.emails_sent++;
@@ -217,7 +217,7 @@ export async function GET(request) {
         try{
           const {data:languagePreference,error:languageError}=await admin.from('user_language_preferences').select('language').eq('user_id',profile.id).maybeSingle();
           if(languageError)throw languageError;
-          const result=await emailSummary(profile.email,items,today,languagePreference?.language||'it');
+          const result=await emailSummary(profile.email,items,today,languagePreference?.language||'it',appUrl);
           if(result.sent){await admin.from('bill_summaries').update({email_sent_at:new Date().toISOString(),email_error:null}).eq('id',recap.id);counts.summary_emails_sent++;}
         }catch(e){await admin.from('bill_summaries').update({email_error:String(e.message).slice(0,150)}).eq('id',recap.id);counts.errors.push(`Email riepilogo ${profile.id} non riuscita`);}
       }

@@ -1,11 +1,11 @@
-import { authenticatedUser, getAdmin, json } from '../../../../lib/server.mjs';
+import { authenticatedUser, getAdmin, json, failure } from '../../../../lib/server.mjs';
 import { MAIL_BUCKET } from '../../../../lib/mail-core.mjs';
 import { recordConfirmedBillSender } from '../../../../lib/mail-senders.mjs';
 export const runtime='nodejs';
 export async function GET(request){
   const user=await authenticatedUser(request);if(!user)return json({error:'Non autorizzato'},401);
   const {data,error}=await getAdmin().from('mail_documents').select('id,connection_id,filename,mime_type,storage_path,size_bytes,subject,sender,received_at,suggestion,status,created_at').eq('user_id',user.id).eq('status','pending').order('created_at',{ascending:false}).limit(100);
-  return error?json({error:error.message},500):json({documents:data||[]});
+  return error?failure(error,'Impossibile caricare i documenti arrivati per email.',500,'mail/documents'):json({documents:data||[]});
 }
 export async function PATCH(request){
   const user=await authenticatedUser(request);if(!user)return json({error:'Non autorizzato'},401);
@@ -29,7 +29,7 @@ export async function PATCH(request){
   const {data:updated,error}=await admin.from('mail_documents')
     .update({status:action,filename:'[eliminato]',subject:null,sender:null,suggestion:{}})
     .eq('user_id',user.id).eq('id',id).eq('status','pending').select('id').maybeSingle();
-  if(error)return json({error:error.message},500);
+  if(error)return failure(error,'Impossibile aggiornare il documento.',500,'mail/documents');
   if(!updated)return json({error:'Documento già elaborato'},409);
   let learningWarning='';
   if(action==='imported'){

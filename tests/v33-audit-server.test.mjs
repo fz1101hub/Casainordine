@@ -39,7 +39,7 @@ test('OAuth: start imposta il cookie e il callback lo verifica e lo cancella',()
   const start=source('app/api/mail/start/route.js'),callback=source('app/api/mail/callback/route.js');
   assert.match(start,/'Set-Cookie':oauthStateCookie\(state\)/);
   assert.match(callback,/browserBinding\(request\.headers\.get\('cookie'\),state\)/);
-  assert.match(callback,/binding==='mismatch'\)return redirect\('other_browser'\)/);
+  assert.match(callback,/binding==='mismatch'\)return redirect\('other_browser',request\)/);
   assert.match(callback,/mailboxMatchesAccount\(account\?\.user,email\)/);
   assert.match(callback,/'Set-Cookie':clearOauthStateCookie\(\)/);
   // Il cookie va verificato prima di salvare la casella.
