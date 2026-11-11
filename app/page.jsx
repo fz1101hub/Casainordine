@@ -12,21 +12,27 @@ import { addDaysISO, nextRecurringDue, todayRome, normalizeDate, euro } from '..
 import { parseBillsCsv } from '../lib/csv.mjs';
 import { parseRatePlanText, rateItemsWithKeys } from '../lib/rate-plan.mjs';
 import { extractBillFields } from '../lib/document-import.mjs';
-import MailImporter from './MailImporter';
-import HouseholdHub from './HouseholdHub';
-import PushSettings from './PushSettings';
 import { ForgotPasswordButton, PasswordRecoveryDialog, DeleteAccountPanel } from './AccountSecurity';
-import CalendarFeed from './CalendarFeed';
-import HomeExtra from './HomeExtra';
-import V20Hub from './V20Hub';
-import V21Hub from './V21Hub';
 import PersonalizedHome from './PersonalizedHome';
 import {useLanguage,LanguageSelector} from './LanguageProvider';
-import SampleAccountSetup from './SampleAccountSetup';
 import { downloadCalendar } from '../lib/calendar.mjs';
 import { billFraudSignals } from '../lib/v20-core.mjs';
 import {localizeMainDemo} from '../lib/v32-demo-fixture-labels.mjs';
 import { friendlyError } from '../lib/friendly-error.mjs';
+import dynamic from 'next/dynamic';
+
+// Le sezioni che non si vedono all'avvio si scaricano solo quando si aprono (secondo audit, A1):
+// prima arrivavano tutte insieme alla prima apertura dell'app.
+function SectionLoading(){const {t}=useLanguage();return <p className="import-progress" role="status">{t('general.loading')}</p>;}
+const lazy=load=>dynamic(load,{loading:()=><SectionLoading/>});
+const MailImporter=lazy(()=>import('./MailImporter'));
+const HouseholdHub=lazy(()=>import('./HouseholdHub'));
+const PushSettings=lazy(()=>import('./PushSettings'));
+const CalendarFeed=lazy(()=>import('./CalendarFeed'));
+const HomeExtra=lazy(()=>import('./HomeExtra'));
+const V20Hub=lazy(()=>import('./V20Hub'));
+const V21Hub=lazy(()=>import('./V21Hub'));
+const SampleAccountSetup=lazy(()=>import('./SampleAccountSetup'));
 
 const categories = ['Luce','Gas','Acqua','Internet','Telefono','Rifiuti','Condominio','Affitto / Mutuo','Assicurazione','Tasse','Auto','Altro'];
 const frequencies = [{value:'none',label:'Non ricorrente'},{value:'monthly',label:'Ogni mese'},{value:'bimonthly',label:'Ogni 2 mesi'},{value:'quarterly',label:'Ogni 3 mesi'},{value:'yearly',label:'Ogni anno'},{value:'biennial',label:'Ogni 2 anni'}];
