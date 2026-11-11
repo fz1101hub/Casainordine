@@ -27,10 +27,12 @@ jobs:
       - name: Verifica build Next.js
         run: npm run build
       - name: Browser per la prova (Chromium, versione di package-lock.json)
-        timeout-minutes: 10
-        # Le librerie di sistema arrivano da apt: se i mirror non rispondono (capita), si prova con
-        # quelle già presenti nell'immagine di GitHub, che di solito bastano.
-        run: npx playwright install --with-deps chromium || npx playwright install chromium
+        timeout-minutes: 12
+        # Prima solo il browser (dal CDN di Playwright, pochi secondi). Le librerie di sistema
+        # (apt, lento e a volte irraggiungibile) si installano solo se il browser non parte.
+        run: |
+          npx playwright install chromium
+          node -e "require('playwright').chromium.launch().then(b=>b.close())" || npx playwright install-deps chromium
       - name: Prova nel browser dell'app compilata (senza database)
         timeout-minutes: 5
         run: |
