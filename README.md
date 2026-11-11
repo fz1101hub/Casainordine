@@ -20,6 +20,7 @@ Ordine completo di installazione su un database nuovo, in quest'ordine:
 7. `migrate_v38_rifiniture.sql`: la ricerca dei documenti condivisi esce dall'API e si aggiungono indici;
 8. `migrate_v39_lista_spesa.sql`: nella lista della spesa si cambiano solo testo, quantità e spunta.
 9. `migrate_v40_sos_cifrate.sql`: schede SOS cifrate con una frase della casa, scelta da chi la gestisce.
+10. `migrate_v42_permessi.sql`: toglie i permessi che l'app non usa. Chi non ha fatto l'accesso non ha più permessi sul database; chi l'ha fatto non può svuotare tabelle né creare trigger. Le regole di accesso restano quelle di prima.
 
 Ogni script è in una sola transazione e si può rieseguire.
 
