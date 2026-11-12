@@ -33,7 +33,7 @@ test('V21 briefing date suffix is restricted to ISO-shaped dates',()=>{
 });
 
 test('V21 filename dates reject invalid calendar days and non-string values',()=>{
- for(const invalid of ['2026-02-29','2026-02-30','2026-04-31','2026-13-01','2026-00-01','2026-01-00','2026-01-32',20261112]){
+ for(const invalid of ['2026-02-29','2026-02-30','2026-04-31','2026-13-01','2026-00-01','2026-01-00','2026-01-32','0000-01-01','2026-1-01','2026-01-1',20261112]){
   assert.equal(filename('en','briefing',invalid),'home-in-5-minutes.json');
  }
  assert.equal(filename('en','briefing','2028-02-29'),'home-in-5-minutes-2028-02-29.json');
