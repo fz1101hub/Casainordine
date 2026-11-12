@@ -28,7 +28,8 @@ const validExportDate=date=>{
  return day<=days[month-1];
 };
 const v21ExportName=(language,type,date)=>{
- const stem=(exportNames[language]||exportNames.it)[type];
+ const names=Object.hasOwn(exportNames,language)?exportNames[language]:exportNames.it;
+ const stem=Object.hasOwn(names,type)?names[type]:null;
  return stem?`${stem}${type==='briefing'&&validExportDate(date)?'-'+date:''}.json`:null;
 };
 const uuid=()=>crypto.randomUUID();
