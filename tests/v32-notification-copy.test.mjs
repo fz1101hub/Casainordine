@@ -218,3 +218,18 @@ test('regional reminder variants reject impossible dates without changing source
   assert.equal(name,'Energia {date} $&');
  }
 });
+
+
+test('regional reminder locales accept real leap days and preserve calendar boundaries',()=>{
+ const variants={it:'it-CH',en:'en-US',es:'es-MX',fr:'fr-CA',de:'de-AT',pt:'pt-BR'};
+ for(const [language,regional] of Object.entries(variants)){
+  for(const dueDate of ['2024-02-29','2026-01-01','2026-12-31']){
+   const name='Acqua {date}';
+   const regionalCopy=billReminderCopy({language:regional,name,dueDate});
+   const baseCopy=billReminderCopy({language,name,dueDate});
+   assert.deepEqual(regionalCopy,baseCopy,regional+' should preserve the base-language date policy for '+dueDate);
+   assert.ok(regionalCopy.text.includes(name),regional+' must retain literal user content');
+   assert.equal(dueDate.length,10);
+  }
+ }
+});
