@@ -1,11 +1,12 @@
-// v4.1: chi cancella l'account lascia alla casa (al proprietario) quello che aveva inserito nelle
-// case condivise, con i file dei documenti. Il comportamento nel database è provato sul database
+// v4.1: quello che un membro ha inserito in una casa condivisa resta alla casa quando lascia la
+// casa o cancella l'account, e compare come «Nome (ex membro)» (scelta del 12 novembre). Il comportamento nel database è provato sul database
 // locale (vedi la descrizione della PR); qui la parte dell'app e il contenuto della migrazione.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { sharedDocumentPaths, removeUserFiles } from '../lib/account-deletion.mjs';
 import { LANGUAGES, translate } from '../lib/i18n.mjs';
+import { memberName, balanceRows } from '../lib/member-names.mjs';
 const source = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
 function storageMock(files) {
@@ -100,7 +101,49 @@ test('Migrazione v4.1: passaggio al proprietario, solo durante la cancellazione'
   assert.match(sql, /^begin;$/m); assert.match(sql, /^commit;$/m);
 });
 
-test('Testo della cancellazione: dice che i dati delle case condivise restano, in 6 lingue', () => {
-  const words = { it: 'proprietario', en: 'owner', es: 'propietario', fr: 'propriétaire', de: 'Eigentümer', pt: 'proprietário' };
-  for (const { code } of LANGUAGES) assert.ok(translate(code, 'account.deleteHelp').includes(words[code]), code);
+test('Testo della cancellazione: i dati restano alla casa con il nome e «ex membro», in 6 lingue', () => {
+  for (const { code } of LANGUAGES) {
+    const help = translate(code, 'account.deleteHelp'), former = translate(code, 'family.formerMember');
+    assert.ok(help.includes(former), `${code}: ${help}`);
+  }
+});
+
+test('Nomi: membri con la parte dell’email, ex membri come «Nome (ex membro)»', () => {
+  const members = [{ user_id: 'a', email: 'anna@example.com' }];
+  const former = [{ user_id: 'b', display_name: 'bruno' }, { user_id: 'c', display_name: null }];
+  assert.equal(memberName('a', { members, former, formerLabel: 'ex membro' }), 'anna');
+  assert.equal(memberName('b', { members, former, formerLabel: 'ex membro' }), 'bruno (ex membro)');
+  assert.equal(memberName('c', { members, former, formerLabel: 'ex membro' }), 'ex membro');
+  assert.equal(memberName('z', { members, former, formerLabel: 'former member' }), 'former member');
+  assert.equal(memberName(null, { members, former }), 'ex membro');
+});
+
+test('Saldi: compaiono anche gli ex membri che devono ancora dare o ricevere', () => {
+  const members = [{ user_id: 'a', email: 'anna@example.com' }];
+  const former = [{ user_id: 'b', display_name: 'bruno' }, { user_id: 'c', display_name: 'carla' }];
+  const rows = balanceRows({ members, former, balanceCents: { a: -1000, b: 1000, c: 0 } });
+  assert.deepEqual(rows.map(r => [r.user_id, r.former, r.balance]), [['a', false, -10], ['b', true, 10]]);
+  // Senza i saldi del database (migrazione v3.4 mancante) restano i membri, calcolati nel browser.
+  assert.deepEqual(balanceRows({ members, former, balanceCents: null, fallback: () => 250 }).map(r => r.balance), [2.5]);
+});
+
+test('Migrazione v4.1: ex membri con il nome, identificativi conservati, saldi completi', () => {
+  const sql = source('supabase/migrate_v41_ex_membri.sql');
+  assert.match(sql, /create table if not exists public\.home_former_members/);
+  assert.match(sql, /create policy v41_former_members_read on public\.home_former_members for select to authenticated\n using \(public\.is_home_member\(home_id\)\)/);
+  assert.match(sql, /revoke all on public\.home_former_members from public, anon, authenticated;\ngrant select on public\.home_former_members to authenticated;/);
+  assert.match(sql, /split_part\(coalesce\(old\.email, ''\), '@', 1\)/, 'si salva solo il nome, non l’email');
+  assert.match(sql, /create trigger v41_member_left after insert or delete on public\.home_members/);
+  for (const [table, column] of [['home_expenses', 'paid_by'], ['home_expense_shares', 'user_id'], ['house_tasks', 'assigned_to'], ['home_audit_log', 'actor_id']])
+    assert.ok(sql.includes(`('public.${table}'::regclass, '${column}')`), `${table}.${column}`);
+  assert.match(sql, /select f\.user_id from public\.home_former_members f where f\.home_id = home/);
+});
+
+test('Interfaccia: nomi degli ex membri in spese, saldi e attività', () => {
+  const hub = source('app/HouseholdHub.jsx'), page = source('app/page.jsx');
+  assert.match(hub, /from\('home_former_members'\)\.select\('user_id,display_name,left_at'\)/);
+  assert.match(hub, /nameOf\(e\.paid_by\)/); assert.match(hub, /nameOf\(s\.user_id\)/);
+  assert.match(hub, /balanceRows\(\{members:rows\.members,former:rows\.former/);
+  assert.match(page, /tr\('tasks\.assignedTo',\{name:/);
+  assert.doesNotMatch(page, /Assegnata a \$\{/);
 });

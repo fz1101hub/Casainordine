@@ -1,23 +1,116 @@
--- Casa in Ordine: chi cancella l'account non porta via i dati delle case condivise.
+-- Casa in Ordine: quello che un membro ha inserito in una casa condivisa resta alla casa, anche
+-- quando lascia la casa o cancella l'account, e nell'app compare come «Nome (ex membro)».
 -- Da eseguire una volta nel SQL Editor di Supabase, DOPO migrate_v40_sos_cifrate.sql. Rieseguibile.
 --
 -- Prima, quando un membro (non il proprietario) cancellava l'account, le chiavi esterne verso
 -- auth.users cancellavano a cascata anche quello che aveva inserito nelle case condivise:
 -- bollette, utenze, attività, documenti, contratti, letture, manutenzioni, schede SOS e altro.
--- Gli altri membri lo perdevano senza preavviso.
+-- Gli altri membri lo perdevano senza preavviso. Nelle spese condivise restava la voce, ma senza
+-- nome (migrate_v37_account.sql).
 --
--- Ora, un attimo prima della cancellazione, quelle voci passano al proprietario della casa.
--- Restano com'erano (stessa casa, stesso contenuto): cambia solo l'autore. Le voci personali,
--- senza casa, si cancellano come prima. Le spese e la lista della spesa restavano già alla casa
--- senza nome (migrate_v37_account.sql).
---
--- I file dei documenti restano nella cartella di chi li aveva caricati: la nuova colonna
--- home_documents.former_user_id ricorda quella cartella, e l'API di cancellazione dell'account
--- non cancella più i file usati da una casa condivisa (lib/account-deletion.mjs).
+-- Ora (scelta di Francesca, 12 novembre: «restano come ex membro, con il nome»):
+--   - chi lascia una casa, o cancella l'account, finisce in home_former_members con il solo nome
+--     che l'app mostra (la parte dell'email prima della @) e la data;
+--   - le colonne che dicono chi ha pagato, a chi è assegnata un'attività, chi ha fatto una
+--     modifica e simili conservano il suo identificativo: l'app lo mostra come «Nome (ex membro)»;
+--   - le voci che aveva creato (bollette, documenti, attività...) restano nella casa; nel database
+--     passano al proprietario, che serve per le regole di accesso, con il contenuto invariato;
+--   - i file dei documenti restano nella cartella di chi li aveva caricati (home_documents.
+--     former_user_id) e l'API di cancellazione dell'account non li cancella più.
+-- Le voci personali, senza casa, si cancellano come prima.
 begin;
 
 create schema if not exists private;
 revoke all on schema private from public, anon, authenticated;
+
+-- ---------------------------------------------------------------------------------------
+-- 0. Ex membri: il nome da mostrare, senza email
+-- ---------------------------------------------------------------------------------------
+create table if not exists public.home_former_members (
+ home_id uuid not null references public.homes(id) on delete cascade,
+ user_id uuid not null,
+ display_name text check (display_name is null or char_length(display_name) between 1 and 120),
+ left_at timestamptz not null default now(),
+ primary key (home_id, user_id)
+);
+comment on table public.home_former_members is
+ 'Chi ha lasciato la casa o cancellato l''account: solo il nome mostrato nell''app (la parte dell''email prima della @), per indicare le sue voci come «Nome (ex membro)».';
+alter table public.home_former_members enable row level security;
+drop policy if exists v41_former_members_read on public.home_former_members;
+create policy v41_former_members_read on public.home_former_members for select to authenticated
+ using (public.is_home_member(home_id));
+revoke all on public.home_former_members from public, anon, authenticated;
+grant select on public.home_former_members to authenticated;
+
+-- Lo scrive il database: quando un membro esce (lascia, viene tolto o cancella l'account) e,
+-- se rientra, lo toglie. Se si sta cancellando la casa intera non c'è niente da ricordare.
+create or replace function private.v41_member_left() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+ if tg_op = 'DELETE' then
+  if exists(select 1 from public.homes h where h.id = old.home_id and h.owner_id <> old.user_id) then
+   insert into public.home_former_members(home_id, user_id, display_name, left_at)
+   values (old.home_id, old.user_id, nullif(left(split_part(coalesce(old.email, ''), '@', 1), 120), ''), now())
+   on conflict (home_id, user_id) do update
+    set display_name = coalesce(excluded.display_name, public.home_former_members.display_name), left_at = excluded.left_at;
+  end if;
+  return old;
+ end if;
+ delete from public.home_former_members where home_id = new.home_id and user_id = new.user_id;
+ return new;
+end $$;
+revoke all on function private.v41_member_left() from public, anon, authenticated;
+drop trigger if exists v41_member_left on public.home_members;
+create trigger v41_member_left after insert or delete on public.home_members
+ for each row execute function private.v41_member_left();
+
+-- I saldi della casa (migrate_v34_saldi.sql) includono anche gli ex membri: chi ha pagato e poi
+-- è uscito deve ancora ricevere, o dare, la sua parte. Prima comparivano solo i membri attuali.
+create or replace function public.v33_home_balances(home uuid)
+returns table(user_id uuid, balance_cents bigint)
+language sql stable security invoker set search_path = '' as $$
+  with paid as (
+    select e.paid_by as uid, sum(round(e.amount*100))::bigint as cents
+    from public.home_expenses e where e.home_id = home group by e.paid_by
+  ), owed as (
+    select s.user_id as uid, sum(round(s.amount*100))::bigint as cents
+    from public.home_expense_shares s join public.home_expenses e on e.id = s.expense_id
+    where e.home_id = home group by s.user_id
+  ), people as (
+    select m.user_id from public.home_members m where m.home_id = home
+    union
+    select f.user_id from public.home_former_members f where f.home_id = home
+  )
+  select x.user_id, coalesce(p.cents, 0) - coalesce(o.cents, 0)
+  from people x
+  left join paid p on p.uid = x.user_id
+  left join owed o on o.uid = x.user_id
+  where public.is_home_member(home)
+$$;
+revoke all on function public.v33_home_balances(uuid) from public, anon;
+grant execute on function public.v33_home_balances(uuid) to authenticated;
+
+-- Le colonne che dicono CHI ha fatto qualcosa in una casa conservano l'identificativo anche
+-- dopo la cancellazione dell'account (prima diventavano vuote: on delete set null). Il nome
+-- da mostrare è in home_former_members.
+-- Nota: non rieseguire migrate_v37_account.sql dopo questa, rimetterebbe le chiavi esterne.
+do $$
+declare c record;
+begin
+ for c in
+  select con.conrelid::regclass as tab, con.conname
+  from pg_catalog.pg_constraint con
+  join pg_catalog.pg_attribute a on a.attrelid = con.conrelid and a.attnum = con.conkey[1]
+  join (values ('public.home_expenses'::regclass, 'created_by'), ('public.home_expenses'::regclass, 'paid_by'),
+               ('public.home_expense_shares'::regclass, 'user_id'), ('public.home_shopping'::regclass, 'created_by'),
+               ('public.house_tasks'::regclass, 'assigned_to'), ('public.home_audit_log'::regclass, 'actor_id'),
+               ('public.payment_receipts'::regclass, 'confirmed_by'), ('public.home_recycle_bin'::regclass, 'deleted_by'))
+   as keep(tab, col) on keep.tab = con.conrelid and keep.col = a.attname
+  where con.contype = 'f' and con.confrelid = 'auth.users'::regclass and cardinality(con.conkey) = 1
+ loop
+  execute format('alter table %s drop constraint %I', c.tab, c.conname);
+ end loop;
+end $$;
 
 -- ---------------------------------------------------------------------------------------
 -- 1. Documenti: il file resta dov'è
@@ -235,7 +328,9 @@ begin
 end $function$;
 
 -- ---------------------------------------------------------------------------------------
--- 6. Il passaggio, un attimo prima della cancellazione dell'account
+-- 6. Le voci dell'utente nelle case di altri, un attimo prima della cancellazione dell'account:
+--    restano nella casa e nel database passano al proprietario (servono un autore e le regole
+--    di accesso); nell'app chi ha pagato o fatto cosa resta l'ex membro.
 -- ---------------------------------------------------------------------------------------
 create or replace function private.v41_hand_over_shared_rows() returns trigger
 language plpgsql security definer set search_path = '' as $$

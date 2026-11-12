@@ -56,8 +56,8 @@ test('Password dimenticata e nuova password: collegati all’app e tradotti',()=
 test('le spese di chi ha cancellato l account mostrano «ex membro» nella lingua scelta', () => {
   const hub=source('app/HouseholdHub.jsx');
   assert.doesNotMatch(hub,/\|\| 'Membro'/);
-  assert.match(hub,/nameOf=m=>fmtName\(m,tr\('family\.formerMember'\)\)/);
-  assert.doesNotMatch(hub.replace(/const fmtName = [^\n]*\n/,'').replace(/nameOf=m=>fmtName/,''),/fmtName\(/);
+  // Dalla v4.1 (scelta del 12 novembre) il nome resta: «Nome (ex membro)», vedi v41-ex-membri.
+  assert.match(hub,/nameOf=userId=>memberName\(userId,\{members:rows\.members,former:rows\.former,formerLabel:tr\('family\.formerMember'\)\}\)/);
   assert.equal(translate('it','family.formerMember'),'ex membro');
   for(const {code} of LANGUAGES){const v=translate(code,'family.formerMember');assert.ok(v&&v!=='family.formerMember',code);}
 });

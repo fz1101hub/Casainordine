@@ -16,6 +16,7 @@ test('Saldi: l’app usa la funzione e ripiega sul calcolo precedente se la migr
   const hub=source('app/HouseholdHub.jsx');
   assert.match(hub,/client\.rpc\('v33_home_balances',\{home:homeId\}\)/);
   assert.match(hub,/const balanceCents=totals\.error\?null:/);
-  assert.match(hub,/rows\.balanceCents&&m\.user_id in rows\.balanceCents\?rows\.balanceCents\[m\.user_id\]:signedMemberBalance\(/);
+  // Dalla v4.1 il calcolo passa da balanceRows (lib/member-names.mjs), che aggiunge gli ex membri.
+  assert.match(hub,/balanceRows\(\{members:rows\.members,former:rows\.former,balanceCents:rows\.balanceCents,fallback:userId=>signedMemberBalance\(/);
   assert.ok(hub.indexOf("client.rpc('v33_home_balances'")<hub.indexOf('if(seq!==loadSeq.current)return;'),'anche la risposta dei saldi passa dal controllo delle risposte superate');
 });
