@@ -15,9 +15,17 @@ export default function PushSettings({client,onNotify}){
   const {subscriptions=[]}=await api('GET').catch(()=>({}));
   return subscriptions.some(x=>x.endpoint===subscription.endpoint);
  }
- useEffect(()=>{setSupported('serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window&&location.protocol==='https:');
-   if('serviceWorker' in navigator)navigator.serviceWorker.ready.then(r=>r.pushManager.getSubscription()).then(ownedSubscription).then(setEnabled).catch(()=>{});
- },[]);
+ useEffect(()=>{
+   let cancelled=false;
+   setEnabled(false);
+   setSupported('serviceWorker' in navigator&&'PushManager' in window&&'Notification' in window&&location.protocol==='https:');
+   if('serviceWorker' in navigator){
+     navigator.serviceWorker.ready.then(r=>r.pushManager.getSubscription()).then(ownedSubscription)
+       .then(value=>{if(!cancelled)setEnabled(value);})
+       .catch(()=>{if(!cancelled)setEnabled(false);});
+   }
+   return ()=>{cancelled=true;};
+ },[client]);
  async function api(method,body){const {data:{session}}=await client.auth.getSession();const r=await fetch('/api/push/subscribe',{method,headers:{'Authorization':`Bearer ${session?.access_token||''}`,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});const p=await r.json().catch(()=>({}));if(!r.ok)throw new Error(p.error?localizeSettingsApiError(p.error,language):t('push.configError'));return p;}
  async function toggle(){setBusy(true);try{
   const reg=await navigator.serviceWorker.ready;
