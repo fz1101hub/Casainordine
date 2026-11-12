@@ -55,3 +55,16 @@ test('V21 export controls use localized helper',()=>{
  assert.match(source,/name=\{v21ExportName\(language,'inventory'\)\}/);
  assert.match(source,/name=\{v21ExportName\(language,'briefing',todayRome\(\)\)\}/);
 });
+
+test('V21 briefing date validation is consistent in every supported language',()=>{
+ for(const language of ['it','en','es','fr','de','pt']){
+  const base=filename(language,'briefing');
+  assert.ok(base.endsWith('.json'));
+  assert.equal(filename(language,'briefing','2028-02-29'),base.replace(/\.json$/,'-2028-02-29.json'));
+  for(const invalid of ['2026-02-29','2100-02-29','0000-01-01','2026-04-31','../../secret']){
+   assert.equal(filename(language,'briefing',invalid),base);
+  }
+  assert.equal(filename(language,'property','2028-02-29'),filename(language,'property'));
+  assert.equal(filename(language,'inventory','2028-02-29'),filename(language,'inventory'));
+ }
+});
