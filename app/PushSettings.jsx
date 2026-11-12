@@ -34,6 +34,7 @@ export default function PushSettings({client,onNotify}){
   if(!session?.access_token)throw new Error(t('push.configError'));
   const reg=await navigator.serviceWorker.ready;
   const existing=await reg.pushManager.getSubscription();
+  if(existing&&!(await ownedSubscription(existing)))throw new Error(t('push.configError'));
   if(existing&&enabled){await api('DELETE',{endpoint:existing.endpoint});await existing.unsubscribe();setEnabled(false);onNotify(t('push.disabled'));}
   else{if(existing)await existing.unsubscribe().catch(()=>{});const permission=await Notification.requestPermission();if(permission!=='granted')throw new Error(t('push.permissionDenied'));
   const subscription=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:toBytes(key)});try{await api('POST',subscription.toJSON());}catch(e){await subscription.unsubscribe();throw e;}
