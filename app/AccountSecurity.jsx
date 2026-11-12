@@ -50,7 +50,8 @@ export function DeleteAccountPanel({ client, user, t, onNotify }) {
     setPending(true);
     try {
       const { data: { session } } = await client.auth.getSession();
-      const response = await fetch('/api/account/delete', { method: 'POST', headers: { Authorization: `Bearer ${session?.access_token || ''}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm_email: confirm.trim() }) });
+      if (!session?.access_token || session.user?.id !== user?.id) { onNotify(t('account.deleteFailed')); setPending(false); return; }
+      const response = await fetch('/api/account/delete', { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm_email: confirm.trim() }) });
       const body = await response.json().catch(() => ({}));
       if (response.ok) {
         // L'account non esiste più: si esce solo da questo dispositivo e si ricarica.
