@@ -34,7 +34,7 @@ test('Eliminazione account: revoca dell’accesso Gmail senza bloccare se fallis
 test('Eliminazione account: conferma con l’email, controllo delle case, poi file e utente',()=>{
   const route=source('app/api/account/delete/route.js');
   assert.match(route,/String\(confirm_email \|\| ''\)\.trim\(\)\.toLowerCase\(\) !== String\(user\.email \|\| ''\)\.trim\(\)\.toLowerCase\(\)/);
-  const order=['sharedOwnedHomes(admin, user.id)','revokeGoogleAccess(admin, user.id)','removeUserFiles(admin, user.id)','admin.auth.admin.deleteUser(user.id)'].map(x=>route.indexOf(x));
+  const order=['sharedOwnedHomes(admin, user.id)','revokeGoogleAccess(admin, user.id)','removeUserFiles(admin, user.id, keep)','admin.auth.admin.deleteUser(user.id)'].map(x=>route.indexOf(x));
   assert.ok(order.every((v,i)=>v>0&&(i===0||v>order[i-1])),order.join(','));
   const sql=source('supabase/migrate_v37_account.sql');
   assert.match(sql,/on delete set null/);
@@ -56,8 +56,8 @@ test('Password dimenticata e nuova password: collegati all’app e tradotti',()=
 test('le spese di chi ha cancellato l account mostrano «ex membro» nella lingua scelta', () => {
   const hub=source('app/HouseholdHub.jsx');
   assert.doesNotMatch(hub,/\|\| 'Membro'/);
-  assert.match(hub,/nameOf=m=>fmtName\(m,tr\('family\.formerMember'\)\)/);
-  assert.doesNotMatch(hub.replace(/const fmtName = [^\n]*\n/,'').replace(/nameOf=m=>fmtName/,''),/fmtName\(/);
+  // Dalla v4.1 (scelta del 12 novembre) il nome resta: «Nome (ex membro)», vedi v41-ex-membri.
+  assert.match(hub,/nameOf=userId=>memberName\(userId,\{members:rows\.members,former:rows\.former,formerLabel:tr\('family\.formerMember'\)\}\)/);
   assert.equal(translate('it','family.formerMember'),'ex membro');
   for(const {code} of LANGUAGES){const v=translate(code,'family.formerMember');assert.ok(v&&v!=='family.formerMember',code);}
 });

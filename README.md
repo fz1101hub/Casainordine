@@ -8,6 +8,7 @@ Cosa cambia per chi usa l'app:
 - Il collegamento di Gmail o Outlook va completato nello stesso browser in cui è stato avviato. Se il browser non conserva il cookie (per esempio la web app sulla schermata Home di iPhone che apre l'accesso in Safari), si può collegare solo la casella con lo stesso indirizzo, già verificato, dell'account.
 - La **conferma automatica dei pagamenti** richiede anche che Gmail o Outlook riportino DMARC superato per il dominio del mittente; con le caselle IMAP la conferma resta sempre manuale. In una casa condivisa serve il ruolo di proprietario o editor.
 - Un membro rimosso da una casa non può più aprire né cancellare i file che vi aveva caricato.
+- Se un membro lascia una casa o cancella il proprio account, quello che aveva inserito nella casa resta: spese, attività e il resto compaiono con il suo nome e la scritta «ex membro». Il suo spazio personale si cancella.
 
 Ordine completo di installazione su un database nuovo, in quest'ordine:
 
@@ -20,7 +21,8 @@ Ordine completo di installazione su un database nuovo, in quest'ordine:
 7. `migrate_v38_rifiniture.sql`: la ricerca dei documenti condivisi esce dall'API e si aggiungono indici;
 8. `migrate_v39_lista_spesa.sql`: nella lista della spesa si cambiano solo testo, quantità e spunta.
 9. `migrate_v40_sos_cifrate.sql`: schede SOS cifrate con una frase della casa, scelta da chi la gestisce.
-10. `migrate_v42_permessi.sql`: toglie i permessi che l'app non usa. Chi non ha fatto l'accesso non ha più permessi sul database; chi l'ha fatto non può svuotare tabelle né creare trigger. Le regole di accesso restano quelle di prima.
+10. `migrate_v41_ex_membri.sql`: quello che un membro aveva inserito in una casa condivisa resta alla casa anche se lascia la casa o cancella l'account: nell'app compare con il suo nome e la scritta «ex membro». Le voci passano al proprietario, i file dei documenti restano.
+11. `migrate_v42_permessi.sql`: toglie i permessi che l'app non usa. Chi non ha fatto l'accesso non ha più permessi sul database; chi l'ha fatto non può svuotare tabelle né creare trigger. Le regole di accesso restano quelle di prima.
 
 Ogni script è in una sola transazione e si può rieseguire.
 
