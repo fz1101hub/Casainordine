@@ -35,6 +35,9 @@ export default function PushSettings({client,onNotify}){
   const reg=await navigator.serviceWorker.ready;
   const existing=await reg.pushManager.getSubscription();
   if(existing&&!(await ownedSubscription(existing)))throw new Error(t('push.configError'));
+  // Una sottoscrizione già appartenente all'utente non va eliminata solo perché
+  // lo stato UI era temporaneamente falso durante il controllo asincrono.
+  if(existing&&!enabled){setEnabled(true);onNotify(t('push.enabled'));return;}
   if(existing&&enabled){await api('DELETE',{endpoint:existing.endpoint});await existing.unsubscribe();setEnabled(false);onNotify(t('push.disabled'));}
   else{if(existing)await existing.unsubscribe().catch(()=>{});const permission=await Notification.requestPermission();if(permission!=='granted')throw new Error(t('push.permissionDenied'));
   const subscription=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:toBytes(key)});try{await api('POST',subscription.toJSON());}catch(e){await subscription.unsubscribe();throw e;}
