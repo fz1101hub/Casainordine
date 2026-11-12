@@ -11,7 +11,8 @@ import '@fontsource/plus-jakarta-sans/700.css';
 import '@fontsource/plus-jakarta-sans/800.css';
 import './globals.css';
 import {LanguageProvider} from './LanguageProvider';
+import {ConfirmHost} from './ConfirmDialog';
 export const metadata = { title: 'Casa in Ordine | Bollette e scadenze', description:'Organizza le spese di casa e ricevi promemoria prima delle scadenze.', applicationName:'Casa in Ordine', appleWebApp:{capable:true,title:'Casa in Ordine',statusBarStyle:'default'}, icons:{apple:'/icon-192.png'} };
 export default function Layout({children}) {
-  return <html lang="it"><body><LanguageProvider>{children}</LanguageProvider></body></html>;
+  return <html lang="it"><body><LanguageProvider>{children}<ConfirmHost/></LanguageProvider></body></html>;
 }

@@ -25,8 +25,8 @@ test('V20 renders localized headings rather than fixed Italian strings',()=>{
 });
 
 test('V20 destructive actions use localized confirmation and feedback',()=>{
- assert.match(source,/window\.confirm\(ui\.confirmDelete\)/);
- assert.match(source,/window\.confirm\(ui\.confirmRestore\)/);
+ assert.match(source,/askConfirm\(ui\.confirmDelete[,)]/);
+ assert.match(source,/askConfirm\(ui\.confirmRestore[,)]/);
  assert.match(source,/onNotify\(ui\.deleted\)/);
  assert.match(source,/onNotify\(ui\.restored\)/);
 });
@@ -35,7 +35,7 @@ test('pagoPA validation and payment warning follow the account language',()=>{
  for(const key of ['noticeCodeInvalid','noticeReminderRequiresDetails','confirmNoticeOriginal','noticeAndReminderSaved','noticeSaved']){
   assert.ok(source.includes('ui.'+key));
  }
- assert.match(source,/window\.confirm\(ui\.confirmNoticeOriginal\)/);
+ assert.match(source,/askConfirm\(ui\.confirmNoticeOriginal[,)]/);
 });
 
 test('pagoPA local scan feedback is localized',()=>{
@@ -48,7 +48,7 @@ test('offline import and moving-plan feedback are localized',()=>{
  for(const key of ['signInToImport','selectWritableHome','confirmAddShopping','shoppingAdded','taskSynced','syncFailed','movePlanCreated','moveStepsPartial','movePlanAndStepsCreated']){
   assert.ok(source.includes('ui.'+key));
  }
- assert.match(source,/window\.confirm\(ui\.confirmAddShopping\)/);
+ assert.match(source,/askConfirm\(ui\.confirmAddShopping[,)]/);
 });
 
 test('monitoring caveats and notification controls use selected language',()=>{
@@ -102,7 +102,7 @@ test('offline draft privacy and savings actions use localized strings',()=>{
  for(const key of ['savingsPrompt','invalidAmount','savingsUpdated','addSavings','noSavingsGoals','compareOffersIntro','offersPortal','noLiveComparison','localDrafts','deviceDrafts','refreshList','downloadForReview','importToHome','importPersonalTask','discardDraft','confirmDiscardDraft','taskLabel','shoppingLabel','documentLabel','savedInBrowser','noOfflineDrafts','offlinePrivacyNotice','loadingV20']){
   assert.ok(source.includes('ui.'+key));
  }
- assert.match(source,/window\.confirm\(ui\.confirmDiscardDraft\)/);
+ assert.match(source,/askConfirm\(ui\.confirmDiscardDraft[,)]/);
 });
 
 test('V20 monitor, migration and demo fallback texts use six-language copy',()=>{

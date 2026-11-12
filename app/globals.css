@@ -312,3 +312,12 @@
 .btn-danger:disabled{opacity:.45;cursor:not-allowed}
 /* Schede SOS protette da una frase (v4.0) */
 .sos-protection{border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:12px 0 16px;background:var(--soft)}.sos-protection h3{display:flex;align-items:center;gap:7px;font-size:15px;margin:0 0 6px;color:var(--ink)}.sos-protection p{margin:4px 0 10px}.sos-protection .extra-form{margin:0}.sos-open{display:flex;align-items:center;flex-wrap:wrap;gap:10px}.sos-forgot{margin-top:10px}.sos-forgot summary{cursor:pointer;font-weight:600;color:var(--green-dark)}
+
+/* Finestre di conferma e di testo dell'app (ConfirmDialog.jsx), al posto di quelle del browser. */
+.app-dialog{border:0;border-radius:16px;padding:0;width:min(440px,calc(100vw - 32px));box-shadow:var(--shadow);background:var(--surface);color:var(--text)}
+.app-dialog::backdrop{background:rgba(17,32,29,.45)}
+.app-dialog form{padding:22px 22px 18px;display:grid;gap:16px}
+.app-dialog p{margin:0;font-size:15px;line-height:1.5;color:var(--ink);white-space:pre-line}
+.app-dialog input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font:inherit}
+.app-dialog-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.app-dialog:focus-visible,.app-dialog button:focus-visible,.app-dialog input:focus-visible{outline:3px solid var(--green);outline-offset:2px}

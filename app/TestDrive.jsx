@@ -10,6 +10,7 @@ import {v21BriefingCopy} from '../lib/v21-briefing-copy.mjs';
 import {v32DemoCopy} from '../lib/v32-demo-copy.mjs';
 import {localizeDemoFixtures} from '../lib/v32-demo-fixture-labels.mjs';
 import {useLanguage,LanguageSelector} from './LanguageProvider';
+import { askConfirm, askText } from './ConfirmDialog';
 
 const NAV=[
  {id:'dashboard',title:'La mia Home',icon:House},
@@ -49,8 +50,8 @@ export default function TestDrive(){
  const toggleBill=(bill)=>{setData(old=>({...old,bills:old.bills.map(b=>b.id===bill.id?{...b,paid_at:b.paid_at?null:new Date().toISOString()}:b)}));setNotice(tr('demo.updated.bill'));};
  const toggleTask=(task)=>{setData(old=>({...old,tasks:old.tasks.map(t=>t.id===task.id?{...t,done_at:t.done_at?null:new Date().toISOString()}:t)}));setNotice(tr('demo.updated.task'));};
  const toggleShopping=(id)=>{setData(old=>({...old,shopping:old.shopping.map(x=>x.id===id?{...x,checked:!x.checked}:x)}));setNotice(tr('demo.updated.shopping'));};
- const reset=()=>{
-  if(!window.confirm(tr('demo.reset.confirm')))return;
+ const reset=async ()=>{
+  if(!(await askConfirm(tr('demo.reset.confirm'),{danger:true})))return;
   localStorage.removeItem(DEMO_STORAGE_KEY);
   localStorage.removeItem(HOME_DEMO_PREFS_KEY);
   setData(createDemoFixtures());setHomeKey(x=>x+1);setScreen('dashboard');setNotice(tr('demo.reset.done'));
