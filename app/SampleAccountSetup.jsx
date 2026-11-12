@@ -4,6 +4,7 @@ import {Database,ShieldCheck,Plus,CheckCircle2} from 'lucide-react';
 import {createDemoFixtures} from '../lib/test-fixtures.mjs';
 import {useLanguage} from './LanguageProvider';
 import {publicError} from '../lib/public-error.mjs';
+import { askConfirm, askText } from './ConfirmDialog';
 
 // Explicitly opt-in: creates fake records only for the signed-in user's brand-new account.
 // Uses normal Supabase Auth + RLS. Never uses service-role credentials or writes to auth.users.
@@ -15,7 +16,7 @@ export default function SampleAccountSetup({client,user,homes=[],onCreated,onNot
  if(homes.length)return null;
  async function create(){
   if(busy)return;
-  if(!window.confirm(t('sample.confirm')))return;
+  if(!(await askConfirm(t('sample.confirm'))))return;
   setBusy(true);setMessage('');
   let homeId=null;
   try{

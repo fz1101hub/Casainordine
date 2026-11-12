@@ -43,7 +43,7 @@ test('SOS privacy, offline encryption and deletion confirmations are localized',
  for(const key of ['emergencyInstructions','emergencyDisclaimer','valvesLocation','procedures','contactLabel','phoneLabel','updateCard','saveCard','cancelEditing','savedOfflineSos','sosEncryptionNotice','devicePassphrase','editLabel','saveEncryptedOffline','openOfflineDrafts','encryptedCopyExists','noOfflineCopy','confirmDeleteSos','localCopyDeleted','deleteLocalCopy']){
   assert.ok(source.includes('briefingCopy.'+key),key);
  }
- assert.match(source,/confirm\(briefingCopy\.confirmDeleteSos\)/);
+ assert.match(source,/askConfirm\(briefingCopy\.confirmDeleteSos[,)]/);
 });
 
 test('vacation links, expiry and restricted sharing copy are localized',()=>{
@@ -62,8 +62,8 @@ test('V21 navigation and dynamic feedback use account language',()=>{
  for(const key of ['sosUpdated','sosSaved','sosEncrypted','vacationCreated','chooseSharePlan','confirmShareLink','shareLinkCreated','photoTypeLimit','itemPhotoName','inventoryPhotoNotes','photoSaved','photoUploadFailed','voteSaved','tabTags','tabSos','tabRadar','tabSimulator','tabPassport','tabVacation','tabInventory','tabDecisions','tabBriefing','eyebrow','sharedHomeInfo','personalInfo','permissionNotice','loadingData','demoMode','enableDatabase','readOnlyHome','confirmDeletePermanent','itemDeleted','operationFailed','migrationRequired']){
   assert.ok(source.includes('briefingCopy.'+key)||(['migrationRequired','operationFailed'].includes(key)&&source.includes('briefingCopy[errorKind]')),key);
  }
- assert.match(source,/confirm\(briefingCopy\.confirmDeletePermanent\)/);
- assert.match(source,/confirm\(briefingCopy\.confirmShareLink\)/);
+ assert.match(source,/askConfirm\(briefingCopy\.confirmDeletePermanent[,)]/);
+ assert.match(source,/askConfirm\(briefingCopy\.confirmShareLink[,)]/);
 });
 
 test('vacation checklist renders translations without rewriting canonical saved titles',()=>{
