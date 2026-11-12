@@ -34,7 +34,9 @@ export default function PushSettings({client,onNotify}){
   if(!session?.access_token)throw new Error(t('push.configError'));
   const reg=await navigator.serviceWorker.ready;
   const existing=await reg.pushManager.getSubscription();
-  if(existing&&!(await ownedSubscription(existing)))throw new Error(t('push.configError'));
+  // Su un browser condiviso la sottoscrizione può essere di un altro account: non si tocca, e si
+  // spiega come fare invece del messaggio generico.
+  if(existing&&!(await ownedSubscription(existing)))throw new Error(t('push.otherAccount'));
   // Una sottoscrizione già appartenente all'utente non va eliminata solo perché
   // lo stato UI era temporaneamente falso durante il controllo asincrono.
   if(existing&&!enabled){setEnabled(true);onNotify(t('push.enabled'));return;}
