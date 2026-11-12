@@ -4,12 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node scripts/build-i18n.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/build-i18n.mjs",
     "build": "next build",
     "start": "next start",
     "test": "node --test tests/*.test.mjs",
-    "postinstall": "node scripts/copy-pdf-worker.mjs",
-    "test:browser": "node scripts/smoke-browser.mjs"
+    "postinstall": "node scripts/copy-pdf-worker.mjs && node scripts/build-i18n.mjs",
+    "test:browser": "node scripts/smoke-browser.mjs",
+    "i18n:build": "node scripts/build-i18n.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "5.3.0",
