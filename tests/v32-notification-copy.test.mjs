@@ -168,3 +168,38 @@ test('i simboli di sostituzione nel nome restano testo (revisione 11 novembre)',
   }
  }
 });
+
+test('regional recipient locale variants preserve the six reminder languages',()=>{
+ const variants={
+  it:['it-IT','IT_it'],
+  en:['en-GB','EN_gb'],
+  es:['es-ES','ES_es'],
+  fr:['fr-FR','FR_fr'],
+  de:['de-DE','DE_de'],
+  pt:['pt-PT','PT_pt']
+ };
+ for(const [language,inputs] of Object.entries(variants)){
+  const expected=billReminderCopy({language,name:'Energia',dueDate:'2026-12-31'});
+  for(const variant of inputs){
+   assert.deepEqual(
+    billReminderCopy({language:variant,name:'Energia',dueDate:'2026-12-31'}),
+    expected,
+    variant+' must not silently fall back to another recipient language'
+   );
+  }
+ }
+});
+
+
+test('regional reminder locales preserve date formatting and literal user tokens',()=>{
+ const variants={it:'it-CH',en:'en-US',es:'es-MX',fr:'fr-CA',de:'de-AT',pt:'pt-BR'};
+ for(const [language,regional] of Object.entries(variants)){
+  const name='Energia {date} $&';
+  const dueDate='2026-12-31';
+  const base=billReminderCopy({language,name,dueDate});
+  const actual=billReminderCopy({language:regional,name,dueDate});
+  assert.deepEqual(actual,base,regional+' must preserve the recipient language and its date policy');
+  assert.ok(actual.text.includes(name),regional+' must preserve literal user tokens');
+  assert.equal(actual.text.split('\n').length,3,regional+' must not add unexpected lines');
+ }
+});

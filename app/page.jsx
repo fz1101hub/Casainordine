@@ -12,20 +12,28 @@ import { addDaysISO, nextRecurringDue, todayRome, normalizeDate, euro } from '..
 import { parseBillsCsv } from '../lib/csv.mjs';
 import { parseRatePlanText, rateItemsWithKeys } from '../lib/rate-plan.mjs';
 import { extractBillFields } from '../lib/document-import.mjs';
-import MailImporter from './MailImporter';
-import HouseholdHub from './HouseholdHub';
-import PushSettings from './PushSettings';
 import { ForgotPasswordButton, PasswordRecoveryDialog, DeleteAccountPanel } from './AccountSecurity';
-import CalendarFeed from './CalendarFeed';
-import HomeExtra from './HomeExtra';
-import V20Hub from './V20Hub';
-import V21Hub from './V21Hub';
 import PersonalizedHome from './PersonalizedHome';
 import {useLanguage,LanguageSelector} from './LanguageProvider';
-import SampleAccountSetup from './SampleAccountSetup';
 import { downloadCalendar } from '../lib/calendar.mjs';
 import { billFraudSignals } from '../lib/v20-core.mjs';
 import {localizeMainDemo} from '../lib/v32-demo-fixture-labels.mjs';
+import { friendlyError } from '../lib/friendly-error.mjs';
+import { localizeSettingsApiError } from '../lib/settings-api-errors.mjs';
+import dynamic from 'next/dynamic';
+
+// Le sezioni che non si vedono all'avvio si scaricano solo quando si aprono (secondo audit, A1):
+// prima arrivavano tutte insieme alla prima apertura dell'app.
+function SectionLoading(){const {t}=useLanguage();return <p className="import-progress" role="status">{t('general.loading')}</p>;}
+const lazy=load=>dynamic(load,{loading:()=><SectionLoading/>});
+const MailImporter=lazy(()=>import('./MailImporter'));
+const HouseholdHub=lazy(()=>import('./HouseholdHub'));
+const PushSettings=lazy(()=>import('./PushSettings'));
+const CalendarFeed=lazy(()=>import('./CalendarFeed'));
+const HomeExtra=lazy(()=>import('./HomeExtra'));
+const V20Hub=lazy(()=>import('./V20Hub'));
+const V21Hub=lazy(()=>import('./V21Hub'));
+const SampleAccountSetup=lazy(()=>import('./SampleAccountSetup'));
 
 const categories = ['Luce','Gas','Acqua','Internet','Telefono','Rifiuti','Condominio','Affitto / Mutuo','Assicurazione','Tasse','Auto','Altro'];
 const frequencies = [{value:'none',label:'Non ricorrente'},{value:'monthly',label:'Ogni mese'},{value:'bimonthly',label:'Ogni 2 mesi'},{value:'quarterly',label:'Ogni 3 mesi'},{value:'yearly',label:'Ogni anno'},{value:'biennial',label:'Ogni 2 anni'}];
@@ -128,8 +136,8 @@ function Auth({client}) {
 }
 
 // Esiti del ritorno da Google/Microsoft (app/api/mail/callback/route.js).
-const MAIL_STATUS={connected:'Casella email collegata! Ora puoi cercare le bollette.',denied:'Autorizzazione annullata: la casella non è stata collegata.',expired:'Il collegamento è scaduto: riprova.',other_browser:'Per sicurezza il collegamento va completato nello stesso browser in cui l’hai avviato. Riprova dall’app; se usi l’app dalla schermata Home di iPhone e il problema continua, avvia il collegamento da Safari.',no_refresh:'Il provider non ha concesso l’accesso continuativo: rimuovi Casa in Ordine dalle app autorizzate del tuo account email e riprova.'};
-function mailStatusMessage(status){return MAIL_STATUS[status]||'Collegamento della casella non riuscito: riprova più tardi.';}
+const MAIL_STATUS={connected:'mail.status.connected',denied:'mail.status.denied',expired:'mail.status.expired',other_browser:'mail.status.otherBrowser',no_refresh:'mail.status.noRefresh'};
+function mailStatusMessage(status,tr){return tr(MAIL_STATUS[status]||'mail.status.failed');}
 
 export default function Page() {
   const {t:tr,money,locale,language}=useLanguage();
@@ -205,7 +213,7 @@ export default function Page() {
     let current=true;
     client.from('home_members').select('user_id,email,role').eq('home_id',activeHomeId).then(({data,error})=>{
       if(!current)return;
-      if(error)notify(error.message);else setHomeMembers(data||[]);
+      if(error)notify(friendlyError(error,tr));else setHomeMembers(data||[]);
     });
     return ()=>{current=false;};
   },[client,activeHomeId,homes]);
@@ -275,14 +283,14 @@ export default function Page() {
     if(!canWrite){notify(tr('v32.feedback.1'));return false;}
     if (demo) {localUpdate(key,rows=>rows.map(x=>x.id===id?{...x,...patch}:x));return true;}
     const {error} = await client.from(table).update(patch).eq('id',id);
-    if(error) {notify(error.message);return false;} await reload();return true;
+    if(error) {notify(friendlyError(error,tr));return false;} await reload();return true;
   }
   async function deleteRow(table,id,key=table) {
     if(!canWrite){notify(tr('v32.feedback.1'));return;}
     if (!window.confirm(tr('v32.flow.deleteConfirm'))) return;
     if(demo){localUpdate(key,rows=>rows.filter(x=>x.id!==id));notify(tr('v32.feedback.2'));return;}
     const {error}=await client.from(table).delete().eq('id',id);
-    if(error)notify(error.message);else{await reload();notify(tr('v32.feedback.2'));}
+    if(error)notify(friendlyError(error,tr));else{await reload();notify(tr('v32.feedback.2'));}
   }
   async function saveBill(e) {
     e.preventDefault();if(!canWrite)return notify(tr('v32.feedback.3'));
@@ -297,7 +305,7 @@ export default function Page() {
     if(item.source==='document' && data.bills.some(b=>b.source==='document'&&b.external_id===item.external_id)){notify(tr('v32.feedback.5'));setBusy(false);return;}
     let savedBillId=null;
     if(demo)localUpdate('bills',x=>[...x,{...item,id:uuid()}]);
-    else {const {data:created,error}=await client.from('bills').insert({...item,user_id:user.id,home_id:activeHomeId}).select('id').single(); if(error){notify(error.code==='23505'?tr('v32.payment.duplicate'):error.message);setBusy(false);return;}savedBillId=created.id;await reload();}
+    else {const {data:created,error}=await client.from('bills').insert({...item,user_id:user.id,home_id:activeHomeId}).select('id').single(); if(error){notify(error.code==='23505'?tr('v32.payment.duplicate'):friendlyError(error,tr));setBusy(false);return;}savedBillId=created.id;await reload();}
     let postSaveWarning='';
     // A detected Italian IBAN is hashed locally and never saved in full.
     // The security check only queues a review; it does not authorize the payee or confirm payment.
@@ -330,7 +338,7 @@ export default function Page() {
     if(demo){const id=uuid(); writeDemo({...data,utilities:[...data.utilities,{...item,id,next_due_date:following||item.next_due_date}],bills:[...data.bills,{...initialBill,id:uuid(),utility_id:id}]});}
     else {
       const {data:created,error}=await client.from('utilities').insert({...item,user_id:user.id,home_id:activeHomeId}).select('id').single();
-      if(error){notify(error.message);setBusy(false);return;}
+      if(error){notify(friendlyError(error,tr));setBusy(false);return;}
       const {error:billError}=await client.from('bills').insert({...initialBill,utility_id:created.id,user_id:user.id,home_id:activeHomeId});
       if(billError){notify(tr('v32.flow.utilityPartial',{error:billError.message}));}
       else if(following){await client.from('utilities').update({next_due_date:following}).eq('id',created.id);}
@@ -342,7 +350,7 @@ export default function Page() {
     e.preventDefault();if(!canWrite)return notify(tr('v32.feedback.3'));setBusy(true);
     const item={title:form.title.trim(),due_date:form.due_date||null,done_at:null,...(activeHomeId?{assigned_to:form.assigned_to||null}:{})};
     if(demo)localUpdate('tasks',x=>[...x,{...item,id:uuid()}]);
-    else {const {error}=await client.from('house_tasks').insert({...item,user_id:user.id,home_id:activeHomeId});if(error){notify(error.message);setBusy(false);return;}await reload();}
+    else {const {error}=await client.from('house_tasks').insert({...item,user_id:user.id,home_id:activeHomeId});if(error){notify(friendlyError(error,tr));setBusy(false);return;}await reload();}
     setModal(null);setBusy(false);notify(tr('v32.feedback.8'));
   }
   async function addSupplier(e){
@@ -353,13 +361,13 @@ export default function Page() {
     if((data.suppliers||[]).some(s=>s.name.toLowerCase()===name.toLowerCase()&&s.category===supplierForm.category)){notify(tr('v32.feedback.11'));return;}
     const item={name,category:supplierForm.category,sender_email:address||null};
     if(demo)localUpdate('suppliers',rows=>[...(rows||[]),{id:uuid(),...item}]);
-    else {const {error}=await client.from('user_suppliers').insert({...item,user_id:user.id});if(error){notify(error.message);return;}await reload();}
+    else {const {error}=await client.from('user_suppliers').insert({...item,user_id:user.id});if(error){notify(friendlyError(error,tr));return;}await reload();}
     setSupplierForm({...supplierForm,name:'',sender_email:''});notify(tr('v32.feedback.12'));
   }
   function prepareRatePlan(text,source,partial=false){
     const result=parseRatePlanText(text,{unitFilter:rateUnit});
     if(!result.rows.length){notify(tr('v32.flow.noRates'));return;}
-    setRatePlan({rows:result.rows,warnings:[...result.warnings,...(partial?['PDF lungo: oltre le prime 8 pagine non sono state lette.']:[])],source});
+    setRatePlan({rows:result.rows,warnings:[...result.warnings,...(partial?[tr('import.pdfTruncated')]:[])],source});
     notify(tr('v32.import.rateProposed',{count:result.rows.length}));
   }
   async function importBillFromText(){
@@ -374,7 +382,7 @@ export default function Page() {
   }
   async function rateFileImport(event){
     const file=event.target.files?.[0];event.target.value='';if(!file)return;
-    setDocumentState({busy:true,message:'Lettura del piano rate…'});
+    setDocumentState({busy:true,message:tr('import.readingRatePlan')});
     try{const {readRatePlanDocument}=await import('../lib/document-reader.js');const result=await readRatePlanDocument(file,message=>setDocumentState({busy:true,message}));prepareRatePlan(result.text,file.name,result.partial);}
     catch(e){notify(tr('v32.import.rateReadError',{detail:e.message}));}
     finally{setDocumentState({busy:false,message:''});}
@@ -407,7 +415,7 @@ export default function Page() {
   async function updateSummaryPrefs(patch){
     if(demo){writeDemo({...data,profile:{...data.profile,...patch}});return;}
     const {error}=await client.from('profiles').update(patch).eq('id',user.id);
-    if(error)notify(error.message);else await reload();
+    if(error)notify(friendlyError(error,tr));else await reload();
   }
   async function pay(bill) {const ok=await updateRow('bills',bill.id,{paid_at:bill.paid_at?null:new Date().toISOString()});if(ok)notify(bill.paid_at?tr('v32.payment.reopened'):tr('v32.payment.paid'));}
   async function toggleTask(t) {await updateRow('house_tasks',t.id,{done_at:t.done_at?null:new Date().toISOString()},'tasks');}
@@ -430,7 +438,7 @@ export default function Page() {
     event.target.value='';
     if(!file||documentState.busy)return;
     if(file.size>15*1024*1024){notify(tr('v32.feedback.22'));return;}
-    setDocumentState({busy:true,message:'Preparazione del documento…'});
+    setDocumentState({busy:true,message:tr('import.preparing')});
     try{
       const {readBillDocument,documentFingerprint}=await import('../lib/document-reader.js');
       const fingerprint=await documentFingerprint(file);
@@ -451,7 +459,7 @@ export default function Page() {
     finally{setDocumentState({busy:false,message:''});}
   }
   async function reviewEmailDocument(document, file){
-    setDocumentState({busy:true,message:'Lettura della bolletta ricevuta via email…'});
+    setDocumentState({busy:true,message:tr('import.readingEmailBill')});
     try{
       const {readBillDocument,documentFingerprint}=await import('../lib/document-reader.js');
       const fingerprint=await documentFingerprint(file);
@@ -467,7 +475,7 @@ export default function Page() {
         category:extracted.category!=='Altro'?extracted.category:(suggested.category||'Altro'),
         amount:extracted.amount??suggested.amount??'',due_date:extracted.due_date||suggested.due_date||'',
         paid:false,source:'document',external_id:fingerprint,mail_doc_id:document.id,import_file:file.name,
-        import_document_type:extracted.documentType,ibanCandidate:extracted.ibanCandidate,mailSender:document.sender||'',mailSenderAuth:suggested.sender_auth==='reported_fail'?'fail':'unknown',import_warnings:[...(extracted.warnings||[]),...(suggested.learned_supplier_hint?[`Mittente associato in passato a ${suggested.learned_supplier_hint} (${suggested.sender_match==='exact'?'indirizzo esatto':'dominio'}). Controlla che sia lo stesso fornitore.`]:[]),...(suggested.sender_auth==='reported_fail'?['Attenzione: autenticazione del mittente non superata secondo gli header disponibili.']:[])]});
+        import_document_type:extracted.documentType,ibanCandidate:extracted.ibanCandidate,mailSender:document.sender||'',mailSenderAuth:suggested.sender_auth==='reported_fail'?'fail':'unknown',import_warnings:[...(extracted.warnings||[]),...(suggested.learned_supplier_hint?[tr(suggested.sender_match==='exact'?'import.senderHintExact':'import.senderHintDomain',{supplier:suggested.learned_supplier_hint})]:[]),...(suggested.sender_auth==='reported_fail'?[tr('import.senderAuthFailed')]:[])]});
       setModal('bill');notify(tr('v32.feedback.27'));
     }catch(e){notify(tr('v32.import.emailReadError',{detail:e.message}));}
     finally{setDocumentState({busy:false,message:''});}
@@ -475,7 +483,7 @@ export default function Page() {
   async function authApi(method='GET') {
     const {data:{session}}=await client.auth.getSession();
     const response=await fetch('/api/integration-key',{method,headers:{Authorization:`Bearer ${session?.access_token||''}`}});
-    const payload=await response.json();if(!response.ok)throw new Error(payload.error||'Errore');return payload;
+    const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error?localizeSettingsApiError(payload.error,language):tr('errors.generic'));return payload;
   }
   async function loadIntegration() {if(demo)return;try{setIntegration(await authApi());}catch(e){notify(e.message);}}
   async function generateToken() {try{const p=await authApi('POST');setNewToken(p.token);await loadIntegration();notify(tr('v32.feedback.28'));}catch(e){notify(e.message);}}
@@ -484,17 +492,17 @@ export default function Page() {
     const enabled=!data.profile?.reminders_enabled;
     if(demo){writeDemo({...data,profile:{...data.profile,reminders_enabled:enabled}});return;}
     const {error}=await client.from('profiles').update({reminders_enabled:enabled}).eq('id',user.id);
-    if(error)notify(error.message);else await reload();
+    if(error)notify(friendlyError(error,tr));else await reload();
   }
   async function toggleAutoPayment() {
     const enabled=!data.profile?.auto_confirm_payments;
     if(demo){writeDemo({...data,profile:{...data.profile,auto_confirm_payments:enabled}});return;}
     const {error}=await client.from('profiles').update({auto_confirm_payments:enabled}).eq('id',user.id);
-    if(error)notify(error.message);else await reload();
+    if(error)notify(friendlyError(error,tr));else await reload();
   }
   useEffect(()=>{if(tab==='connect'&&!demo&&user)loadIntegration();},[tab,user?.id]);
   useEffect(()=>{if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('/sw.js').catch(()=>{});},[]);
-  useEffect(()=>{if(new URLSearchParams(window.location.search).has('invite')||sessionStorage.getItem('pending_house_invite'))setTab('household');const mail=new URLSearchParams(window.location.search).get('mail');if(mail){setTab('connect');notify(mailStatusMessage(mail));window.history.replaceState({},'',window.location.pathname);}},[]);
+  useEffect(()=>{if(new URLSearchParams(window.location.search).has('invite')||sessionStorage.getItem('pending_house_invite'))setTab('household');const mail=new URLSearchParams(window.location.search).get('mail');if(mail){setTab('connect');notify(mailStatusMessage(mail,tr));window.history.replaceState({},'',window.location.pathname);}},[]);
 
   const today=todayRome(), soon=addDaysISO(today,7);
   // Nella prova senza account i dati di esempio si mostrano nella lingua scelta; quelli salvati restano invariati.

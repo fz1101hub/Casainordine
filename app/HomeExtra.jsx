@@ -5,6 +5,7 @@ import {readRatePlanDocument,documentFingerprint} from '../lib/document-reader.j
 import {extractConsumption,extractMeterCandidates,monthlyConsumption,consumptionAnomalies,expenseForecast,safeBackup,serializeCsv,UNITS} from '../lib/home-insights.mjs';
 import {todayRome} from '../lib/dates.mjs';
 import {useLanguage} from './LanguageProvider';
+import { friendlyError } from '../lib/friendly-error.mjs';
 
 const TAB_TITLES={insights:'Consumi e previsioni',archive:'Archivio documenti',properties:'I miei immobili',maintenance:'Manutenzioni',contracts:'Contratti e tariffe',payments:'Ricevute e pagamenti',alerts:'Centro notifiche e backup'};
 const tables={properties:'home_properties',documents:'home_documents',meters:'meter_readings',meterSchedules:'meter_reminders',assets:'maintenance_assets',events:'maintenance_events',receipts:'payment_receipts',contracts:'home_contracts'};
@@ -49,7 +50,7 @@ export default function HomeExtra({client,demo,user,homeId,canWrite,bills=[],uti
   // Cambiando casa in fretta può arrivare per ultima la risposta della casa precedente: si scarta.
   if(seq!==loadSeq.current)return;
   const errors=responses.filter(r=>r.error);
-  if(errors.length)onNotify(tr('extra.errors.migration')+' '+errors[0].error.message);
+  if(errors.length){console.error('[extra]',errors[0].error?.message);onNotify(tr('extra.errors.migration'));}
   const next={};for(let i=0;i<keys.length;i++)next[keys[i]]=responses[i].data||[];
   next.alerts=responses[keys.length].data||[];next.preferences=responses[keys.length+1].data||null;
   setRows(next);setLoading(false);
@@ -58,7 +59,7 @@ export default function HomeExtra({client,demo,user,homeId,canWrite,bills=[],uti
  async function run(op,success,{refreshParent=false,personal=false}={}){
    if(!canWrite&&!personal){onNotify(tr('extra.errors.readOnly'));return false;}setWorking(true);
    try {const result=await op();if(result?.error)throw result.error;onNotify(success);await load();if(refreshParent)onRefresh();return true;}
-   catch(e){onNotify(e.message||tr('extra.errors.operation'));return false;}
+   catch(e){onNotify(friendlyError(e,tr));return false;}
    finally{setWorking(false);}
  }
  const common={user_id:user?.id,home_id:homeId||null};
@@ -90,7 +91,7 @@ export default function HomeExtra({client,demo,user,homeId,canWrite,bills=[],uti
  }
  async function openDocument(document){const popup=window.open('about:blank','_blank');if(popup)popup.opener=null;try{const {data,error}=await client.storage.from('house-documents').createSignedUrl(document.storage_path,60);if(error)throw error;if(popup)popup.location.replace(data.signedUrl);else window.location.assign(data.signedUrl);}catch(e){popup?.close();onNotify(tr('extra.archive.unavailable',{error:e.message}))}}
  async function deleteDocument(document){if(!window.confirm(tr('extra.archive.deleteConfirm')))return;
-  const {error}=await client.storage.from('house-documents').remove([document.storage_path]);if(error){onNotify(error.message);return;}
+  const {error}=await client.storage.from('house-documents').remove([document.storage_path]);if(error){onNotify(friendlyError(error,tr));return;}
   await run(()=>client.from('home_documents').delete().eq('id',document.id),tr('extra.archive.deleted'));
  }
  async function analyseConsumption(file){if(!file)return;setReview(tr('extra.insights.ocrWorking'));try{
