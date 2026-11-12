@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Lock, LockOpen, KeyRound } from 'lucide-react';
 import { deriveKey, makeVerifier, newSalt, openCard, phraseMatches, phraseProblem, scopeOf, sealCard } from '../lib/sos-vault.mjs';
+import { askConfirm, askText } from './ConfirmDialog';
 
 const PROBLEM_KEYS = { short: 'sos.phraseShort', mismatch: 'sos.phraseMismatch' };
 const BLANK = { title: '', location_hint: '', instructions: '', contact_label: '', contact_phone: '' };
@@ -133,7 +134,7 @@ export function SosProtectionCard({ vault, t, canWrite, demo, onNotify, onChange
         <button className="btn btn-primary" disabled={busy || !phrase}>{t('sos.unlock')}</button>
       </form>
       {canWrite && !demo && <details className="sos-forgot"><summary>{t('sos.forgotTitle')}</summary><p>{t('sos.forgotHelp')}</p>
-        <button type="button" className="btn btn-danger" disabled={busy} onClick={() => { if (window.confirm(t('sos.resetConfirm'))) run(async () => { await vault.reset(); clear(); onNotify(t('sos.resetDone')); await onChanged(); }); }}>{t('sos.resetButton')}</button></details>}
+        <button type="button" className="btn btn-danger" disabled={busy} onClick={async () => { if ((await askConfirm(t('sos.resetConfirm'),{danger:true}))) run(async () => { await vault.reset(); clear(); onNotify(t('sos.resetDone')); await onChanged(); }); }}>{t('sos.resetButton')}</button></details>}
     </div>;
   }
   return <div className="sos-protection">

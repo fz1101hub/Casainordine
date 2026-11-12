@@ -22,6 +22,7 @@ import { friendlyError } from '../lib/friendly-error.mjs';
 import { localizeSettingsApiError } from '../lib/settings-api-errors.mjs';
 import { memberName } from '../lib/member-names.mjs';
 import dynamic from 'next/dynamic';
+import { askConfirm, askText } from './ConfirmDialog';
 
 // Le sezioni che non si vedono all'avvio si scaricano solo quando si aprono (secondo audit, A1):
 // prima arrivavano tutte insieme alla prima apertura dell'app.
@@ -290,7 +291,7 @@ export default function Page() {
   }
   async function deleteRow(table,id,key=table) {
     if(!canWrite){notify(tr('v32.feedback.1'));return;}
-    if (!window.confirm(tr('v32.flow.deleteConfirm'))) return;
+    if (!(await askConfirm(tr('v32.flow.deleteConfirm'),{danger:true}))) return;
     if(demo){localUpdate(key,rows=>rows.filter(x=>x.id!==id));notify(tr('v32.feedback.2'));return;}
     const {error}=await client.from(table).delete().eq('id',id);
     if(error)notify(friendlyError(error,tr));else{await reload();notify(tr('v32.feedback.2'));}
@@ -299,7 +300,7 @@ export default function Page() {
     e.preventDefault();if(!canWrite)return notify(tr('v32.feedback.3'));
     if(form.source==='document'&&['ricevuta','sollecito','nota_credito'].includes(form.import_document_type)){
       const label=form.import_document_type==='ricevuta'?tr('v32.flow.receiptLabel'):form.import_document_type==='nota_credito'?tr('v32.flow.creditNoteLabel'):tr('v32.flow.reminderLabel');
-      if(!window.confirm(tr('v32.flow.documentConfirm',{kind:label})))return;
+      if(!(await askConfirm(tr('v32.flow.documentConfirm',{kind:label}))))return;
     }
     setBusy(true);
     const amount=Number(form.amount);
@@ -428,7 +429,7 @@ export default function Page() {
     try {
       const text=await file.text(),{bills,errors}=parseBillsCsv(text);
       if(!bills.length) throw new Error(errors.slice(0,3).join(' · ') || 'Nessuna riga valida');
-      if(!window.confirm(tr('v32.import.csvConfirm',{count:bills.length,excluded:errors.length?tr('v32.import.csvExcluded',{count:errors.length}):''})))return;
+      if(!(await askConfirm(tr('v32.import.csvConfirm',{count:bills.length,excluded:errors.length?tr('v32.import.csvExcluded',{count:errors.length}):''}))))return;
       if(demo)localUpdate('bills',x=>[...x,...bills.map(b=>({...b,id:uuid()}))]);
       else {const {error}=await client.from('bills').insert(bills.map(b=>({...b,user_id:user.id,home_id:activeHomeId})));if(error)throw error;await reload();}
       notify(tr('v32.import.csvSaved',{count:bills.length,ignored:errors.length?tr('v32.import.csvIgnored',{count:errors.length}):''}));
@@ -490,7 +491,7 @@ export default function Page() {
   }
   async function loadIntegration() {if(demo)return;try{setIntegration(await authApi());}catch(e){notify(e.message);}}
   async function generateToken() {try{const p=await authApi('POST');setNewToken(p.token);await loadIntegration();notify(tr('v32.feedback.28'));}catch(e){notify(e.message);}}
-  async function revokeToken() {if(!window.confirm(tr('v32.flow.revokeConfirm')))return;try{await authApi('DELETE');setNewToken('');await loadIntegration();notify(tr('v32.feedback.29'));}catch(e){notify(e.message);}}
+  async function revokeToken() {if(!(await askConfirm(tr('v32.flow.revokeConfirm'),{danger:true})))return;try{await authApi('DELETE');setNewToken('');await loadIntegration();notify(tr('v32.feedback.29'));}catch(e){notify(e.message);}}
   async function toggleEmails() {
     const enabled=!data.profile?.reminders_enabled;
     if(demo){writeDemo({...data,profile:{...data.profile,reminders_enabled:enabled}});return;}

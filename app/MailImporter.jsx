@@ -5,6 +5,7 @@ import { IMAP_PROVIDERS, providerLabel } from '../lib/mail-providers.mjs';
 import {useLanguage} from './LanguageProvider';
 import {safeMailApiMessage} from '../lib/mail-api-errors.mjs';
 import {formatMailDate} from '../lib/mail-date.mjs';
+import { askConfirm, askText } from './ConfirmDialog';
 
 async function mailRequest(client,path,method='GET',payload,tr,language){
   const {data:{session}}=await client.auth.getSession();
@@ -49,12 +50,12 @@ export default function MailImporter({client,onReview,notify,refresh=0,onPayment
     await load();
     await onPaymentsChanged?.();
   });
-  const disconnect=c=>{
-    if(!window.confirm(tr('mail.disconnectConfirm',{email:c.email_address})))return;
+  const disconnect=async c=>{
+    if(!(await askConfirm(tr('mail.disconnectConfirm',{email:c.email_address}))))return;
     act(c.id,async()=>{const result=await request('connections','DELETE',{id:c.id});await load();notify(tr('mail.disconnectDone'));});
   };
-  const dismiss=d=>{
-    if(!window.confirm(tr('mail.dismissConfirm')))return;
+  const dismiss=async d=>{
+    if(!(await askConfirm(tr('mail.dismissConfirm'))))return;
     act(d.id,async()=>{await request('documents','PATCH',{id:d.id,action:'dismissed'});await load();notify(tr('mail.dismissed'));});
   };
   const paymentAction=(p,action)=>act(`payment-${p.id}`,async()=>{
@@ -69,8 +70,8 @@ export default function MailImporter({client,onReview,notify,refresh=0,onPayment
     await request('payments','DELETE',{id:entry.id});
     await load();notify(tr('mail.senderRevoked'));
   });
-  const forgetBillSender=entry=>{
-    if(!window.confirm(tr('mail.senderForgetConfirm',{email:entry.sender_email})))return;
+  const forgetBillSender=async entry=>{
+    if(!(await askConfirm(tr('mail.senderForgetConfirm',{email:entry.sender_email}))))return;
     act(`forget-${entry.id}`,async()=>{await request('senders','DELETE',{id:entry.id});await load();notify(tr('mail.senderForgotten'));});
   };
   const review=d=>act(d.id,async()=>{
