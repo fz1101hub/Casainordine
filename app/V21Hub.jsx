@@ -19,9 +19,18 @@ const exportNames={
  de:{property:'immobilienpass',inventory:'versicherungsinventar',briefing:'zuhause-in-5-minuten'},
  pt:{property:'passaporte-imovel',inventory:'inventario-seguro',briefing:'casa-em-5-minutos'}
 };
+const validExportDate=date=>{
+ if(typeof date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(date))return false;
+ const [year,month,day]=date.split('-').map(Number);
+ if(year<1||month<1||month>12||day<1)return false;
+ const leap=year%4===0&&(year%100!==0||year%400===0);
+ const days=[31,leap?29:28,31,30,31,30,31,31,30,31,30,31];
+ return day<=days[month-1];
+};
 const v21ExportName=(language,type,date)=>{
- const stem=(exportNames[language]||exportNames.it)[type];
- return stem?`${stem}${type==='briefing'&&/^\d{4}-\d{2}-\d{2}$/.test(date||'')?'-'+date:''}.json`:null;
+ const names=Object.hasOwn(exportNames,language)?exportNames[language]:exportNames.it;
+ const stem=Object.hasOwn(names,type)?names[type]:null;
+ return stem?`${stem}${type==='briefing'&&validExportDate(date)?'-'+date:''}.json`:null;
 };
 const uuid=()=>crypto.randomUUID();
 const initial={assets:[],properties:[],events:[],docs:[],contracts:[],emergency:[],inventory:[],vacations:[],shares:[],decisions:[],votes:[],refunds:[]};
