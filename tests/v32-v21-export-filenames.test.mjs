@@ -44,6 +44,10 @@ test('V21 filename dates reject invalid calendar days and non-string values',()=
 test('V21 filename helper falls back to Italian and rejects unknown types',()=>{
  assert.equal(filename('unknown','property'),filename('it','property'));
  assert.equal(filename('fr','unknown'),null);
+ for(const inherited of ['__proto__','constructor','toString','hasOwnProperty']){
+  assert.equal(filename('en',inherited),null,`inherited export type ${inherited} must be rejected`);
+  assert.equal(filename(inherited,'property'),filename('it','property'),`inherited locale ${inherited} must fall back`);
+ }
 });
 
 test('V21 export controls use localized helper',()=>{
