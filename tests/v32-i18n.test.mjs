@@ -129,3 +129,13 @@ test('push toggle validates session before touching browser subscription',()=>{
  const browserMutation=toggle.indexOf('getSubscription()');
  assert.ok(sessionGuard>=0&&browserMutation>sessionGuard,'authentication must precede browser subscription mutation');
 });
+
+
+test('push toggle refuses a foreign browser subscription before any unsubscribe or API delete',()=>{
+ const source=readFileSync(fileURLToPath(new URL('../app/PushSettings.jsx',import.meta.url)),'utf8');
+ const toggle=source.slice(source.indexOf('async function toggle()'));
+ const guard=toggle.indexOf("if(existing&&!(await ownedSubscription(existing)))throw new Error(t('push.configError'))");
+ assert.ok(guard>toggle.indexOf('getSubscription()'),'ownership checked after reading subscription');
+ assert.ok(guard<toggle.indexOf("api('DELETE'"),'ownership checked before server deletion');
+ assert.ok(guard<toggle.indexOf('existing.unsubscribe()'),'ownership checked before browser unsubscribe');
+});
