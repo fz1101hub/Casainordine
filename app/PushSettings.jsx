@@ -28,6 +28,10 @@ export default function PushSettings({client,onNotify}){
  },[client]);
  async function api(method,body){const {data:{session}}=await client.auth.getSession();if(!session?.access_token)throw new Error(t('push.configError'));const r=await fetch('/api/push/subscribe',{method,headers:{'Authorization':`Bearer ${session?.access_token||''}`,'Content-Type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});const p=await r.json().catch(()=>({}));if(!r.ok)throw new Error(p.error?localizeSettingsApiError(p.error,language):t('push.configError'));return p;}
  async function toggle(){setBusy(true);try{
+  // Prima di toccare una sottoscrizione del browser, verificare la sessione:
+  // un logout durante la schermata impostazioni non deve disiscrivere il dispositivo.
+  const {data:{session}}=await client.auth.getSession();
+  if(!session?.access_token)throw new Error(t('push.configError'));
   const reg=await navigator.serviceWorker.ready;
   const existing=await reg.pushManager.getSubscription();
   if(existing&&enabled){await api('DELETE',{endpoint:existing.endpoint});await existing.unsubscribe();setEnabled(false);onNotify(t('push.disabled'));}
