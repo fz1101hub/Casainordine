@@ -1,7 +1,20 @@
 'use client';
 import {createContext,useCallback,useContext,useEffect,useMemo,useRef,useState} from 'react';
 import {db} from '../lib/supabase-browser';
-import {browserLanguage,DEFAULT_LANGUAGE,formatDate,formatMoney,LANGUAGES,localeFor,normalizeLanguage,translate,languageStorageKey} from '../lib/i18n.mjs';
+import {browserLanguage,DEFAULT_LANGUAGE,formatDate,formatMoney,interpolate,LANGUAGES,localeFor,normalizeLanguage,languageStorageKey} from '../lib/i18n-core.mjs';
+// Solo l'italiano arriva con l'app (serve per la prima pagina, che è in italiano); le altre lingue
+// si scaricano quando servono, una alla volta (lib/i18n-dicts/, generati da scripts/build-i18n.mjs).
+import italian from '../lib/i18n-dicts/it.json';
+
+const dictionaries={it:italian};
+function loadDictionary(lang){
+ if(dictionaries[lang])return Promise.resolve(dictionaries[lang]);
+ return import(`../lib/i18n-dicts/${lang}.json`).then(module=>(dictionaries[lang]=module.default||module));
+}
+// Finché la lingua scelta non è arrivata (pochi millisecondi, una volta sola) si usa l'italiano.
+function translate(lang,key,params){
+ return interpolate((dictionaries[lang]||italian)[key]??italian[key]??key,params);
+}
 
 function accountLanguage(userId){
  try{const saved=localStorage.getItem(languageStorageKey(userId));if(saved)return normalizeLanguage(saved);}catch{}
@@ -55,8 +68,13 @@ export function LanguageProvider({children}){
   });
   return()=>{active=false;authRequest.current++;subscription.unsubscribe();};
  },[]);
+ const [,setLoaded]=useState(0);
  useEffect(()=>{
   if(typeof document!=='undefined')document.documentElement.lang=language;
+  if(dictionaries[language])return;
+  let active=true;
+  loadDictionary(language).then(()=>{if(active)setLoaded(n=>n+1);}).catch(()=>{});
+  return()=>{active=false;};
  },[language]);
  const setLanguage=useCallback(async(code)=>{
   const next=normalizeLanguage(code);
@@ -78,13 +96,14 @@ export function LanguageProvider({children}){
    return false;
   }
  },[accountId]);
+ const ready=Boolean(dictionaries[language]);
  const value=useMemo(()=>({
   language,locale:localeFor(language),languages:LANGUAGES,
   t:(key,params)=>translate(language,key,params),
   money:(amount,currency='EUR')=>formatMoney(amount,language,currency),
   date:(iso,options)=>formatDate(iso,language,options),
   setLanguage,saveError
- }),[language,setLanguage,saveError]);
+ }),[language,setLanguage,saveError,ready]);
  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }
 export function useLanguage(){

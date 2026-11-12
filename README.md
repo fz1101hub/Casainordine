@@ -345,7 +345,7 @@ Per ogni provider, l'utente deve fornire consenso o una credenziale valida. Prim
 ## Primo avvio
 
 1. Installa Node.js 20+.
-2. Da terminale, in questa cartella: `npm install` (il comando copia automaticamente il worker PDF.js nella cartella `public/`).
+2. Da terminale, in questa cartella: `npm install` (il comando copia automaticamente il worker PDF.js nella cartella `public/` e prepara i dizionari delle lingue in `lib/i18n-dicts/`).
 3. Avvia la demo: `npm run dev` e apri `http://localhost:3000`.
 4. Per abilitarne l'uso reale, crea un progetto su **Supabase**, esegui `supabase/schema.sql` nel SQL Editor e copia `.env.example` in `.env.local`.
 5. Inserisci `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SECRET_KEY` (secret/service-role **solo backend**), `CRON_SECRET` e `APP_URL`.
