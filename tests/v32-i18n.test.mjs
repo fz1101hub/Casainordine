@@ -120,3 +120,12 @@ test('push settings reject missing authentication and do not hide subscription l
  assert.match(source,/const \{subscriptions=\[\]\}=await api\('GET'\);/);
  assert.doesNotMatch(source,/api\('GET'\)\.catch\(/);
 });
+
+
+test('push toggle validates session before touching browser subscription',()=>{
+ const source=readFileSync(fileURLToPath(new URL('../app/PushSettings.jsx',import.meta.url)),'utf8');
+ const toggle=source.slice(source.indexOf('async function toggle()'));
+ const sessionGuard=toggle.indexOf("if(!session?.access_token)throw new Error(t('push.configError'))");
+ const browserMutation=toggle.indexOf('getSubscription()');
+ assert.ok(sessionGuard>=0&&browserMutation>sessionGuard,'authentication must precede browser subscription mutation');
+});
