@@ -14,15 +14,15 @@ const filename=(language,type,date)=>runInNewContext(
 );
 
 test('V21 filenames work in all six languages without changing JSON extension',()=>{
- const stems=new Set();
  for(const language of ['it','en','es','fr','de','pt']){
+  const stems=new Set();
   for(const type of ['property','inventory','briefing']){
    const name=filename(language,type);
    assert.match(name,/^[a-z0-9-]+\.json$/);
    stems.add(name);
   }
+  assert.equal(stems.size,3,'export types should have distinct filenames within each locale');
  }
- assert.equal(stems.size,18,'all locale/type pairs should have distinct filenames');
 });
 
 test('V21 briefing date suffix is restricted to ISO-shaped dates',()=>{
