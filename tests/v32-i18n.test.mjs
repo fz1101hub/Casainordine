@@ -112,3 +112,11 @@ test('all advanced home section, property and document keys resolve in six langu
   }
  }
 });
+
+
+test('push settings reject missing authentication and do not hide subscription lookup failures',()=>{
+ const source=readFileSync(fileURLToPath(new URL('../app/PushSettings.jsx',import.meta.url)),'utf8');
+ assert.match(source,/if\(!session\?\.access_token\)throw new Error\(t\('push\.configError'\)\)/);
+ assert.match(source,/const \{subscriptions=\[\]\}=await api\('GET'\);/);
+ assert.doesNotMatch(source,/api\('GET'\)\.catch\(/);
+});
