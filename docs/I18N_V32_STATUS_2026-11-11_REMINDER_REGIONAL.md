@@ -30,3 +30,10 @@ GitHub Actions «Test automatici», [run 43121430129](https://github.com/fz1101h
 ## CI verificata sul commit `c17881c92b930c32bf6281e59fd419da884bcbb0` — 12 novembre 2026
 
 GitHub Actions «Test automatici», [run 43128622833](https://github.com/fz1101hub/Casainordine/actions/runs/43128622833): `completed/success`. Il job `test` (ID `130886943097`) e tutti i passaggi principali sono `success`: installazione dipendenze, controllo vulnerabilità note, test di logica, build Next.js e Chromium sull'app compilata **senza database**. Questo risultato riguarda il commit `c17881c`, non il nuovo commit di documentazione. Non costituisce una verifica linguistica integrale, un test IMAP reale o una prova RLS multiaccount. La PR #42 rimane in revisione; **Fase 1 incompleta, Fasi 2 e 3 non avviate**. Il rilascio resta bloccato dai gate già elencati.
+
+
+## CI sul test bisestile — 12 novembre 2026
+
+GitHub Actions [run 43142948285](https://github.com/fz1101hub/Casainordine/actions/runs/43142948285), sul commit `a57835ff3921160d27f3ab6249b9d9840720a537`, risulta `completed/success`. Job `test` ID `130934029696`: installazione da lockfile, controllo vulnerabilità note, test di logica (compresi 29 febbraio valido e confini anno), build Next.js e prova Chromium dell'app compilata senza database tutti `success`. Questa evidenza riguarda solo quel commit; non prova correttezza linguistica completa, invio email, accessi Supabase/RLS o funzionamento IMAP reale.
+
+**Gate operativo Fase 1:** evitare di confondere la copertura dei promemoria con il completamento della 3.2. Priorità successive: inventario delle stringhe residue nei moduli V20/V21 e nei messaggi API, revisione dei sei cataloghi, test browser/mobile/accessibilità, quindi prove IMAP staging e RLS con due utenti. Mantenere la PR #42 draft e non pubblicare finché questi gate non sono documentati. Fasi 2 e 3 non avviate.
