@@ -139,3 +139,14 @@ test('push toggle refuses a foreign browser subscription before any unsubscribe 
  assert.ok(guard<toggle.indexOf("api('DELETE'"),'ownership checked before server deletion');
  assert.ok(guard<toggle.indexOf('existing.unsubscribe()'),'ownership checked before browser unsubscribe');
 });
+
+
+test('push toggle preserves an owned subscription when UI state is temporarily stale',()=>{
+ const source=readFileSync(fileURLToPath(new URL('../app/PushSettings.jsx',import.meta.url)),'utf8');
+ const toggle=source.slice(source.indexOf('async function toggle()'));
+ const ownership=toggle.indexOf("if(existing&&!(await ownedSubscription(existing)))");
+ const recovery=toggle.indexOf('if(existing&&!enabled){setEnabled(true);');
+ const unsubscribe=toggle.indexOf('existing.unsubscribe()');
+ assert.ok(ownership>=0&&recovery>ownership&&unsubscribe>recovery,'owned subscription must be recovered without unsubscribing');
+ assert.match(toggle,/if\(existing&&!enabled\)\{setEnabled\(true\);onNotify\(t\('push\.enabled'\)\);return;\}/);
+});
