@@ -203,3 +203,33 @@ test('regional reminder locales preserve date formatting and literal user tokens
   assert.equal(actual.text.split('\n').length,3,regional+' must not add unexpected lines');
  }
 });
+
+test('regional reminder variants reject impossible dates without changing source input',()=>{
+ const variants=['it-CH','en-US','es-MX','fr-CA','de-AT','pt-BR'];
+ for(const language of variants){
+  const name='Energia {date} $&';
+  for(const dueDate of ['2026-02-30','2025-02-29','2026-13-01','not-a-date']){
+   assert.throws(
+    ()=>billReminderCopy({language,name,dueDate}),
+    TypeError,
+    language+' must reject '+dueDate
+   );
+  }
+  assert.equal(name,'Energia {date} $&');
+ }
+});
+
+
+test('regional reminder locales accept real leap days and preserve calendar boundaries',()=>{
+ const variants={it:'it-CH',en:'en-US',es:'es-MX',fr:'fr-CA',de:'de-AT',pt:'pt-BR'};
+ for(const [language,regional] of Object.entries(variants)){
+  for(const dueDate of ['2024-02-29','2026-01-01','2026-12-31']){
+   const name='Acqua {date}';
+   const regionalCopy=billReminderCopy({language:regional,name,dueDate});
+   const baseCopy=billReminderCopy({language,name,dueDate});
+   assert.deepEqual(regionalCopy,baseCopy,regional+' should preserve the base-language date policy for '+dueDate);
+   assert.ok(regionalCopy.text.includes(name),regional+' must retain literal user content');
+   assert.equal(dueDate.length,10);
+  }
+ }
+});
