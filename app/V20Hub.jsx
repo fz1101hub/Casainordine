@@ -106,7 +106,7 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   setWorking(true);try{const {error}=d.type==='shopping'?await client.rpc('v20_apply_offline_shopping',{p_client_id:d.id,p_title:d.title,p_home_id:homeId}):await client.rpc('v20_apply_offline_task',{p_client_id:d.id,title_text:d.title,due_on:d.date||null});if(error)throw error;
    await removeDraft(d.id);await refreshDrafts();onRefresh();onNotify(d.type==='shopping'?ui.shoppingAdded:ui.taskSynced);
   }catch(e){onNotify(ui.syncFailed+v20SafeError(language,e))}finally{setWorking(false)}}
- function downloadDraft(d){const url=URL.createObjectURL(d.file);const a=document.createElement('a');a.href=url;a.download=d.title||'documento';a.click();setTimeout(()=>URL.revokeObjectURL(url),6000)}
+ function downloadDraft(d){const url=URL.createObjectURL(d.file);const a=document.createElement('a');a.href=url;a.download=d.title||ui.documentLabel;a.click();setTimeout(()=>URL.revokeObjectURL(url),6000)}
  if(demo)return <section className="panel extra-panel"><h2>{ui.v20Name}</h2><p>{ui.demoSetupNotice}</p></section>;
  return <div className="extra-hub v20-hub">
  {tab==='monitor'&&<><header className="page-heading"><div><div className="eyebrow">{ui.dailyCheck}</div><h1>{ui.monitorTitle}</h1><p>{ui.monitorDescription}</p></div></header>
