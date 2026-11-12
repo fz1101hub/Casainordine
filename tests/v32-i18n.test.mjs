@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {LANGUAGES,DEFAULT_LANGUAGE,MESSAGE_KEYS,TRANSLATIONS,browserLanguage,normalizeLanguage,translate,localeFor,formatDate,formatMoney,languageStorageKey} from '../lib/i18n.mjs';
+import {LANGUAGES,DEFAULT_LANGUAGE,MESSAGE_KEYS,TRANSLATIONS,browserLanguage,acceptedLanguage,normalizeLanguage,translate,localeFor,formatDate,formatMoney,languageStorageKey} from '../lib/i18n.mjs';
 test('six selectable languages and Italian default',()=>{
  assert.deepEqual(LANGUAGES.map(x=>x.code),['it','en','es','fr','de','pt']);
  assert.equal(DEFAULT_LANGUAGE,'it');
@@ -13,6 +13,15 @@ test('accepts regional browser locales and safe fallback',()=>{
  assert.equal(browserLanguage('fr-CH'),'fr');
  assert.equal(browserLanguage('ar'),'it');
  assert.equal(normalizeLanguage('ES_es'),'es');
+});
+test('Accept-Language respects regional preferences and rejects invalid quality weights',()=>{
+ assert.equal(acceptedLanguage('fr-CA, en-US;q=0.8'),'fr');
+ assert.equal(acceptedLanguage('de-DE;q=0, es-MX;q=0.6'),'es');
+ assert.equal(acceptedLanguage('pt-BR;q=1.5, en-US;q=0.7'),'en');
+ assert.equal(acceptedLanguage('fr-FR;q=-0.5, de-DE;q=0.4'),'de');
+ assert.equal(acceptedLanguage('es-ES;q=NaN, pt-PT;q=0.3'),'pt');
+ assert.equal(acceptedLanguage('ja-JP, it-IT;q=0.5'),'it');
+ assert.equal(acceptedLanguage('en-US;q=0, fr-FR;q=0'),'it');
 });
 test('all translations cover the same keys with nonempty text',()=>{
  for(const lang of LANGUAGES){
@@ -102,4 +111,12 @@ test('all advanced home section, property and document keys resolve in six langu
    assert.ok(translated&&translated!==key,lang.code+': '+key);
   }
  }
+});
+
+
+test('push settings reject missing authentication and do not hide subscription lookup failures',()=>{
+ const source=readFileSync(fileURLToPath(new URL('../app/PushSettings.jsx',import.meta.url)),'utf8');
+ assert.match(source,/if\(!session\?\.access_token\)throw new Error\(t\('push\.configError'\)\)/);
+ assert.match(source,/const \{subscriptions=\[\]\}=await api\('GET'\);/);
+ assert.doesNotMatch(source,/api\('GET'\)\.catch\(/);
 });

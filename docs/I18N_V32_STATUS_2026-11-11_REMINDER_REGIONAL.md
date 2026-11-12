@@ -10,3 +10,30 @@ Questo ramo aggiunge un test di regressione alla generazione delle email promemo
 ## Verifica successiva — commit `1878785729db282e8a1a20bec11d439bd9afef17`
 
 GitHub Actions «Test automatici», [run 43089429094](https://github.com/fz1101hub/Casainordine/actions/runs/43089429094): `completed/success`, associata al commit indicato. Il job `test` è `completed/success`: dipendenze da lockfile, controllo vulnerabilità note, test di logica (inclusi i nuovi casi regionali), build Next.js e prova Chromium dell'app compilata senza database hanno tutti esito `success`. Questa prova **non** verifica email reali, account distinti, RLS con database, IMAP in staging, traduzioni in browser/mobile o accessibilità. La PR #40 resta draft e la Fase 1 aperta. Nessuna autorizzazione al rilascio o all'avvio delle fasi successive deriva dalla sola CI.
+
+## Verifica CI e nuova regressione — 11 novembre 2026
+
+Sul commit `4e712fcecaccabd22f1f1dd003b1b3d30e875bf7`, GitHub Actions [run 43103042672](https://github.com/fz1101hub/Casainordine/actions/runs/43103042672) risulta `completed/success`. Questo esito non riguarda il commit successivo.
+
+Il commit `c66ae92a1a8c2dc6da0518b665220804a06bf6b5` aggiunge una regressione sulle sei varianti regionali dei promemoria: scadenze impossibili e date non valide devono essere rifiutate, mantenendo invariato il nome fornito dall'utente. **CI e build su questo nuovo commit non ancora verificate.** Restano aperti i gate di rilascio sopra indicati; Fase 1 non conclusa, Fasi 2 e 3 non avviate.
+
+## Verifica CI — 12 novembre 2026
+
+Sul commit `d79ff22714851f99269252fce5a7df8c3e6cfbd8`, GitHub Actions «Test automatici» [run 43112714493](https://github.com/fz1101hub/Casainordine/actions/runs/43112714493) risulta `completed/success`. Nel job `test` risultano `success` installazione dipendenze, controllo vulnerabilità note, test di logica (inclusa la regressione sulle date impossibili), build Next.js e prova Chromium dell'app compilata senza database. Questa verifica supera la precedente indicazione «CI e build non ancora verificate» limitatamente al commit `d79ff22`; non certifica alcun commit successivo.
+
+La PR draft #42 resta il percorso di revisione per i commit post-merge della #40. Restano non eseguiti o non documentati i collaudi linguistici completi, browser/mobile/accessibilità nelle sei lingue, IMAP in staging e RLS multiaccount con preferenze distinte. Nessun merge, rilascio, migrazione o invio email reale autorizzato da questa CI. **Fase 1 aperta; Fasi 2 e 3 non avviate.**
+
+## CI verificata sul commit `d099bdabe895397f3be8eb2ce2ffa2ef019e2761` — 12 novembre 2026
+
+GitHub Actions «Test automatici», [run 43121430129](https://github.com/fz1101hub/Casainordine/actions/runs/43121430129): `completed/success`. Il job `test` è `completed/success`; sono riusciti installazione da lockfile, controllo vulnerabilità note, test di logica, build Next.js e prova Chromium senza database. La verifica si riferisce **esclusivamente** a `d099bda`; non equivale a collaudo E2E con Supabase o a validazione linguistica. La PR #42 resta nel percorso di revisione; prima del rilascio rimangono revisione completa delle sei lingue, browser/mobile/accessibilità, IMAP staging, RLS con due account e verifica del commit candidato. Fase 1 aperta; Fasi 2 e 3 non avviate.
+
+## CI verificata sul commit `c17881c92b930c32bf6281e59fd419da884bcbb0` — 12 novembre 2026
+
+GitHub Actions «Test automatici», [run 43128622833](https://github.com/fz1101hub/Casainordine/actions/runs/43128622833): `completed/success`. Il job `test` (ID `130886943097`) e tutti i passaggi principali sono `success`: installazione dipendenze, controllo vulnerabilità note, test di logica, build Next.js e Chromium sull'app compilata **senza database**. Questo risultato riguarda il commit `c17881c`, non il nuovo commit di documentazione. Non costituisce una verifica linguistica integrale, un test IMAP reale o una prova RLS multiaccount. La PR #42 rimane in revisione; **Fase 1 incompleta, Fasi 2 e 3 non avviate**. Il rilascio resta bloccato dai gate già elencati.
+
+
+## CI sul test bisestile — 12 novembre 2026
+
+GitHub Actions [run 43142948285](https://github.com/fz1101hub/Casainordine/actions/runs/43142948285), sul commit `a57835ff3921160d27f3ab6249b9d9840720a537`, risulta `completed/success`. Job `test` ID `130934029696`: installazione da lockfile, controllo vulnerabilità note, test di logica (compresi 29 febbraio valido e confini anno), build Next.js e prova Chromium dell'app compilata senza database tutti `success`. Questa evidenza riguarda solo quel commit; non prova correttezza linguistica completa, invio email, accessi Supabase/RLS o funzionamento IMAP reale.
+
+**Gate operativo Fase 1:** evitare di confondere la copertura dei promemoria con il completamento della 3.2. Priorità successive: inventario delle stringhe residue nei moduli V20/V21 e nei messaggi API, revisione dei sei cataloghi, test browser/mobile/accessibilità, quindi prove IMAP staging e RLS con due utenti. Mantenere la PR #42 draft e non pubblicare finché questi gate non sono documentati. Fasi 2 e 3 non avviate.
