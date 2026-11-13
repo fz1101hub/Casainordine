@@ -20,3 +20,8 @@ test('integer count formatting respects all six account locales',()=>{
  }
  assert.notEqual(new Intl.NumberFormat('en-GB').format(1234),new Intl.NumberFormat('de-DE').format(1234));
 });
+
+test('V20 savings progress has a localized accessible name including goal label',()=>{
+ assert.match(source, /<progress[^>]*aria-label=\{\x60\$\{ui\.progressMonthly\}: \$\{g\.label\}\x60\}/);
+ assert.match(source, /<progress[^>]*value=\{p\?\.progress\|\|0\}/);
+});
