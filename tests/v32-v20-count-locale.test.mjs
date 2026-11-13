@@ -25,3 +25,8 @@ test('V20 savings progress has a localized accessible name including goal label'
  assert.match(source, /<progress[^>]*aria-label=\{\x60\$\{ui\.progressMonthly\}: \$\{g\.label\}\x60\}/);
  assert.match(source, /<progress[^>]*value=\{p\?\.progress\|\|0\}/);
 });
+
+test('V20 destructive buttons identify the individual record to assistive technology',()=>{
+ assert.match(source,/aria-label=\{\x60\$\{ui\.deleteLabel\}: \$\{n\.creditor_name\|\|ui\.pagopaNotice\}\x60\}/);
+ assert.match(source,/aria-label=\{\x60\$\{ui\.deleteLabel\}: \$\{g\.label\}\x60\}/);
+});
