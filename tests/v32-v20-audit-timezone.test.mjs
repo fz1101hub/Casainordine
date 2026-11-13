@@ -29,6 +29,6 @@ test('audit display follows Rome daylight-saving transitions without changing th
   assert.equal(formatter.format(new Date(winter)),'13:00',locale+' winter offset');
   assert.equal(formatter.format(new Date(summer)),'14:00',locale+' summer offset');
  }
- assert.equal(new Date(winter).toISOString(),winter.replace('.000',''));
- assert.equal(new Date(summer).toISOString(),summer.replace('.000',''));
+ assert.equal(new Date(winter).toISOString(),'2026-01-15T12:00:00.000Z');
+ assert.equal(new Date(summer).toISOString(),'2026-07-15T12:00:00.000Z');
 });
