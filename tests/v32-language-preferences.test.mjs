@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {LANGUAGES, DEFAULT_LANGUAGE, acceptedLanguage, browserLanguage, normalizeLanguage, languageStorageKey, localeFor} from '../lib/i18n-core.mjs';
+import {LANGUAGES, DEFAULT_LANGUAGE, acceptedLanguage, browserLanguage, normalizeLanguage, languageStorageKey, localeFor, interpolate} from '../lib/i18n-core.mjs';
 
 // Fase 1 v3.2: preferenze lingua, fallback e intestazioni di pagine condivise.
 test('language normalization supports six languages and regional variants', () => {
@@ -38,4 +38,14 @@ test('account-scoped language preference keys do not overlap', () => {
  assert.notEqual(first,anonymous);
  assert.notEqual(second,anonymous);
  assert.equal(languageStorageKey('account-a'),first);
+});
+
+
+test('interpolation uses only explicitly provided translation parameters', () => {
+ assert.equal(interpolate('Hello {name}',{name:'Ada'}),'Hello Ada');
+ assert.equal(interpolate('{missing} {constructor} {toString}',{}),'{missing} {constructor} {toString}');
+ const inherited=Object.create({name:'inherited'});
+ assert.equal(interpolate('Hello {name}',inherited),'Hello {name}');
+ assert.equal(interpolate('{name}',{name:0}),'0');
+ assert.equal(interpolate('{name}',{name:null}),'null');
 });
