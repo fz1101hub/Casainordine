@@ -80,5 +80,5 @@ test('five-minute briefing labels are translated and refreshed when language cha
 
 test('QR preview uses translated privacy and HTTPS fallback notices',()=>{
  for(const key of ['qrModuleUnavailable','qrHttpsRequired','printQr','qrAccessNotice','qrAltPrefix'])assert.ok(source.includes('copy.'+key),key);
- assert.match(source,/<QrPreview asset=\{selection\} copy=\{briefingCopy\}\/>/);
+ assert.match(source,/<QrPreview asset=\{selection\} copy=\{briefingCopy\} categoryLabel=\{assetCategory\}\/>/);
 });
