@@ -34,3 +34,12 @@ test('V20 rejects impossible ISO calendar dates without normalizing them', () =>
   }
   assert.notEqual(formatV20Date('2024-02-29', 'it-IT'), '—');
 });
+
+test('V20 does not guess ambiguous or partial provider dates', () => {
+  for (const value of ['03/04/2026', '11/14/2026', '2026/11/14', 'Nov 14 2026', '2026-11', '2026-11-14 extra']) {
+    assert.equal(formatV20Timestamp(value, 'en-GB', 'Never'), 'Never');
+    assert.equal(formatV20Date(value, 'it-IT'), '—');
+  }
+  assert.notEqual(formatV20Timestamp('2026-11-14T08:00:00.123Z', 'pt-PT'), '—');
+  assert.notEqual(formatV20Date('2026-11-14', 'fr-FR'), '—');
+});
