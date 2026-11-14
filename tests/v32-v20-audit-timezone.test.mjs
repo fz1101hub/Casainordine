@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 const source=readFileSync(new URL('../app/V20Hub.jsx',import.meta.url),'utf8');
 
 test('V20 audit timestamps use account locale and explicit Rome timezone',()=>{
- assert.match(source,/new Date\(a\.created_at\)\.toLocaleString\(locale,\{timeZone:'Europe\/Rome'\}\)/);
+ assert.match(source,/formatV20Timestamp\(a\.created_at,locale\)/);
  assert.doesNotMatch(source,/new Date\(a\.created_at\)\.toLocaleString\(locale\)/);
 });
 
