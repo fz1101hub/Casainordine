@@ -4,9 +4,9 @@ import {readFileSync} from 'node:fs';
 
 const source = readFileSync(new URL('../app/V21Hub.jsx', import.meta.url), 'utf8');
 
-test('V21 renders temporary-share expiry with the active user locale', () => {
+test('V21 renders temporary-share expiry with the active user locale and Rome timezone', () => {
   assert.match(source, /const\s*\{[^}]*\blocale\b[^}]*\}\s*=\s*useLanguage\(\)/);
-  assert.match(source, /new Date\(s\.expires_at\)\.toLocaleString\(locale\)/);
+  assert.match(source, /new Intl\.DateTimeFormat\(locale,\{dateStyle:'short',timeStyle:'short',timeZone:'Europe\/Rome'\}\)\.format\(new Date\(s\.expires_at\)\)/);
   assert.doesNotMatch(source, /new Date\(s\.expires_at\)\.toLocaleString\(['"]it-IT['"]/);
 });
 
