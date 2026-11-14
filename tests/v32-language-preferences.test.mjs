@@ -33,6 +33,9 @@ test('Accept-Language honors quality, exclusions and stable tie ordering', () =>
  assert.equal(acceptedLanguage('fr;q=1.001,en;q=0.9'),'en');
  assert.equal(acceptedLanguage('es;q=0.123,fr;q=0.122'),'es');
  assert.equal(acceptedLanguage('de;q=1.000,en;q=0.9'),'de');
+ assert.equal(acceptedLanguage('en;q=0.9;q=0,fr;q=0.8'),'fr');
+ assert.equal(acceptedLanguage('de;Q=0;q=1,es;q=0.5'),'es');
+ assert.equal(acceptedLanguage('pt;q=0.5;Q=0.6,en;q=0.4'),'en');
  assert.equal(acceptedLanguage(null),DEFAULT_LANGUAGE);
 });
 
