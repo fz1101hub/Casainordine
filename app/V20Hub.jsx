@@ -15,6 +15,12 @@ import {readRatePlanDocument} from '../lib/document-reader.js';
 import {listDrafts,removeDraft} from '../lib/offline-queue.js';
 import { askConfirm, askText } from './ConfirmDialog';
 const today=todayRome;
+// Avoid showing an Invalid Date string when an external mail provider returns an invalid timestamp.
+function formatV20Timestamp(value,locale,fallback){
+ if(typeof value!=='string'||!value.trim())return fallback;
+ const timestamp=new Date(value);
+ return Number.isNaN(timestamp.getTime())?fallback:timestamp.toLocaleString(locale,{timeZone:'Europe/Rome'});
+}
 function Field({label,children}){return <label className="extra-field">{label}{children}</label>}
 function Item({children,action}){return <div className="extra-item"><div>{children}</div>{action}</div>}
 const key=()=>crypto.randomUUID();
@@ -115,7 +121,7 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
  {!missing.length&&<p className="muted">{ui.noMissingBills}</p>}
  </section><section className="panel extra-panel"><h2><RefreshCw size={19}/> {ui.mailConnections}</h2><p>{ui.mailHealthDescription}</p>
  <label className="extra-toggle"><input type="checkbox" checked={rows.preferences?.push_monitor!==false} onChange={async e=>{const {error}=await client.from('user_alert_preferences').upsert({user_id:user.id,push_monitor:e.target.checked},{onConflict:'user_id'});if(error)onNotify(v20SafeError(language,error));else{onNotify(ui.pushMonitorSaved);await load()}}}/> {ui.pushMonitorLabel}</label>
- {rows.connections.map(c=>{const h=mailHealth(c);return <Item key={c.id}><b>{c.email_address}</b><small>{c.provider} · {ui.lastChecked}{c.last_sync_at?new Date(c.last_sync_at).toLocaleString(locale,{timeZone:'Europe/Rome'}):ui.never}</small><small style={{color:h.level==='ok'?'#167d64':'#a34526'}}>{v20MailHealthLabel(c,language)}</small></Item>})}
+ {rows.connections.map(c=>{const h=mailHealth(c);return <Item key={c.id}><b>{c.email_address}</b><small>{c.provider} · {ui.lastChecked}{formatV20Timestamp(c.last_sync_at,locale,ui.never)}</small><small style={{color:h.level==='ok'?'#167d64':'#a34526'}}>{v20MailHealthLabel(c,language)}</small></Item>})}
  {!rows.connections.length&&<p className="muted">{ui.noMailConnections}</p>}
  </section><section className="panel extra-panel"><h2>{ui.automaticAlerts}</h2>{rows.alerts.filter(a=>['missing_bill','mail_sync','fraud'].includes(a.kind)).map(a=><Item key={a.id} action={a.read_at?null:<button className="btn btn-soft" onClick={async()=>{const {error}=await client.from('user_alerts').update({read_at:new Date().toISOString()}).eq('id',a.id).eq('user_id',user.id);if(error)onNotify(v20SafeError(language,error));else await load()}}>{ui.markRead}</button>}><b>{a.title}</b><small>{a.body}{a.read_at?' · '+ui.read:''}</small></Item>)}{!rows.alerts.some(a=>['missing_bill','mail_sync','fraud'].includes(a.kind))&&<p className="muted">{ui.noAlerts}</p>}</section></div></>}
  {tab==='fraud'&&<><header className="page-heading"><div><div className="eyebrow">{ui.fraudCheck}</div><h1>{ui.fraudTitle}</h1><p>{ui.fraudDescription}</p></div></header>
