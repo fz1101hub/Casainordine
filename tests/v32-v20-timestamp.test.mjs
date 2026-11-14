@@ -26,3 +26,11 @@ test('V20 history, trash and offline dates reject malformed values', () => {
     assert.equal(formatV20Date(iso, locale), new Date(iso).toLocaleDateString(locale, {timeZone: 'Europe/Rome'}));
   }
 });
+
+test('V20 rejects impossible ISO calendar dates without normalizing them', () => {
+  for (const value of ['2026-02-30', '2025-02-29T08:00:00Z', '2026-13-01', '2026-04-31T09:00:00+02:00', '2026-00-10']) {
+    assert.equal(formatV20Timestamp(value, 'it-IT', 'Mai'), 'Mai');
+    assert.equal(formatV20Date(value, 'en-GB'), '—');
+  }
+  assert.notEqual(formatV20Date('2024-02-29', 'it-IT'), '—');
+});
