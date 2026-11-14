@@ -61,7 +61,14 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   setRows(next);setLoading(false);
  },[client,homeId,user?.id,language]);
  useEffect(()=>{load();},[load]);
-  useEffect(()=>{if(tab==='offline'){listDrafts(user?.id).then(setDrafts).catch(e=>setOfflineError(v20SafeError(language)));}},[tab,user?.id]);
+  useEffect(()=>{
+  let active=true;
+  setDrafts([]);setOfflineError('');
+  if(tab==='offline'&&user?.id){
+   listDrafts(user.id).then(items=>{if(active)setDrafts(items)}).catch(()=>{if(active)setOfflineError(v20SafeError(language))});
+  }
+  return ()=>{active=false};
+ },[tab,user?.id,language]);
  const common={user_id:user?.id,home_id:homeId||null};
  async function save(table,content,message,options={}){if(!client||!canWrite)return onNotify(ui.editPermissionRequired);setWorking(true);try{
   const {data,error}=await client.from(table).insert({...common,...content}).select('*').single();if(error)throw error;onNotify(message);await load();if(options.parent)onRefresh();return data;
