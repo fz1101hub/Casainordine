@@ -2,6 +2,7 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {AlertTriangle,Check,Download,History,House,MailWarning,Plus,ShieldAlert,Trash2,WifiOff,RefreshCw,Wallet,ScanLine,Car,FileText} from 'lucide-react';
 import {todayRome} from '../lib/dates.mjs';
+import {formatV20Timestamp} from '../lib/v20-timestamp.mjs';
 import {useLanguage} from './LanguageProvider';
 import {v20UiCopy} from '../lib/v20-ui-copy.mjs';
 import {localizedMoveChecklist} from '../lib/v20-move-i18n.mjs';
@@ -15,12 +16,6 @@ import {readRatePlanDocument} from '../lib/document-reader.js';
 import {listDrafts,removeDraft} from '../lib/offline-queue.js';
 import { askConfirm, askText } from './ConfirmDialog';
 const today=todayRome;
-// Avoid showing an Invalid Date string when an external mail provider returns an invalid timestamp.
-function formatV20Timestamp(value,locale,fallback){
- if(typeof value!=='string'||!value.trim())return fallback;
- const timestamp=new Date(value);
- return Number.isNaN(timestamp.getTime())?fallback:timestamp.toLocaleString(locale,{timeZone:'Europe/Rome'});
-}
 function Field({label,children}){return <label className="extra-field">{label}{children}</label>}
 function Item({children,action}){return <div className="extra-item"><div>{children}</div>{action}</div>}
 const key=()=>crypto.randomUUID();
