@@ -5,7 +5,9 @@ import {readFileSync} from 'node:fs';
 const source=readFileSync(new URL('../app/V20Hub.jsx',import.meta.url),'utf8');
 
 test('V20 mail synchronization timestamps use profile locale and Rome timezone',()=>{
- assert.match(source,/new Date\(c\.last_sync_at\)\.toLocaleString\(locale,\{timeZone:'Europe\/Rome'\}\)/);
+ assert.match(source,/formatV20Timestamp\(c\.last_sync_at,locale,ui\.never\)/);
+ assert.match(source,/Number\.isNaN\(timestamp\.getTime\(\)\)\?fallback/);
+ assert.match(source,/timestamp\.toLocaleString\(locale,\{timeZone:'Europe\/Rome'\}\)/);
  assert.doesNotMatch(source,/new Date\(c\.last_sync_at\)\.toLocaleString\('it-IT'/);
 });
 
