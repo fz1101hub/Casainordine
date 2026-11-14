@@ -10,7 +10,9 @@ test('language normalization supports six languages and regional variants', () =
   assert.equal(browserLanguage(locale.replace('-','_')),code);
   assert.equal(localeFor(code),locale);
  }
- for (const value of [null,'','xx','<script>','unknown']) {
+ assert.equal(normalizeLanguage('EN_gb'),'en');
+ assert.equal(normalizeLanguage('pt_PT'),'pt');
+ for (const value of [null,'','xx','<script>','unknown','en-@@','de--DE','fr-123456789','pt-','es<script>']) {
   assert.equal(normalizeLanguage(value),DEFAULT_LANGUAGE);
   assert.equal(browserLanguage(value),DEFAULT_LANGUAGE);
  }
