@@ -57,4 +57,7 @@ test('interpolation uses only explicitly provided translation parameters', () =>
  assert.equal(interpolate('Hello {name}',inherited),'Hello {name}');
  assert.equal(interpolate('{name}',{name:0}),'0');
  assert.equal(interpolate('{name}',{name:null}),'null');
+ assert.equal(interpolate('Hello {name}',null),'Hello {name}');
+ assert.equal(interpolate('Hello {name}',false),'Hello {name}');
+ assert.equal(interpolate('Hello {name}',0),'Hello {name}');
 });
