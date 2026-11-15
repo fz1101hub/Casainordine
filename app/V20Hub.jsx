@@ -37,6 +37,7 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
  const [riskPreview,setRiskPreview]=useState(null),[drafts,setDrafts]=useState([]),[offlineError,setOfflineError]=useState('');
  const scope=(q)=>homeId?q.eq('home_id',homeId):q.is('home_id',null);
  const loadSeq=useRef(0);
+ const draftSeq=useRef(0);
  const load=useCallback(async()=>{
   const seq=++loadSeq.current;
   if(!client){setLoading(false);return;}setLoading(true);
@@ -62,12 +63,12 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
  },[client,homeId,user?.id,language]);
  useEffect(()=>{load();},[load]);
   useEffect(()=>{
-  let active=true;
+  const seq=++draftSeq.current;
   setDrafts([]);setOfflineError('');
   if(tab==='offline'&&user?.id){
-   listDrafts(user.id).then(items=>{if(active)setDrafts(items)}).catch(()=>{if(active)setOfflineError(v20SafeError(language))});
+   listDrafts(user.id).then(items=>{if(seq===draftSeq.current)setDrafts(items)}).catch(()=>{if(seq===draftSeq.current)setOfflineError(v20SafeError(language))});
   }
-  return ()=>{active=false};
+  return ()=>{draftSeq.current++};
  },[tab,user?.id,language]);
  const common={user_id:user?.id,home_id:homeId||null};
  async function save(table,content,message,options={}){if(!client||!canWrite)return onNotify(ui.editPermissionRequired);setWorking(true);try{
@@ -107,7 +108,7 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   setWorking(true);try{const {error}=await client.rpc('v20_register_pagopa',{p_home_id:homeId||null,p_notice_code:code,p_creditor_code:notice.creditor_code||null,p_creditor_name:notice.creditor_name,p_amount:notice.amount===''?null:Number(notice.amount),p_due_on:notice.due_on||null,p_create_bill:createBill});if(error)throw error;
    onNotify(createBill?ui.noticeAndReminderSaved:ui.noticeSaved);setNotice({notice_code:'',creditor_code:'',creditor_name:'',amount:'',due_on:''});setRawNotice('');await load();onRefresh();}
    catch(e){onNotify(v20SafeError(language,e))}finally{setWorking(false)}}
-  async function refreshDrafts(){try{setDrafts(await listDrafts(user?.id));setOfflineError('')}catch(e){setOfflineError(v20SafeError(language))}}
+  async function refreshDrafts(){if(tab!=='offline'||!user?.id)return;const seq=++draftSeq.current;const accountId=user.id;try{const items=await listDrafts(accountId);if(seq!==draftSeq.current)return;setDrafts(items);setOfflineError('')}catch(e){if(seq===draftSeq.current)setOfflineError(v20SafeError(language))}}
  async function importDraft(d){if(!client||!user)return onNotify(ui.signInToImport);if(d.type==='document')return;
   if(d.type==='shopping'&&(!homeId||!canWrite))return onNotify(ui.selectWritableHome);
   if(d.type==='shopping'&&!(await askConfirm(ui.confirmAddShopping)))return;
