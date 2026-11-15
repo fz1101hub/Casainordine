@@ -28,7 +28,7 @@ for (const locale of locales) {
     });
   }
   test(`V20 invalid date inputs do not reach UI: ${locale}`, () => {
-    for (const input of [null, undefined, 42, {}, '2026-00-01', '2026-04-31', '2026-11-15T25:00:00Z', '2026-11-15T12:00:00+25:00']) {
+    for (const input of [null, undefined, 42, {}, '2026-00-01', '2026-04-31', '2026-11-15T25:00:00Z', '2026-11-15T12:00:00+25:00', '2026-11-15T24:00:00Z', '2026-11-15T12:60:00Z', '2026-11-15T12:00:60Z', '2026-11-15T12:00:00+02:60']) {
       assert.equal(formatV20Timestamp(input, locale, 'not available'), 'not available');
     }
   });
