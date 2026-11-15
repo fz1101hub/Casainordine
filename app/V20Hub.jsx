@@ -38,6 +38,8 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
  const scope=(q)=>homeId?q.eq('home_id',homeId):q.is('home_id',null);
  const loadSeq=useRef(0);
  const draftSeq=useRef(0);
+ const activeAccount=useRef(user?.id);
+ activeAccount.current=user?.id;
  const load=useCallback(async()=>{
   const seq=++loadSeq.current;
   if(!client){setLoading(false);return;}setLoading(true);
@@ -110,11 +112,17 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
    catch(e){onNotify(v20SafeError(language,e))}finally{setWorking(false)}}
   async function refreshDrafts(){if(tab!=='offline'||!user?.id)return;const seq=++draftSeq.current;const accountId=user.id;try{const items=await listDrafts(accountId);if(seq!==draftSeq.current)return;setDrafts(items);setOfflineError('')}catch(e){if(seq===draftSeq.current)setOfflineError(v20SafeError(language))}}
  async function importDraft(d){if(!client||!user)return onNotify(ui.signInToImport);if(d.type==='document')return;
+  const accountId=user.id;
   if(d.type==='shopping'&&(!homeId||!canWrite))return onNotify(ui.selectWritableHome);
   if(d.type==='shopping'&&!(await askConfirm(ui.confirmAddShopping)))return;
+  if(activeAccount.current!==accountId)return;
   setWorking(true);try{const {error}=d.type==='shopping'?await client.rpc('v20_apply_offline_shopping',{p_client_id:d.id,p_title:d.title,p_home_id:homeId}):await client.rpc('v20_apply_offline_task',{p_client_id:d.id,title_text:d.title,due_on:d.date||null});if(error)throw error;
-   await removeDraft(d.id);await refreshDrafts();onRefresh();onNotify(d.type==='shopping'?ui.shoppingAdded:ui.taskSynced);
-  }catch(e){onNotify(ui.syncFailed+v20SafeError(language,e))}finally{setWorking(false)}}
+   // An account switch during the RPC must not remove or display another account's draft.
+   if(activeAccount.current!==accountId)return;
+   await removeDraft(d.id);if(activeAccount.current!==accountId)return;
+   await refreshDrafts();if(activeAccount.current!==accountId)return;
+   onRefresh();onNotify(d.type==='shopping'?ui.shoppingAdded:ui.taskSynced);
+  }catch(e){if(activeAccount.current===accountId)onNotify(ui.syncFailed+v20SafeError(language,e))}finally{setWorking(false)}}
  function downloadDraft(d){const url=URL.createObjectURL(d.file);const a=document.createElement('a');a.href=url;a.download=d.title||ui.documentLabel;a.click();setTimeout(()=>URL.revokeObjectURL(url),6000)}
  if(demo)return <section className="panel extra-panel"><h2>{ui.v20Name}</h2><p>{ui.demoSetupNotice}</p></section>;
  return <div className="extra-hub v20-hub">
