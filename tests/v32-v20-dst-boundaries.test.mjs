@@ -102,3 +102,21 @@ for (const locale of locales) {
     }
   });
 }
+
+
+// Date-only provider values represent a calendar date, not a local clock time.
+// Verify deterministic display for all supported locales and invalid locale fallback.
+for (const locale of locales) {
+  test(`V20 date-only ISO calendar rendering: ${locale}`, () => {
+    for (const input of ['2024-02-29', '2026-01-01', '2026-12-31']) {
+      const expected = new Date(input).toLocaleDateString(locale, {timeZone: zone});
+      assert.equal(formatV20Date(input, locale), expected, input);
+      assert.equal(formatV20Timestamp(input, locale, 'unavailable', true), expected, input);
+    }
+  });
+}
+
+test('V20 invalid locale returns supplied fallback instead of throwing', () => {
+  assert.equal(formatV20Timestamp('2026-11-15T12:30:00Z', 'not_a_locale!', 'unavailable'), 'unavailable');
+  assert.equal(formatV20Date('2026-11-15', 'not_a_locale!', 'unavailable'), 'unavailable');
+});
