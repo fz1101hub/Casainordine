@@ -34,6 +34,7 @@ for (const locale of locales) {
   });
 }
 
+for (const locale of locales) {
   test(`V20 ISO calendar and timezone validation: ${locale}`, () => {
     const fallback = 'date unavailable';
     for (const invalid of [
@@ -52,3 +53,5 @@ for (const locale of locales) {
       assert.notEqual(formatV20Timestamp(valid, locale, fallback), fallback, valid);
     }
   });
+
+}
