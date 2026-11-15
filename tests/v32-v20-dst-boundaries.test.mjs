@@ -33,3 +33,22 @@ for (const locale of locales) {
     }
   });
 }
+
+  test(`V20 ISO calendar and timezone validation: ${locale}`, () => {
+    const fallback = 'date unavailable';
+    for (const invalid of [
+      '2026-02-29', '1900-02-29', '2026-06-31', '0000-01-01',
+      '2026-11-15T12:00:00+24:00', '2026-11-15T12:00:00-02:60',
+      '2026-11-15T12:00:00.1234567890Z',
+      '15/11/2026', '11/15/2026', '2026-11-15T12:00:00Z extra',
+    ]) {
+      assert.equal(formatV20Timestamp(invalid, locale, fallback), fallback, invalid);
+      assert.equal(formatV20Date(invalid, locale, fallback), fallback, invalid);
+    }
+    for (const valid of [
+      '2024-02-29', '2000-02-29', '2026-11-15T23:59:59Z',
+      '2026-11-15T12:00:00.123456789Z', '2026-11-15T12:00:00+01:00',
+    ]) {
+      assert.notEqual(formatV20Timestamp(valid, locale, fallback), fallback, valid);
+    }
+  });
