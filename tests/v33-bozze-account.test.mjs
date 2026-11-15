@@ -28,6 +28,9 @@ test('Bozze offline: la copia per la pagina offline è identica e la cache del s
   assert.match(source('lib/offline-queue.js'),/owner:deviceAccountId\(\)/);
   assert.match(source('public/sw.js'),/const CACHE='casa-shell-v41';/);
   const hub=source('app/V20Hub.jsx');
-  assert.equal((hub.match(/listDrafts\(user\?\.id\)/g)||[]).length,2);
+  assert.match(hub,/listDrafts\(user\.id\)/,'il caricamento iniziale usa l’identità corrente');
+  assert.match(hub,/listDrafts\(accountId\)/,'l’aggiornamento usa l’identità catturata');
+  assert.match(hub,/const seq=\+\+draftSeq\.current/,'ogni richiesta incrementa la sequenza');
+  assert.match(hub,/if\(seq!==draftSeq\.current\)return/,'le risposte obsolete sono ignorate');
   assert.doesNotMatch(hub,/listDrafts\(\)/);
 });
