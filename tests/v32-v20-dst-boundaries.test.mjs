@@ -57,3 +57,20 @@ for (const locale of locales) {
   });
 
 }
+
+// Equivalent ISO instants must render identically regardless of provider offset.
+// This guards against accidentally treating an explicit offset as local wall time.
+for (const locale of locales) {
+  test(`V20 equivalent instants across provider offsets: ${locale}`, () => {
+    const variants = [
+      '2026-03-29T01:30:00Z',
+      '2026-03-29T03:30:00+02:00',
+      '2026-03-28T20:30:00-05:00',
+    ];
+    const expected = new Date(variants[0]);
+    for (const input of variants) {
+      assert.equal(formatV20Timestamp(input, locale), expected.toLocaleString(locale, {timeZone: zone}), input);
+      assert.equal(formatV20Date(input, locale), expected.toLocaleDateString(locale, {timeZone: zone}), input);
+    }
+  });
+}
