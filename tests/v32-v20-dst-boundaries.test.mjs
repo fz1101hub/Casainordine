@@ -74,3 +74,20 @@ for (const locale of locales) {
     }
   });
 }
+
+
+// The repeated Rome wall-clock hour at autumn DST transition represents two
+// distinct instants. Verify both with Intl rather than assuming a fixed offset.
+for (const locale of locales) {
+  test(`V20 autumn DST repeated hour preserves both instants: ${locale}`, () => {
+    const earlier = '2026-10-25T00:30:00Z';
+    const later = '2026-10-25T01:30:00Z';
+    for (const instant of [earlier, later]) {
+      const expected = new Date(instant);
+      assert.equal(formatV20Timestamp(instant, locale), expected.toLocaleString(locale, {timeZone: zone}));
+      assert.equal(formatV20Date(instant, locale), expected.toLocaleDateString(locale, {timeZone: zone}));
+    }
+    // Both dates are the same even though their UTC instants differ.
+    assert.equal(formatV20Date(earlier, locale), formatV20Date(later, locale));
+  });
+}
