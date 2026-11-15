@@ -91,3 +91,14 @@ for (const locale of locales) {
     assert.equal(formatV20Date(earlier, locale), formatV20Date(later, locale));
   });
 }
+
+// Accepted ISO separators must behave consistently across browser and Node engines.
+for (const locale of locales) {
+  test(`V20 lowercase and space ISO separators: ${locale}`, () => {
+    const canonical = '2026-11-15T12:30:00Z';
+    for (const variant of ['2026-11-15t12:30:00z', '2026-11-15 12:30:00Z', '2026-11-15T12:30:00z']) {
+      assert.equal(formatV20Timestamp(variant, locale), formatV20Timestamp(canonical, locale));
+      assert.equal(formatV20Date(variant, locale), formatV20Date(canonical, locale));
+    }
+  });
+}
