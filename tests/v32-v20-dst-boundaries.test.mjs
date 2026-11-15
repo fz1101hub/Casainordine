@@ -120,3 +120,23 @@ test('V20 invalid locale returns supplied fallback instead of throwing', () => {
   assert.equal(formatV20Timestamp('2026-11-15T12:30:00Z', 'not_a_locale!', 'unavailable'), 'unavailable');
   assert.equal(formatV20Date('2026-11-15', 'not_a_locale!', 'unavailable'), 'unavailable');
 });
+
+// Provider offsets can move an instant across a calendar-day or year boundary
+// in Rome. Both full timestamp and date-only views must use the same instant.
+for (const locale of locales) {
+  test(`V20 provider offsets across Rome calendar boundaries: ${locale}`, () => {
+    const cases = [
+      ['2026-12-31T23:30:00Z', '2027-01-01T00:30:00+01:00'],
+      ['2026-01-01T00:30:00+14:00', '2025-12-31T10:30:00Z'],
+      ['2026-03-29T01:30:00Z', '2026-03-29T03:30:00+02:00'],
+    ];
+    for (const [source, equivalent] of cases) {
+      const instant = new Date(source);
+      assert.equal(instant.getTime(), new Date(equivalent).getTime());
+      for (const input of [source, equivalent]) {
+        assert.equal(formatV20Timestamp(input, locale), instant.toLocaleString(locale, {timeZone: zone}), input);
+        assert.equal(formatV20Date(input, locale), instant.toLocaleDateString(locale, {timeZone: zone}), input);
+      }
+    }
+  });
+}
