@@ -8,7 +8,26 @@ export default function CalendarFeed({client,onNotify}){
  const {t,language}=useLanguage();
  const [active,setActive]=useState(false),[url,setUrl]=useState(''),[busy,setBusy]=useState(false);
  async function request(method){const {data:{session}}=await client.auth.getSession();const res=await fetch('/api/calendar/feed',{method,headers:{Authorization:`Bearer ${session?.access_token||''}`}});const body=await res.json().catch(()=>({}));if(!res.ok)throw new Error(body.error?localizeSettingsApiError(body.error,language):t('calendar.configError'));return body;}
- useEffect(()=>{request('GET').then(v=>setActive(v.active)).catch(()=>{});},[client]);
+ useEffect(()=>{
+  let current=true;
+  let generation=0;
+  async function refresh(){
+   const ticket=++generation;
+   setActive(false);
+   setUrl('');
+   try {
+    const result=await request('GET');
+    if(current&&ticket===generation)setActive(Boolean(result.active));
+   } catch {
+    if(current&&ticket===generation)setActive(false);
+   }
+  }
+  refresh();
+  const {data:{subscription}}=client.auth.onAuthStateChange((event)=>{
+   if(event==='SIGNED_IN'||event==='SIGNED_OUT'||event==='USER_UPDATED')refresh();
+  });
+  return ()=>{current=false;generation++;subscription?.unsubscribe();};
+ },[client]);
  async function doAction(method){setBusy(true);try{if(method==='DELETE'&&!(await askConfirm(t('calendar.revokeConfirm'),{danger:true})))return;
   const data=await request(method);setActive(method==='POST');setUrl(data.url||'');onNotify(t(method==='POST'?'calendar.created':'calendar.revoked'));
  }catch(e){onNotify(e.message);}finally{setBusy(false);}}
