@@ -8,7 +8,7 @@ export default function CalendarFeed({client,onNotify}){
  const {t,language}=useLanguage();
  const [active,setActive]=useState(false),[url,setUrl]=useState(''),[busy,setBusy]=useState(false);
  const authGeneration=useRef(0);
- async function request(method,authTicket){const {data:{session}}=await client.auth.getSession();if(authTicket!==authGeneration.current)throw new Error('Stale calendar session');const res=await fetch('/api/calendar/feed',{method,headers:{Authorization:`Bearer ${session?.access_token||''}`}});const body=await res.json().catch(()=>({}));if(!res.ok)throw new Error(body.error?localizeSettingsApiError(body.error,language):t('calendar.configError'));return body;}
+ async function request(method,authTicket){const {data:{session}}=await client.auth.getSession();if(authTicket!==authGeneration.current)throw new Error('Stale calendar session');if(!session?.access_token)throw new Error(t('calendar.configError'));const res=await fetch('/api/calendar/feed',{method,headers:{Authorization:`Bearer ${session.access_token}`}});const body=await res.json().catch(()=>({}));if(!res.ok)throw new Error(body.error?localizeSettingsApiError(body.error,language):t('calendar.configError'));return body;}
  useEffect(()=>{
   let current=true;
   let generation=0;
