@@ -42,7 +42,8 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
  activeAccount.current=user?.id;
  const load=useCallback(async()=>{
   const seq=++loadSeq.current;
-  if(!client){setLoading(false);return;}setLoading(true);
+  const accountId=user?.id;
+  if(!client||!accountId){setLoading(false);return;}setLoading(true);
   const specs=[['goals','home_savings_goals'],['moves','home_move_plans'],['steps','home_move_steps'],['notices','pagopa_notices'],['risk','bill_security_reviews'],['audit','home_audit_log'],['recycle','home_recycle_bin']];
   const res=await Promise.all([...specs.map(([k,t])=>scope(client.from(t).select('*')).order(k==='audit'?'created_at':k==='recycle'?'deleted_at':'created_at',{ascending:false}).limit(k==='audit'?200:400)),
     client.from('user_alerts').select('*').eq('user_id',user.id).in('kind',['missing_bill','mail_sync','fraud','move','savings']).order('created_at',{ascending:false}).limit(100),
@@ -56,7 +57,7 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
     homeId?client.from('home_former_members').select('user_id,display_name').eq('home_id',homeId).then(r=>r.error?{data:[],error:null}:r):Promise.resolve({data:[],error:null})
   ]);
   // Cambiando casa in fretta può arrivare per ultima la risposta della casa precedente: si scarta.
-  if(seq!==loadSeq.current)return;
+  if(seq!==loadSeq.current||activeAccount.current!==accountId)return;
   const error=res.find(r=>r.error);if(error)onNotify(ui.migrationRequired+v20SafeError(language,error.error));
   const next={};for(let i=0;i<specs.length;i++)next[specs[i][0]]=res[i].data||[];
   next.alerts=res[specs.length].data||[];next.connections=res[specs.length+1].data||[];next.preferences=res[specs.length+2].data||null;
