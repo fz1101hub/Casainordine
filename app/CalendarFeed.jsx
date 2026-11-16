@@ -24,7 +24,7 @@ export default function CalendarFeed({client,onNotify}){
   }
   refresh();
   const {data:{subscription}}=client.auth.onAuthStateChange((event)=>{
-   if(event==='SIGNED_IN'||event==='SIGNED_OUT'||event==='USER_UPDATED')refresh();
+   if(event==='SIGNED_IN'||event==='SIGNED_OUT'||event==='USER_UPDATED')Promise.resolve().then(()=>{if(current)refresh();});
   });
   return ()=>{current=false;generation++;subscription?.unsubscribe();};
  },[client]);
