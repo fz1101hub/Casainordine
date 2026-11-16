@@ -48,7 +48,7 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   const res=await Promise.all([...specs.map(([k,t])=>scope(client.from(t).select('*')).order(k==='audit'?'created_at':k==='recycle'?'deleted_at':'created_at',{ascending:false}).limit(k==='audit'?200:400)),
     client.from('user_alerts').select('*').eq('user_id',user.id).in('kind',['missing_bill','mail_sync','fraud','move','savings']).order('created_at',{ascending:false}).limit(100),
     // mail_connections contiene credenziali cifrate e non è leggibile dal browser: si passa dall'API.
-    client.auth.getSession().then(({data:{session}})=>session?.access_token?fetch('/api/mail/connections',{headers:{Authorization:`Bearer ${session.access_token}`}}):{ok:false,status:401,json:async()=>({})})
+    client.auth.getSession().then(({data:{session}})=>session?.user?.id===accountId&&session?.access_token?fetch('/api/mail/connections',{headers:{Authorization:`Bearer ${session.access_token}`}}):{ok:false,status:401,json:async()=>({})})
       .then(async r=>{const body=await r.json().catch(()=>({}));return r.ok?{data:body.connections||[],error:null}:{data:[],error:{status:r.status}};})
       .catch(e=>({data:[],error:{message:e.message}})),
     client.from('user_alert_preferences').select('user_id,push_monitor').eq('user_id',user.id).maybeSingle(),
