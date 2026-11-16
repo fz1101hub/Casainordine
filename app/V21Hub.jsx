@@ -89,6 +89,7 @@ export default function V21Hub({client,user,homeId,homeName='',canWrite,demo,bil
   const errors=results.filter(r=>r.error);
   const decisionIds=newRows.decisions.map(x=>x.id),planIds=newRows.vacations.map(x=>x.id);
   if(decisionIds.length){const v=await Promise.resolve(client.from('home_decision_votes').select('decision_id,user_id,choice,created_at').in('decision_id',decisionIds.slice(0,500)).limit(2000)).catch(()=>({data:[],error:true}));newRows.votes=v.data||[];if(v.error)errors.push(v);}
+  if(seq!==loadSeq.current)return;
   if(planIds.length){const s=await Promise.resolve(client.from('home_vacation_shares').select('id,plan_id,expires_at,revoked_at,created_at').in('plan_id',planIds.slice(0,500)).order('created_at',{ascending:false}).limit(100)).catch(()=>({data:[],error:true}));newRows.shares=s.data||[];if(s.error)errors.push(s);}
   // Cambiando casa in fretta può arrivare per ultima la risposta della casa precedente: si scarta.
   if(seq!==loadSeq.current)return;
