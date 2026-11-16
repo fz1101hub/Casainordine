@@ -140,3 +140,22 @@ for (const locale of locales) {
     }
   });
 }
+
+
+// Fractional-hour provider offsets are valid ISO 8601 instants. They must not
+// be mistaken for malformed offsets or interpreted in the runner timezone.
+for (const locale of locales) {
+  test(`V20 fractional-hour provider offsets: ${locale}`, () => {
+    const variants = [
+      '2026-11-15T12:00:00Z',
+      '2026-11-15T17:45:00+05:45',
+      '2026-11-15T08:30:00-03:30',
+      '2026-11-16T02:00:00+14:00',
+    ];
+    const expected = new Date(variants[0]);
+    for (const input of variants) {
+      assert.equal(formatV20Timestamp(input, locale), expected.toLocaleString(locale, {timeZone: zone}), input);
+      assert.equal(formatV20Date(input, locale), expected.toLocaleDateString(locale, {timeZone: zone}), input);
+    }
+  });
+}
