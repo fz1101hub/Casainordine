@@ -43,7 +43,7 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
  const load=useCallback(async()=>{
   const seq=++loadSeq.current;
   const accountId=user?.id;
-  if(!client||!accountId){setLoading(false);return;}setLoading(true);
+  if(!client||!accountId){setRows({goals:[],moves:[],steps:[],notices:[],risk:[],audit:[],recycle:[],alerts:[],connections:[],preferences:null,people:[],former:[]});setLoading(false);return;}setLoading(true);
   const specs=[['goals','home_savings_goals'],['moves','home_move_plans'],['steps','home_move_steps'],['notices','pagopa_notices'],['risk','bill_security_reviews'],['audit','home_audit_log'],['recycle','home_recycle_bin']];
   const res=await Promise.all([...specs.map(([k,t])=>scope(client.from(t).select('*')).order(k==='audit'?'created_at':k==='recycle'?'deleted_at':'created_at',{ascending:false}).limit(k==='audit'?200:400)),
     client.from('user_alerts').select('*').eq('user_id',user.id).in('kind',['missing_bill','mail_sync','fraud','move','savings']).order('created_at',{ascending:false}).limit(100),
