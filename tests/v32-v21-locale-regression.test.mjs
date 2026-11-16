@@ -25,3 +25,10 @@ test('V21 clears prior account/home rows before asynchronous reload',()=>{
  assert.match(source,/if\(!client\|\|!user\?\.id\)\{setRows\(\{\.\.\.initial\}\);setLoading\(false\);return;\}setRows\(\{\.\.\.initial\}\);setLoading\(true\);/);
  assert.match(source,/if\(seq!==loadSeq\.current\)return;/);
 });
+
+test('V21 discards stale loads before fetching votes and vacation shares',()=>{
+ const guard=source.indexOf('if(seq!==loadSeq.current)return;',source.indexOf('const results=await Promise.all'));
+ const votes=source.indexOf("client.from('home_decision_votes')");
+ const shares=source.indexOf("client.from('home_vacation_shares')");
+ assert.ok(guard>0&&votes>guard&&shares>guard,'stale guard must precede dependent queries');
+});
