@@ -19,3 +19,9 @@ test('V21 export filenames support six languages without leaking user titles',()
  assert.match(source,/validExportDate\(date\)/);
  assert.match(source,/JSON\.stringify\(object,null,2\)/);
 });
+
+
+test('V21 clears prior account/home rows before asynchronous reload',()=>{
+ assert.match(source,/if\(!client\|\|!user\?\.id\)\{setRows\(\{\.\.\.initial\}\);setLoading\(false\);return;\}setRows\(\{\.\.\.initial\}\);setLoading\(true\);/);
+ assert.match(source,/if\(seq!==loadSeq\.current\)return;/);
+});
