@@ -14,3 +14,9 @@ test('calendar feed never sends an empty bearer token', () => {
   assert.match(source, /Authorization:`Bearer \$\{session\.access_token\}`/);
   assert.doesNotMatch(source, /session\?\.access_token\|\|''/);
 });
+
+test('calendar clipboard callbacks do not notify a different authenticated session', () => {
+  assert.match(source, /const ticket=authGeneration\.current;const secret=url/);
+  assert.match(source, /clipboard\.writeText\(secret\)\.then\(\(\)=>\{if\(ticket===authGeneration\.current\)onNotify/);
+  assert.match(source, /\.catch\(\(\)=>\{if\(ticket===authGeneration\.current\)onNotify\(t\('calendar\.copyFailed'\)\)/);
+});
