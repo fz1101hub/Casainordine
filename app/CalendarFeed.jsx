@@ -12,14 +12,14 @@ export default function CalendarFeed({client,onNotify}){
  useEffect(()=>{
   let current=true;
   let generation=0;
-  const mountedGeneration=authGeneration.current;
   async function refresh(){
    const ticket=++generation;
+   const authTicket=authGeneration.current;
    setActive(false);
    setUrl('');
    try {
     const result=await request('GET');
-    if(current&&ticket===generation&&authGeneration.current===mountedGeneration)setActive(Boolean(result.active));
+    if(current&&ticket===generation&&authGeneration.current===authTicket)setActive(Boolean(result.active));
    } catch {
     if(current&&ticket===generation)setActive(false);
    }
