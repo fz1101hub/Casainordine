@@ -8,7 +8,9 @@ test('Cambio casa: ogni caricamento scarta le risposte superate',()=>{
     const s=source(path);
     assert.match(s,/const loadSeq=useRef\(0\);/,path);
     assert.match(s,/const seq=\+\+loadSeq\.current;/,path);
-    const guard=s.indexOf('if(seq!==loadSeq.current)return;');
+    const guard=path==='app/V20Hub.jsx'
+      ? s.indexOf('if(seq!==loadSeq.current||activeAccount.current!==accountId)return;')
+      : s.indexOf('if(seq!==loadSeq.current)return;');
     assert.ok(guard>0&&guard<s.indexOf(setter),path+': controllo prima di usare la risposta');
   }
   const page=source('app/page.jsx');
