@@ -33,3 +33,13 @@ test('Spese condivise: solo le quote delle spese della casa aperta',()=>{
   assert.match(s,/from\('home_expense_shares'\)\.select\('expense_id,user_id,amount'\)\.in\('expense_id',expenseIds\)/);
   assert.doesNotMatch(s,/from\('home_expense_shares'\)\.select\('expense_id,user_id,amount'\)\.limit\(1000\)/);
 });
+
+test('V20: assenza account svuota i dati in memoria prima di terminare il caricamento',()=>{
+  const s=source('app/V20Hub.jsx');
+  const start=s.indexOf('if(!client||!accountId){');
+  const end=s.indexOf('setLoading(true);',start);
+  assert.ok(start>=0&&end>start,'ramo senza sessione presente');
+  const branch=s.slice(start,end);
+  assert.match(branch,/setRows\(\{goals:\[\],moves:\[\],steps:\[\],notices:\[\],risk:\[\],audit:\[\],recycle:\[\],alerts:\[\],connections:\[\],preferences:null,people:\[\],former:\[\]\}\)/);
+  assert.ok(branch.indexOf('setRows(')<branch.indexOf('setLoading(false)'));
+});
