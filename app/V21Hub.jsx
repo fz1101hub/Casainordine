@@ -83,6 +83,8 @@ export default function V21Hub({client,user,homeId,homeName='',canWrite,demo,bil
   const tables={assets:'maintenance_assets',properties:'home_properties',events:'maintenance_events',docs:'home_documents',contracts:'home_contracts',emergency:'home_emergency_cards',inventory:'home_inventory_items',vacations:'home_vacation_plans',decisions:'home_decisions',refunds:'home_refund_expectations'};
   const keys=Object.keys(tables);
   const results=await Promise.all(keys.map(k=>Promise.resolve(scope(client.from(tables[k]).select('*')).order('created_at',{ascending:false}).limit(500)).catch(()=>({data:[],error:true}))));
+  // Evita letture dipendenti con ID della casa precedente dopo un cambio di contesto.
+  if(seq!==loadSeq.current)return;
   const newRows={...initial};keys.forEach((k,i)=>newRows[k]=results[i].data||[]);
   const errors=results.filter(r=>r.error);
   const decisionIds=newRows.decisions.map(x=>x.id),planIds=newRows.vacations.map(x=>x.id);
