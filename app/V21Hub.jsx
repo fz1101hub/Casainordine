@@ -70,6 +70,9 @@ export default function V21Hub({client,user,homeId,homeName='',canWrite,demo,bil
  const [inventory,setInventory]=useState({name:'',room:'',serial_number:'',estimated_value:'0',property_id:'',document_id:'',asset_id:'',notes:''});
  const [vacation,setVacation]=useState({title:'',starts_on:todayRome(),ends_on:todayRome(),notes:''});
  const [shareText,setShareText]=useState(''),[shareDuration,setShareDuration]=useState(72),[sharePlan,setSharePlan]=useState(''),[shareLink,setShareLink]=useState('');
+ // A temporary sharing URL belongs to the current account and home only.
+ // Never leave it visible after switching context, including logout.
+ useEffect(()=>{setShareLink('');setSharePlan('');setShareText('');},[user?.id,homeId]);
  const [decision,setDecision]=useState({title:'',description:'',proposed_budget:'0',closes_on:''});
  const [refund,setRefund]=useState({label:'',expected_amount:'',expected_on:todayRome(),bill_id:''});
  const [scenario,setScenario]=useState({monthlyBaseline:'500',consumptionShare:'30',consumptionReduction:'15',otherDelta:'0',unexpectedCost:'0',months:'12'});
