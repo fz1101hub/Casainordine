@@ -143,13 +143,17 @@ export default function V21Hub({client,user,homeId,homeName='',canWrite,demo,bil
   if(typeof response==='string'&&shareContextRef.current.userId===shareContext.userId&&shareContextRef.current.homeId===shareContext.homeId){setShareLink(`${location.origin}/vacanza/${response}`);setShareText('');}
  }
  async function openAttachment(id){const document=rows.docs.find(d=>d.id===id);if(!document||!client)return;
+  // A signed URL must not open after the user switches account or home.
+  const attachmentContext={...shareContextRef.current};
+  const stillCurrent=()=>shareContextRef.current.userId===attachmentContext.userId&&shareContextRef.current.homeId===attachmentContext.homeId;
   // Safari su iPhone blocca window.open dopo un'attesa: la scheda si apre subito, nel tocco.
   const popup=window.open('about:blank','_blank');if(popup)popup.opener=null;
   try{
    const {data,error}=await client.storage.from('house-documents').createSignedUrl(document.storage_path,60);
+   if(!stillCurrent()){popup?.close();return;}
    if(error||!data?.signedUrl){popup?.close();return onNotify(briefingCopy.operationFailed);}
    if(popup)popup.location.replace(data.signedUrl);else window.location.assign(data.signedUrl);
-  }catch(_error){popup?.close();onNotify(briefingCopy.operationFailed)}
+  }catch(_error){popup?.close();if(stillCurrent())onNotify(briefingCopy.operationFailed)}
  }
  async function uploadInventoryPhoto(file){
   if(!file||!client||!canWrite||!user)return;
