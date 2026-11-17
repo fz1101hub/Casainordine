@@ -8,4 +8,5 @@ test('V21 temporary vacation share details are cleared on account or home switch
  const effect=/useEffect\(\(\)=>\{setShareLink\(''\);setSharePlan\(''\);setShareText\(''\);\},\[user\?\.id,homeId\]\)/;
  assert.match(source,effect);
  assert.match(source,/\{shareLink&&<div className="extra-alert">/);
+ assert.match(source,/shareContextRef\.current\.userId===shareContext\.userId&&shareContextRef\.current\.homeId===shareContext\.homeId/);
 });
