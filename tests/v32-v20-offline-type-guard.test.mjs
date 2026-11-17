@@ -14,5 +14,6 @@ test('V20 offline import rejects unsupported draft types before selecting an RPC
  assert.ok(guard>=0,'only task and shopping may be imported');
  assert.ok(rpc>guard,'type validation must precede both RPC branches');
  assert.match(body,/if\(d\.type==='shopping'&&\(!homeId\|\|!canWrite\)\)/);
- assert.match(body,/if\(activeAccount\.current!==accountId\)return;/);
+ assert.match(body,/const sameContext=\(\)=>activeAccount\.current===accountId&&activeHome\.current===importHomeId/);
+ assert.match(body,/if\(!sameContext\(\)\)return;/);
 });
