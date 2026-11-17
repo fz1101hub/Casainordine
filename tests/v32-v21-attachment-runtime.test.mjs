@@ -145,3 +145,18 @@ test('missing Supabase client returns without opening a tab',async()=>{
  const h=harness({missingClient:true});await h.openAttachment('doc-a');
  assert.deepEqual(h.events,[]);
 });
+
+
+test('unsafe javascript signed URL is rejected without navigation',async()=>{
+ const h=harness();const operation=h.openAttachment('doc-a');
+ h.resolveSigned({data:{signedUrl:'javascript:alert(1)'},error:null});
+ await operation;
+ assert.deepEqual(h.events,['close',['notify','localized failure']]);
+});
+
+test('insecure HTTP signed URL is rejected with blocked popup',async()=>{
+ const h=harness({popupBlocked:true});const operation=h.openAttachment('doc-a');
+ h.resolveSigned({data:{signedUrl:'http://example.invalid/private'},error:null});
+ await operation;
+ assert.deepEqual(h.events,[['notify','localized failure']]);
+});
