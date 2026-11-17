@@ -65,3 +65,25 @@ test('current Storage rejection gives localized feedback',async()=>{
  await operation;
  assert.deepEqual(h.events,['close',['notify','localized failure']]);
 });
+
+test('Storage error response closes popup and notifies in current context',async()=>{
+ const h=harness();const operation=h.openAttachment('doc-a');
+ h.resolveSigned({data:null,error:{message:'denied'}});
+ await operation;
+ assert.deepEqual(h.events,['close',['notify','localized failure']]);
+});
+
+test('missing signed URL closes popup and notifies in current context',async()=>{
+ const h=harness();const operation=h.openAttachment('doc-a');
+ h.resolveSigned({data:{},error:null});
+ await operation;
+ assert.deepEqual(h.events,['close',['notify','localized failure']]);
+});
+
+test('stale Storage error response never notifies a different home',async()=>{
+ const h=harness();const operation=h.openAttachment('doc-a');
+ h.context.homeId='home-b';
+ h.resolveSigned({data:null,error:{message:'denied'}});
+ await operation;
+ assert.deepEqual(h.events,['close']);
+});
