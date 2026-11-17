@@ -15,6 +15,7 @@ function harness({popupBlocked=false,missingDocument=false,missingClient=false}=
  const context = {userId:'account-a',homeId:'home-a'};
  const popup = {opener:'initial',close(){events.push('close')},location:{replace(url){events.push(['open',url])}}};
  const sandbox = {
+  URL,
   rows:{docs:missingDocument?[]:[{id:'doc-a',storage_path:'account-a/doc.pdf'}]},
   client:{storage:{from(bucket){assert.equal(bucket,'house-documents');return {createSignedUrl(path,seconds){
    assert.equal(path,'account-a/doc.pdf');assert.equal(seconds,60);return pending;
