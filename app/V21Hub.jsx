@@ -97,7 +97,8 @@ export default function V21Hub({client,user,homeId,homeName='',canWrite,demo,bil
   const errorKind=v21LoadErrorKind(errors);
   if(errorKind)onNotify(briefingCopy[errorKind]);
  },[client,homeId,user?.id,language]);
- useEffect(()=>{load()},[load]);
+ // Invalidate in-flight requests on unmount or before a new load effect.
+ useEffect(()=>{load();return ()=>{loadSeq.current+=1;}},[load]);
  // Schede SOS cifrate con la frase della casa (migrate_v40_sos_cifrate.sql).
  const vault=useSosVault({client,user,homeId,demo,cards:rows.emergency});
  const sosLabel=homeId?(homeName||briefingCopy.tabSos):tr('sos.personalSpace');
