@@ -72,6 +72,8 @@ export default function V21Hub({client,user,homeId,homeName='',canWrite,demo,bil
  const [shareText,setShareText]=useState(''),[shareDuration,setShareDuration]=useState(72),[sharePlan,setSharePlan]=useState(''),[shareLink,setShareLink]=useState('');
  // A temporary sharing URL belongs to the current account and home only.
  // Never leave it visible after switching context, including logout.
+ const shareContextRef=useRef({userId:user?.id,homeId});
+ shareContextRef.current={userId:user?.id,homeId};
  useEffect(()=>{setShareLink('');setSharePlan('');setShareText('');},[user?.id,homeId]);
  const [decision,setDecision]=useState({title:'',description:'',proposed_budget:'0',closes_on:''});
  const [refund,setRefund]=useState({label:'',expected_amount:'',expected_on:todayRome(),bill_id:''});
@@ -135,9 +137,10 @@ export default function V21Hub({client,user,homeId,homeName='',canWrite,demo,bil
   saveOfflineCopy(localStorage,user?.id,copy);setPassphrase('');setPassphraseConfirm('');setOfflineSaved(n=>n+1);onNotify(briefingCopy.sosEncrypted)}catch(e){onNotify(briefingCopy.operationFailed)}}
  async function createVacation(e){e.preventDefault();const saved=await add('home_vacation_plans',{...vacation,checklist:VACATION_CHECKLIST.map(title=>({title,done:false}))},briefingCopy.vacationCreated);if(saved)setVacation({title:'',starts_on:todayRome(),ends_on:todayRome(),notes:''});}
  async function createShare(){if(!sharePlan||!shareText.trim())return onNotify(briefingCopy.chooseSharePlan);
+  const shareContext={...shareContextRef.current};
   if(!(await askConfirm(briefingCopy.confirmShareLink)))return;
   const response=await act(()=>client.rpc('v21_create_vacation_share',{plan:sharePlan,text_to_share:shareText,hours_valid:Number(shareDuration)}),briefingCopy.shareLinkCreated);
-  if(typeof response==='string'){setShareLink(`${location.origin}/vacanza/${response}`);setShareText('');}
+  if(typeof response==='string'&&shareContextRef.current.userId===shareContext.userId&&shareContextRef.current.homeId===shareContext.homeId){setShareLink(`${location.origin}/vacanza/${response}`);setShareText('');}
  }
  async function openAttachment(id){const document=rows.docs.find(d=>d.id===id);if(!document||!client)return;
   // Safari su iPhone blocca window.open dopo un'attesa: la scheda si apre subito, nel tocco.
