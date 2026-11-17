@@ -8,7 +8,7 @@ test('V20 clears offline drafts and invalidates stale account-scoped loads',()=>
  assert.match(source,/const draftSeq=useRef\(0\)/);
  assert.match(source,/const seq=\+\+draftSeq\.current;\s*setDrafts\(\[\]\);setOfflineError\(''\)/);
  assert.match(source,/tab==='offline'&&user\?\.id/);
- assert.match(source,/listDrafts\(user\.id\)\.then\(items=>\{if\(seq===draftSeq\.current\)setDrafts\(items\)\}/);
+ assert.match(source,/listDrafts\(accountId\)\.then\(items=>\{if\(seq===draftSeq\.current&&activeAccount\.current===accountId\)setDrafts\(items\)\}/);
  assert.match(source,/return \(\)=>\{draftSeq\.current\+\+\}/);
  assert.match(source,/\[tab,user\?\.id,language\]/);
 });
@@ -16,6 +16,6 @@ test('V20 clears offline drafts and invalidates stale account-scoped loads',()=>
 test('manual refresh discards late results and errors after a newer request or account change',()=>{
  assert.match(source,/async function refreshDrafts\(\)\{if\(tab!=='offline'\|\|!user\?\.id\)return;const seq=\+\+draftSeq\.current/);
  assert.match(source,/const accountId=user\.id;try\{const items=await listDrafts\(accountId\)/);
- assert.match(source,/if\(seq!==draftSeq\.current\)return;setDrafts\(items\)/);
- assert.match(source,/if\(seq===draftSeq\.current\)setOfflineError\(v20SafeError\(language\)\)/);
+ assert.match(source,/if\(seq!==draftSeq\.current\|\|activeAccount\.current!==accountId\)return;setDrafts\(items\)/);
+ assert.match(source,/if\(seq===draftSeq\.current&&activeAccount\.current===accountId\)setOfflineError\(v20SafeError\(language\)\)/);
 });
