@@ -73,7 +73,8 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   const seq=++draftSeq.current;
   setDrafts([]);setOfflineError('');
   if(tab==='offline'&&user?.id){
-   listDrafts(user.id).then(items=>{if(seq===draftSeq.current)setDrafts(items)}).catch(()=>{if(seq===draftSeq.current)setOfflineError(v20SafeError(language))});
+   const accountId=user.id;
+   listDrafts(accountId).then(items=>{if(seq===draftSeq.current&&activeAccount.current===accountId)setDrafts(items)}).catch(()=>{if(seq===draftSeq.current&&activeAccount.current===accountId)setOfflineError(v20SafeError(language))});
   }
   return ()=>{draftSeq.current++};
  },[tab,user?.id,language]);
@@ -115,7 +116,7 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   setWorking(true);try{const {error}=await client.rpc('v20_register_pagopa',{p_home_id:homeId||null,p_notice_code:code,p_creditor_code:notice.creditor_code||null,p_creditor_name:notice.creditor_name,p_amount:notice.amount===''?null:Number(notice.amount),p_due_on:notice.due_on||null,p_create_bill:createBill});if(error)throw error;
    onNotify(createBill?ui.noticeAndReminderSaved:ui.noticeSaved);setNotice({notice_code:'',creditor_code:'',creditor_name:'',amount:'',due_on:''});setRawNotice('');await load();onRefresh();}
    catch(e){onNotify(v20SafeError(language,e))}finally{setWorking(false)}}
-  async function refreshDrafts(){if(tab!=='offline'||!user?.id)return;const seq=++draftSeq.current;const accountId=user.id;try{const items=await listDrafts(accountId);if(seq!==draftSeq.current)return;setDrafts(items);setOfflineError('')}catch(e){if(seq===draftSeq.current)setOfflineError(v20SafeError(language))}}
+  async function refreshDrafts(){if(tab!=='offline'||!user?.id)return;const seq=++draftSeq.current;const accountId=user.id;try{const items=await listDrafts(accountId);if(seq!==draftSeq.current||activeAccount.current!==accountId)return;setDrafts(items);setOfflineError('')}catch(e){if(seq===draftSeq.current&&activeAccount.current===accountId)setOfflineError(v20SafeError(language))}}
  async function importDraft(d){if(!client||!user)return onNotify(ui.signInToImport);if(!['task','shopping'].includes(d.type))return onNotify(ui.syncFailed);
   const accountId=user.id;
   const importHomeId=homeId;
