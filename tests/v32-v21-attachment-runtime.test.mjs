@@ -1,0 +1,67 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+
+// Exercise the real openAttachment body with mocked browser and Storage boundaries.
+const source = readFileSync(new URL('../app/V21Hub.jsx', import.meta.url), 'utf8');
+const body = source.match(/async function openAttachment\(id\)\{([\s\S]*?)\n \}/)?.[1];
+assert.ok(body, 'openAttachment implementation found');
+
+function harness() {
+ let resolveSigned;
+ const pending = new Promise(resolve => { resolveSigned = resolve; });
+ const events = [];
+ const context = {userId:'account-a',homeId:'home-a'};
+ const popup = {opener:'initial',close(){events.push('close')},location:{replace(url){events.push(['open',url])}}};
+ const sandbox = {
+  rows:{docs:[{id:'doc-a',storage_path:'account-a/doc.pdf'}]},
+  client:{storage:{from(bucket){assert.equal(bucket,'house-documents');return {createSignedUrl(path,seconds){
+   assert.equal(path,'account-a/doc.pdf');assert.equal(seconds,60);return pending;
+  }}}}},
+  shareContextRef:{current:context},
+  window:{open(){return popup},location:{assign(url){events.push(['navigate',url])}}},
+  onNotify(message){events.push(['notify',message])},
+  briefingCopy:{operationFailed:'localized failure'}
+ };
+ const openAttachment=vm.runInNewContext('(async function openAttachment(id){'+body+'\n})',sandbox);
+ return {openAttachment,resolveSigned,events,context};
+}
+
+test('signed attachment opens for the unchanged account and home',async()=>{
+ const h=harness();const operation=h.openAttachment('doc-a');
+ h.resolveSigned({data:{signedUrl:'https://example.invalid/signed'},error:null});
+ await operation;
+ assert.deepEqual(h.events,[['open','https://example.invalid/signed']]);
+});
+
+test('signed attachment is discarded after account switch',async()=>{
+ const h=harness();const operation=h.openAttachment('doc-a');
+ h.context.userId='account-b';
+ h.resolveSigned({data:{signedUrl:'https://example.invalid/private'},error:null});
+ await operation;
+ assert.deepEqual(h.events,['close']);
+});
+
+test('signed attachment is discarded after home switch',async()=>{
+ const h=harness();const operation=h.openAttachment('doc-a');
+ h.context.homeId='home-b';
+ h.resolveSigned({data:{signedUrl:'https://example.invalid/private'},error:null});
+ await operation;
+ assert.deepEqual(h.events,['close']);
+});
+
+test('stale Storage rejection does not notify the new context',async()=>{
+ const h=harness();const operation=h.openAttachment('doc-a');
+ h.context.userId='account-b';
+ h.resolveSigned(Promise.reject(new Error('storage unavailable')));
+ await operation;
+ assert.deepEqual(h.events,['close']);
+});
+
+test('current Storage rejection gives localized feedback',async()=>{
+ const h=harness();const operation=h.openAttachment('doc-a');
+ h.resolveSigned(Promise.reject(new Error('storage unavailable')));
+ await operation;
+ assert.deepEqual(h.events,['close',['notify','localized failure']]);
+});
