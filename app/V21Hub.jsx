@@ -152,7 +152,9 @@ export default function V21Hub({client,user,homeId,homeName='',canWrite,demo,bil
    const {data,error}=await client.storage.from('house-documents').createSignedUrl(document.storage_path,60);
    if(!stillCurrent()){popup?.close();return;}
    if(error||!data?.signedUrl){popup?.close();return onNotify(briefingCopy.operationFailed);}
-   if(popup)popup.location.replace(data.signedUrl);else window.location.assign(data.signedUrl);
+   // Only navigate to an HTTPS signed Storage URL; reject unsafe or malformed schemes.
+   let signedUrl;try{signedUrl=new URL(data.signedUrl);if(signedUrl.protocol!=='https:')throw new Error('unsafe signed URL');}catch{popup?.close();return onNotify(briefingCopy.operationFailed);}
+   if(popup)popup.location.replace(signedUrl.href);else window.location.assign(signedUrl.href);
   }catch(_error){popup?.close();if(stillCurrent())onNotify(briefingCopy.operationFailed)}
  }
  async function uploadInventoryPhoto(file){
