@@ -37,3 +37,18 @@ test('V21 export filenames fall back to Italian for unsupported locale',()=>{
  assert.equal(exportName('xx','property','2026-11-17'),'passaporto-immobile.json');
  assert.equal(exportName('__proto__','property','2026-11-17'),'passaporto-immobile.json');
 });
+
+test('V21 briefing date validation handles Gregorian century boundaries',()=>{
+ const valid=['2000-02-29','2400-02-29','1900-02-28','2100-02-28','2026-12-31','0001-01-01'];
+ const invalid=['1900-02-29','2100-02-29','0000-01-01','2026-06-31','2026-11-31','2026-02-30','2026-12-32','2026-01-01T00:00:00Z'];
+ for(const date of valid)assert.equal(exportName('fr','briefing',date),'maison-en-5-minutes-'+date+'.json');
+ for(const date of invalid)assert.equal(exportName('fr','briefing',date),'maison-en-5-minutes.json');
+});
+test('V21 export names reject inherited or unexpected keys without altering locale',()=>{
+ for(const type of ['constructor','toString','__proto__','hasOwnProperty','PROPERTY','',null]){
+  assert.equal(exportName('de',type,'2026-11-17'),null);
+ }
+ for(const locale of ['constructor','toString','__proto__','EN','en-GB',null]){
+  assert.equal(exportName(locale,'inventory','2026-11-17'),'inventario-assicurativo.json');
+ }
+});
