@@ -125,7 +125,7 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
    await removeDraft(d.id);if(activeAccount.current!==accountId)return;
    await refreshDrafts();if(activeAccount.current!==accountId)return;
    onRefresh();onNotify(d.type==='shopping'?ui.shoppingAdded:ui.taskSynced);
-  }catch(e){if(activeAccount.current===accountId)onNotify(ui.syncFailed+v20SafeError(language,e))}finally{setWorking(false)}}
+  }catch(e){if(activeAccount.current===accountId)onNotify(ui.syncFailed+v20SafeError(language,e))}finally{if(activeAccount.current===accountId)setWorking(false)}}
  function downloadDraft(d){const url=URL.createObjectURL(d.file);const a=document.createElement('a');a.href=url;a.download=d.title||ui.documentLabel;a.click();setTimeout(()=>URL.revokeObjectURL(url),6000)}
  if(demo)return <section className="panel extra-panel"><h2>{ui.v20Name}</h2><p>{ui.demoSetupNotice}</p></section>;
  return <div className="extra-hub v20-hub">
