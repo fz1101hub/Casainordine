@@ -35,7 +35,9 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
  const [rawNotice,setRawNotice]=useState(''),[noticeMessage,setNoticeMessage]=useState('');
  const [selectedBill,setSelectedBill]=useState(''),[sender,setSender]=useState(''),[auth,setAuth]=useState('unknown'),[iban,setIban]=useState('');
  const [riskPreview,setRiskPreview]=useState(null),[drafts,setDrafts]=useState([]),[offlineError,setOfflineError]=useState('');
- const scope=(q)=>homeId?q.eq('home_id',homeId):q.is('home_id',null);
+ const scope=(q)=>homeId?q.eq('home_id',homeId):q.eq('user_id',user?.id).is('home_id',null);
+ // Mutations must stay within the current home/account, independently of RLS.
+ const scopedMutation=q=>homeId?q.eq('home_id',homeId):q.eq('user_id',user?.id).is('home_id',null);
  const loadSeq=useRef(0);
  const draftSeq=useRef(0);
  const activeAccount=useRef(user?.id);
@@ -74,11 +76,11 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   return ()=>{draftSeq.current++};
  },[tab,user?.id,language]);
  const common={user_id:user?.id,home_id:homeId||null};
- async function save(table,content,message,options={}){if(!client||!canWrite)return onNotify(ui.editPermissionRequired);setWorking(true);try{
+ async function save(table,content,message,options={}){if(!client||!canWrite||!user?.id)return onNotify(ui.editPermissionRequired);setWorking(true);try{
   const {data,error}=await client.from(table).insert({...common,...content}).select('*').single();if(error)throw error;onNotify(message);await load();if(options.parent)onRefresh();return data;
  }catch(e){onNotify(v20SafeError(language,e));return null;}finally{setWorking(false)}}
- async function change(table,id,patch,message){if(!client||!canWrite)return;setWorking(true);try{const {error}=await client.from(table).update(patch).eq('id',id);if(error)throw error;onNotify(message);await load();}catch(e){onNotify(v20SafeError(language,e))}finally{setWorking(false)}}
- async function erase(table,id){if(!canWrite||!(await askConfirm(ui.confirmDelete,{danger:true})))return;setWorking(true);try{const {error}=await client.from(table).delete().eq('id',id);if(error)throw error;onNotify(ui.deleted);await load();}catch(e){onNotify(v20SafeError(language,e))}finally{setWorking(false)}}
+ async function change(table,id,patch,message){if(!client||!canWrite||!user?.id)return;setWorking(true);try{const {error}=await scopedMutation(client.from(table).update(patch).eq('id',id));if(error)throw error;onNotify(message);await load();}catch(e){onNotify(v20SafeError(language,e))}finally{setWorking(false)}}
+ async function erase(table,id){if(!canWrite||!user?.id||!(await askConfirm(ui.confirmDelete,{danger:true})))return;setWorking(true);try{const {error}=await scopedMutation(client.from(table).delete().eq('id',id));if(error)throw error;onNotify(ui.deleted);await load();}catch(e){onNotify(v20SafeError(language,e))}finally{setWorking(false)}}
  const missing=useMemo(()=>missingBillCandidates(utilities,bills,today()),[utilities,bills]);
  const activeBill=bills.find(x=>x.id===selectedBill);
  const knownIban=rows.risk.filter(r=>r.review_status==='reviewed'&&bills.some(b=>b.id===r.bill_id&&b.supplier===activeBill?.supplier)).map(r=>r.iban_fingerprint).filter(Boolean);
