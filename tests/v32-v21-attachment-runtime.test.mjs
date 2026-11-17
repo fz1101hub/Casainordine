@@ -87,3 +87,27 @@ test('stale Storage error response never notifies a different home',async()=>{
  await operation;
  assert.deepEqual(h.events,['close']);
 });
+
+test('signed attachment is discarded after logout',async()=>{
+ const h=harness();const operation=h.openAttachment('doc-a');
+ h.context.userId=undefined;
+ h.resolveSigned({data:{signedUrl:'https://example.invalid/private'},error:null});
+ await operation;
+ assert.deepEqual(h.events,['close']);
+});
+
+test('signed attachment is discarded when account and home both change',async()=>{
+ const h=harness();const operation=h.openAttachment('doc-a');
+ h.context.userId='account-b';h.context.homeId='home-b';
+ h.resolveSigned({data:{signedUrl:'https://example.invalid/private'},error:null});
+ await operation;
+ assert.deepEqual(h.events,['close']);
+});
+
+test('missing signed URL after account switch does not notify',async()=>{
+ const h=harness();const operation=h.openAttachment('doc-a');
+ h.context.userId='account-b';
+ h.resolveSigned({data:{},error:null});
+ await operation;
+ assert.deepEqual(h.events,['close']);
+});
