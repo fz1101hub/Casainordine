@@ -114,7 +114,7 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
    onNotify(createBill?ui.noticeAndReminderSaved:ui.noticeSaved);setNotice({notice_code:'',creditor_code:'',creditor_name:'',amount:'',due_on:''});setRawNotice('');await load();onRefresh();}
    catch(e){onNotify(v20SafeError(language,e))}finally{setWorking(false)}}
   async function refreshDrafts(){if(tab!=='offline'||!user?.id)return;const seq=++draftSeq.current;const accountId=user.id;try{const items=await listDrafts(accountId);if(seq!==draftSeq.current)return;setDrafts(items);setOfflineError('')}catch(e){if(seq===draftSeq.current)setOfflineError(v20SafeError(language))}}
- async function importDraft(d){if(!client||!user)return onNotify(ui.signInToImport);if(d.type==='document')return;
+ async function importDraft(d){if(!client||!user)return onNotify(ui.signInToImport);if(!['task','shopping'].includes(d.type))return onNotify(ui.syncFailed);
   const accountId=user.id;
   if(d.type==='shopping'&&(!homeId||!canWrite))return onNotify(ui.selectWritableHome);
   if(d.type==='shopping'&&!(await askConfirm(ui.confirmAddShopping)))return;
