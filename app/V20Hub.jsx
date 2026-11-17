@@ -61,7 +61,7 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
     homeId?client.from('home_former_members').select('user_id,display_name').eq('home_id',homeId).then(r=>r.error?{data:[],error:null}:r):Promise.resolve({data:[],error:null})
   ]);
   // Cambiando casa in fretta può arrivare per ultima la risposta della casa precedente: si scarta.
-  if(seq!==loadSeq.current||activeAccount.current!==accountId)return;
+  if(seq!==loadSeq.current||activeAccount.current!==accountId||activeHome.current!==homeId)return;
   const error=res.find(r=>r.error);if(error)onNotify(ui.migrationRequired+v20SafeError(language,error.error));
   const next={};for(let i=0;i<specs.length;i++)next[specs[i][0]]=res[i].data||[];
   next.alerts=res[specs.length].data||[];next.connections=res[specs.length+1].data||[];next.preferences=res[specs.length+2].data||null;
