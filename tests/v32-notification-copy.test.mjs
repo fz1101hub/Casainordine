@@ -233,3 +233,15 @@ test('regional reminder locales accept real leap days and preserve calendar boun
   }
  }
 });
+
+
+test('German bill reminder uses consistent formal address without altering dates or names',()=>{
+ const name='Strom';
+ const {subject,text}=billReminderCopy({language:'de-DE',name,dueDate:'2026-12-31'});
+ assert.match(subject,/Rechnungsfälligkeit/);
+ assert.match(text,/Die Rechnung Strom ist am/);
+ assert.match(text,/Öffnen Sie Casa in Ordine, um die Details zu prüfen\./);
+ assert.doesNotMatch(text,/Öffne Casa in Ordine/);
+ assert.equal(text.split('\n').length,3);
+ assert.equal(name,'Strom');
+});
