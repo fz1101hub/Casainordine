@@ -44,7 +44,7 @@ test('V21 sensitive warnings contain no hidden direction controls, markup or unr
    const value=copy[key];
    assert.ok(!forbidden.test(value),`${language}.${key} contains invisible control characters`);
    assert.ok(!/<[^>]*>/.test(value),`${language}.${key} unexpectedly contains HTML-like markup`);
-   assert.ok(!/\\{[a-zA-Z][\w]*\\}/.test(value),`${language}.${key} has unresolved placeholders`);
+   assert.ok(!/\{[a-zA-Z][\w]*\}/.test(value),`${language}.${key} has unresolved placeholders`);
   }
  }
 });
