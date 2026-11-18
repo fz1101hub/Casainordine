@@ -83,7 +83,21 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   const {data,error}=await client.from(table).insert({...common,...content}).select('*').single();if(error)throw error;onNotify(message);await load();if(options.parent)onRefresh();return data;
  }catch(e){onNotify(v20SafeError(language,e));return null;}finally{setWorking(false)}}
  async function change(table,id,patch,message){if(!client||!canWrite||!user?.id)return;setWorking(true);try{const {error}=await scopedMutation(client.from(table).update(patch).eq('id',id));if(error)throw error;onNotify(message);await load();}catch(e){onNotify(v20SafeError(language,e))}finally{setWorking(false)}}
- async function erase(table,id){if(!canWrite||!user?.id||!(await askConfirm(ui.confirmDelete,{danger:true})))return;setWorking(true);try{const {error}=await scopedMutation(client.from(table).delete().eq('id',id));if(error)throw error;onNotify(ui.deleted);await load();}catch(e){onNotify(v20SafeError(language,e))}finally{setWorking(false)}}
+ async function erase(table,id){
+  if(!canWrite||!user?.id)return;
+  const accountId=user.id, deletionHomeId=homeId;
+  const sameContext=()=>activeAccount.current===accountId&&activeHome.current===deletionHomeId;
+  if(!(await askConfirm(ui.confirmDelete,{danger:true}))||!sameContext())return;
+  setWorking(true);
+  try{
+   const query=client.from(table).delete().eq('id',id);
+   const {error}=await (deletionHomeId?query.eq('home_id',deletionHomeId):query.eq('user_id',accountId).is('home_id',null));
+   if(!sameContext())return;
+   if(error)throw error;
+   onNotify(ui.deleted);await load();
+  }catch(e){if(sameContext())onNotify(v20SafeError(language,e))}
+  finally{if(sameContext())setWorking(false)}
+ }
  const missing=useMemo(()=>missingBillCandidates(utilities,bills,today()),[utilities,bills]);
  const activeBill=bills.find(x=>x.id===selectedBill);
  const knownIban=rows.risk.filter(r=>r.review_status==='reviewed'&&bills.some(b=>b.id===r.bill_id&&b.supplier===activeBill?.supplier)).map(r=>r.iban_fingerprint).filter(Boolean);
