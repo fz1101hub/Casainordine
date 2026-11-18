@@ -29,7 +29,8 @@ const validExportDate=date=>{
  return day<=days[month-1];
 };
 const v21ExportName=(language,type,date)=>{
- const names=Object.hasOwn(exportNames,language)?exportNames[language]:exportNames.it;
+ const baseLanguage=typeof language==='string'?language.toLowerCase().split(/[-_]/)[0]:'it';
+ const names=Object.hasOwn(exportNames,baseLanguage)?exportNames[baseLanguage]:exportNames.it;
  const stem=Object.hasOwn(names,type)?names[type]:null;
  return stem?`${stem}${type==='briefing'&&validExportDate(date)?'-'+date:''}.json`:null;
 };
