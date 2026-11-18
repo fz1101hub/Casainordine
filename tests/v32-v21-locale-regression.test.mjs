@@ -15,7 +15,7 @@ test('V21 export filenames support six languages without leaking user titles',()
  for(const code of ['it','en','es','fr','de','pt']){
   assert.match(source,new RegExp('\\b'+code+':\\{property:'));
  }
- assert.match(source,/Object\.hasOwn\(exportNames,language\)/);
+ assert.match(source,/Object\.hasOwn\(exportNames,baseLanguage\)/);
  assert.match(source,/validExportDate\(date\)/);
  assert.match(source,/JSON\.stringify\(object,null,2\)/);
 });
