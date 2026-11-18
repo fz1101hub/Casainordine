@@ -48,7 +48,13 @@ test('V21 export names reject inherited or unexpected keys without altering loca
  for(const type of ['constructor','toString','__proto__','hasOwnProperty','PROPERTY','',null]){
   assert.equal(exportName('de',type,'2026-11-17'),null);
  }
- for(const locale of ['constructor','toString','__proto__','EN','en-GB',null]){
+ for(const locale of ['constructor','toString','__proto__',null]){
   assert.equal(exportName(locale,'inventory','2026-11-17'),'inventario-assicurativo.json');
+ }
+});
+
+test('V21 regional and uppercase locale tags retain their translated filenames',()=>{
+ for(const [locale,base] of [['EN','en'],['en-GB','en'],['es-ES','es'],['fr-FR','fr'],['de-DE','de'],['pt-PT','pt'],['en_US','en']]){
+  assert.equal(exportName(locale,'inventory','2026-11-17'),exportName(base,'inventory','2026-11-17'));
  }
 });
