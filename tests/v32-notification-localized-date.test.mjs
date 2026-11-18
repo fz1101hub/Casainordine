@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 import {billReminderCopy} from '../lib/notification-copy.mjs';
 import {formatDate,localeFor} from '../lib/i18n-core.mjs';
@@ -30,5 +31,15 @@ test('bill reminder names are bounded by grapheme count without splitting emoji'
   const copy=billReminderCopy({language,name,dueDate:'2028-02-29'});
   assert.ok(copy.text.includes(emoji.repeat(160)),language);
   assert.ok(!copy.text.includes(emoji.repeat(161)),language);
+ }
+});
+
+test('bill reminder grapheme segmentation uses the recipient language',()=>{
+ const source=readFileSync(new URL('../lib/notification-copy.mjs',import.meta.url),'utf8');
+ assert.match(source,/new Intl\.Segmenter\(lang,\s*\{granularity:'grapheme'\}\)/);
+ for(const language of languages){
+  const copy=billReminderCopy({language,name:'e\u0301'.repeat(161),dueDate:'2028-02-29'});
+  assert.ok(copy.text.includes('e\u0301'.repeat(160)),language);
+  assert.ok(!copy.text.includes('e\u0301'.repeat(161)),language);
  }
 });
