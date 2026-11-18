@@ -203,3 +203,12 @@ test('V20 HTTP 400 invalid requests reuse localized validation guidance safely',
  }
  assert.equal(translations.size,6);
 });
+
+test('V20 error locale parsing agrees with shared language normalization',()=>{
+ for(const [input,expected] of [[' EN_gb ','en'],['FR-fr','fr'],['pt_PT','pt'],['de-DE','de'],['es-ES','es']]){
+  assert.equal(v20SafeError(input,{status:403}),v20SafeError(expected,{status:403}));
+ }
+ for(const invalid of ['en--GB','fr!','pt/../../secret','en GB','xx-YY']){
+  assert.equal(v20SafeError(invalid,{status:403}),v20SafeError('it',{status:403}));
+ }
+});
