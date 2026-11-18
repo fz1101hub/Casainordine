@@ -35,3 +35,16 @@ test('V21 privacy warnings resolve regional locale variants without losing trans
   for(const key of criticalKeys)assert.equal(localized[key],v21BriefingCopy(base)[key],`${language}.${key}`);
  }
 });
+
+test('V21 sensitive warnings contain no hidden direction controls, markup or unresolved placeholders',()=>{
+ const forbidden=/[\u202a-\u202e\u2066-\u2069\u200e\u200f\u061c\u0000-\u0008\u000b\u000c\u000e-\u001f]/u;
+ for(const language of ['it',...locales]){
+  const copy=v21BriefingCopy(language);
+  for(const key of criticalKeys){
+   const value=copy[key];
+   assert.ok(!forbidden.test(value),`${language}.${key} contains invisible control characters`);
+   assert.ok(!/<[^>]*>/.test(value),`${language}.${key} unexpectedly contains HTML-like markup`);
+   assert.ok(!/\\{[a-zA-Z][\w]*\\}/.test(value),`${language}.${key} has unresolved placeholders`);
+  }
+ }
+});
