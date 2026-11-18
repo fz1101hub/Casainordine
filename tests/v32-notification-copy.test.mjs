@@ -245,3 +245,18 @@ test('German bill reminder uses consistent informal address without altering dat
  assert.equal(text.split('\n').length,3);
  assert.equal(name,'Strom');
 });
+
+
+test('French and Portuguese reminder footers use informal address consistently',()=>{
+ const cases=[
+  {language:'fr-FR',expected:'Ouvre Casa in Ordine pour vérifier les détails.',formal:/Ouvrez Casa in Ordine/},
+  {language:'pt-PT',expected:'Abre Casa in Ordine para consultar os detalhes.',formal:/Abra Casa in Ordine/}
+ ];
+ for(const {language,expected,formal} of cases){
+  const {text}=billReminderCopy({language,name:'Energia',dueDate:'2026-12-31'});
+  assert.ok(text.endsWith(expected),language);
+  assert.doesNotMatch(text,formal,language);
+  assert.match(text,/Energia/,language);
+  assert.equal(text.split('\n').length,3,language);
+ }
+});
