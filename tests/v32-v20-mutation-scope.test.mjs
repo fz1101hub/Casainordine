@@ -11,8 +11,10 @@ test('V20 personal reads are restricted to the active user and null home',()=>{
 test('V20 update and delete are scoped to active home/account',()=>{
  assert.match(source,/const scopedMutation=q=>homeId\?q\.eq\('home_id',homeId\):q\.eq\('user_id',user\?\.id\)\.is\('home_id',null\)/);
  assert.match(source,/scopedMutation\(client\.from\(table\)\.update\(patch\)\.eq\('id',id\)\)/);
- assert.match(source,/scopedMutation\(client\.from\(table\)\.delete\(\)\.eq\('id',id\)\)/);
- assert.doesNotMatch(source,/client\.from\(table\)\.delete\(\)\.eq\('id',id\);/);
+ assert.match(source,/const accountId=user\.id, deletionHomeId=homeId/);
+ assert.match(source,/if\(!\(await askConfirm\(ui\.confirmDelete,\{danger:true\}\)\)\|\|!sameContext\(\)\)return/);
+ assert.match(source,/const query=client\.from\(table\)\.delete\(\)\.eq\('id',id\)/);
+ assert.match(source,/deletionHomeId\?query\.eq\('home_id',deletionHomeId\):query\.eq\('user_id',accountId\)\.is\('home_id',null\)/);
 });
 
 test('V20 writes require a signed-in account',()=>{
