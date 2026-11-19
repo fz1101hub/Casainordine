@@ -337,3 +337,21 @@ test('V20 PostgREST PGRST116 no-row errors use localized not-found guidance',()=
  assert.equal(v20ErrorCategory({status:401,code:'PGRST116'}),'auth');
  assert.equal(v20ErrorCategory({status:403,code:'PGRST116'}),'access');
 });
+
+
+test('V20 PostgreSQL data exceptions show localized validation without leaking provider details',()=>{
+ const translations=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  for(const code of ['22001','22003','22007']){
+   assert.equal(v20ErrorCategory({code}),'validation');
+   const message=v20SafeError(locale,{code,message:'private account token=secret',details:'internal database value'});
+   assert.equal(message,v20SafeError(locale,{status:422}));
+   assert.doesNotMatch(message,/private|account|token|secret|internal|database|22001|22003|22007/i);
+   translations.add(message);
+   assert.equal(v20ErrorCategory({code:code+' '}),'generic');
+  }
+ }
+ assert.equal(translations.size,6);
+ assert.equal(v20ErrorCategory({status:401,code:'22001'}),'auth');
+ assert.equal(v20ErrorCategory({status:403,code:'22003'}),'access');
+});
