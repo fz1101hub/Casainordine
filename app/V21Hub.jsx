@@ -117,7 +117,16 @@ export default function V21Hub({client,user,homeId,homeName='',canWrite,demo,bil
  const add=(table,item,msg)=>canWrite?act(()=>client.from(table).insert({...common,...item}),msg):onNotify(briefingCopy.readOnlyHome);
  const scopedMutation=query=>homeId?query.eq('home_id',homeId):query.eq('user_id',user?.id).is('home_id',null);
  const edit=(table,id,patch,msg)=>canWrite&&user?.id?act(()=>scopedMutation(client.from(table).update(patch).eq('id',id)),msg):onNotify(briefingCopy.readOnlyHome);
- async function remove(table,id){if(!canWrite||!user?.id||!(await askConfirm(briefingCopy.confirmDeletePermanent,{danger:true})))return;await act(()=>scopedMutation(client.from(table).delete().eq('id',id)),briefingCopy.itemDeleted);}
+ async function remove(table,id){
+  if(!canWrite||!user?.id)return;
+  const accountId=user.id, targetHomeId=homeId||null;
+  if(!(await askConfirm(briefingCopy.confirmDeletePermanent,{danger:true})))return;
+  // The confirmation can outlive a switch of account/home. Never delete in the new context.
+  if(shareContextRef.current.userId!==accountId||(shareContextRef.current.homeId||null)!==targetHomeId)return;
+  await act(()=>{const query=client.from(table).delete().eq('id',id);
+    return targetHomeId?query.eq('home_id',targetHomeId):query.eq('user_id',accountId).is('home_id',null);
+  },briefingCopy.itemDeleted);
+ }
  const suspicious=useMemo(()=>detectBillingInconsistencies({bills,contracts:rows.contracts,refunds:rows.refunds,copy:briefingCopy}),[bills,rows.contracts,rows.refunds,language]);
  const result=useMemo(()=>simulateScenario(scenario),[scenario]);
  const inventoryTotal=useMemo(()=>inventorySummary(rows.inventory),[rows.inventory]);
