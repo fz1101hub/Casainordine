@@ -295,7 +295,7 @@ test('V20 database constraint SQLSTATE codes provide safe six-language feedback'
    assert.equal(v20ErrorCategory({code}),'validation');
    assert.equal(v20SafeError(locale,{code,details:'private address token=secret'}),v20SafeError(locale,{status:422}));
   }
-  for(const code of ['23505 ','23505x','23503',23505]){
+  for(const code of ['23505 ','23505x','23503 ',23505]){
    assert.equal(v20ErrorCategory({code}),'generic');
    assert.equal(v20SafeError(locale,{code,message:'private token=secret'}),v20SafeError(locale));
   }
@@ -303,4 +303,21 @@ test('V20 database constraint SQLSTATE codes provide safe six-language feedback'
  // HTTP authorization takes precedence even if the provider also returns an SQLSTATE.
  assert.equal(v20ErrorCategory({status:403,code:'23505'}),'access');
  assert.equal(v20ErrorCategory({status:401,code:'23502'}),'auth');
+});
+
+
+test('V20 foreign-key dependencies provide actionable safe feedback in six languages',()=>{
+ const messages=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const message=v20SafeError(locale,{code:'23503',message:'private table and key token=secret'});
+  messages.add(message);
+  assert.equal(v20ErrorCategory({code:'23503'}),'dependency');
+  assert.notEqual(message,v20SafeError(locale));
+  assert.notEqual(message,v20SafeError(locale,{status:422}));
+  assert.doesNotMatch(message,/private|token|secret|23503|postgres|supabase/i);
+  assert.equal(v20SafeError(locale,{code:'23503 '}),v20SafeError(locale));
+ }
+ assert.equal(messages.size,6);
+ assert.equal(v20ErrorCategory({status:403,code:'23503'}),'access');
+ assert.equal(v20ErrorCategory({status:401,code:'23503'}),'auth');
 });
