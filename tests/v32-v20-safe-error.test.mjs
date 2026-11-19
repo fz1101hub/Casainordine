@@ -254,3 +254,17 @@ test('V20 HTTP 412 failed precondition uses safe localized concurrent-edit guida
  }
  assert.equal(translations.size,6);
 });
+
+
+test('V20 HTTP 428 required precondition preserves localized conflict guidance',()=>{
+ const translations=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const message=v20SafeError(locale,{status:428,message:'private If-Match token=secret'});
+  translations.add(message);
+  assert.equal(v20ErrorCategory({status:428}),'conflict');
+  assert.equal(message,v20SafeError(locale,{status:412}));
+  assert.doesNotMatch(message,/private|If-Match|token|secret|428|supabase/i);
+  assert.equal(v20SafeError(locale,{status:'428'}),v20SafeError(locale));
+ }
+ assert.equal(translations.size,6);
+});
