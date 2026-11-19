@@ -2,6 +2,7 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {QrCode,Siren,ScanSearch,Calculator,FileCheck2,Plane,Camera,Vote,ClipboardCheck,Plus,Trash2,Download,Share2,KeyRound} from 'lucide-react';
 import {todayRome} from '../lib/dates.mjs';
+import {normalizeLanguage} from '../lib/i18n-core.mjs';
 import {formatV20Timestamp} from '../lib/v20-timestamp.mjs';
 import {useLanguage} from './LanguageProvider';
 import {v21BriefingCopy} from '../lib/v21-briefing-copy.mjs';
@@ -29,7 +30,7 @@ const validExportDate=date=>{
  return day<=days[month-1];
 };
 const v21ExportName=(language,type,date)=>{
- const baseLanguage=typeof language==='string'?language.toLowerCase().split(/[-_]/)[0]:'it';
+ const baseLanguage=normalizeLanguage(language);
  const names=Object.hasOwn(exportNames,baseLanguage)?exportNames[baseLanguage]:exportNames.it;
  const stem=Object.hasOwn(names,type)?names[type]:null;
  return stem?`${stem}${type==='briefing'&&validExportDate(date)?'-'+date:''}.json`:null;
