@@ -2,13 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
+import {normalizeLanguage} from '../lib/i18n-core.mjs';
 
 // Execute the production filename helpers without importing the JSX component.
 const source=readFileSync(new URL('../app/V21Hub.jsx',import.meta.url),'utf8');
 const start=source.indexOf('const exportNames=');
 const end=source.indexOf('const uuid=',start);
 assert.ok(start>=0&&end>start,'V21 export helpers must remain discoverable');
-const context=vm.createContext({});
+const context=vm.createContext({normalizeLanguage});
 vm.runInContext(source.slice(start,end)+'\nthis.exportName=v21ExportName;',context);
 const exportName=context.exportName;
 const expected={
