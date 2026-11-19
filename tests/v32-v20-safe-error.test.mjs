@@ -355,3 +355,22 @@ test('V20 PostgreSQL data exceptions show localized validation without leaking p
  assert.equal(v20ErrorCategory({status:401,code:'22001'}),'auth');
  assert.equal(v20ErrorCategory({status:403,code:'22003'}),'access');
 });
+
+
+test('V20 PostgreSQL lock and cancelled-query SQLSTATEs use localized safe recovery',()=>{
+ const locked=new Set(),timedOut=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const lock=v20SafeError(locale,{code:'55P03',message:'private lock token=secret'});
+  const timeout=v20SafeError(locale,{code:'57014',details:'private SQL query token=secret'});
+  locked.add(lock);timedOut.add(timeout);
+  assert.equal(v20ErrorCategory({code:'55P03'}),'locked');
+  assert.equal(v20ErrorCategory({code:'57014'}),'timeout');
+  assert.equal(lock,v20SafeError(locale,{status:423}));
+  assert.equal(timeout,v20SafeError(locale,{status:408}));
+  assert.doesNotMatch(lock+' '+timeout,/private|token|secret|55P03|57014|postgres|supabase/i);
+  for(const code of ['55P03 ','57014x',55])assert.equal(v20SafeError(locale,{code}),v20SafeError(locale));
+ }
+ assert.equal(locked.size,6);assert.equal(timedOut.size,6);
+ assert.equal(v20ErrorCategory({status:401,code:'55P03'}),'auth');
+ assert.equal(v20ErrorCategory({status:403,code:'57014'}),'access');
+});
