@@ -240,3 +240,17 @@ test('V20 HTTP 423 locked resources show safe recovery in six languages',()=>{
  }
  assert.equal(translated.size,6);
 });
+
+
+test('V20 HTTP 412 failed precondition uses safe localized concurrent-edit guidance',()=>{
+ const translations=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const message=v20SafeError(locale,{status:412,message:'private ETag token=secret'});
+  translations.add(message);
+  assert.equal(v20ErrorCategory({status:412}),'conflict');
+  assert.equal(message,v20SafeError(locale,{status:409}));
+  assert.doesNotMatch(message,/private|ETag|token|secret|412|supabase/i);
+  assert.equal(v20SafeError(locale,{status:'412'}),v20SafeError(locale));
+ }
+ assert.equal(translations.size,6);
+});
