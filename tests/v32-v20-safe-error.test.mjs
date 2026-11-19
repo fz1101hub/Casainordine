@@ -212,3 +212,16 @@ test('V20 error locale parsing agrees with shared language normalization',()=>{
   assert.equal(v20SafeError(invalid,{status:403}),v20SafeError('it',{status:403}));
  }
 });
+
+test('V20 HTTP 507 insufficient storage shows localized recovery without exposing provider details',()=>{
+ const translated=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const message=v20SafeError(locale,{status:507,message:'private bucket token=secret'});
+  translated.add(message);
+  assert.equal(v20ErrorCategory({status:507}),'storage');
+  assert.notEqual(message,v20SafeError(locale));
+  assert.doesNotMatch(message,/private|bucket|token|secret|507|supabase/i);
+  assert.equal(v20SafeError(locale,{status:'507'}),v20SafeError(locale));
+ }
+ assert.equal(translated.size,6);
+});
