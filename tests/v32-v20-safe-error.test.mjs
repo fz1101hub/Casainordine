@@ -225,3 +225,18 @@ test('V20 HTTP 507 insufficient storage shows localized recovery without exposin
  }
  assert.equal(translated.size,6);
 });
+
+
+test('V20 HTTP 423 locked resources show safe recovery in six languages',()=>{
+ const translated=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const message=v20SafeError(locale,{status:423,message:'private lock token=secret'});
+  translated.add(message);
+  assert.equal(v20ErrorCategory({status:423}),'locked');
+  assert.notEqual(message,v20SafeError(locale));
+  assert.notEqual(message,v20SafeError(locale,{status:409}));
+  assert.doesNotMatch(message,/private|token|secret|423|supabase/i);
+  assert.equal(v20SafeError(locale,{status:'423'}),v20SafeError(locale));
+ }
+ assert.equal(translated.size,6);
+});
