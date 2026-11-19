@@ -268,3 +268,18 @@ test('V20 HTTP 428 required precondition preserves localized conflict guidance',
  }
  assert.equal(translations.size,6);
 });
+
+
+test('V20 HTTP 501 unsupported server feature uses safe six-language guidance',()=>{
+ const translations=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const message=v20SafeError(locale,{status:501,message:'private server route token=secret'});
+  translations.add(message);
+  assert.equal(v20ErrorCategory({status:501}),'schema');
+  assert.equal(message,v20SafeError(locale,{code:'PGRST202'}));
+  assert.notEqual(message,v20SafeError(locale,{status:503}));
+  assert.doesNotMatch(message,/private|route|token|secret|501|supabase/i);
+  assert.equal(v20SafeError(locale,{status:'501'}),v20SafeError(locale));
+ }
+ assert.equal(translations.size,6);
+});
