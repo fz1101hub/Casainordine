@@ -29,3 +29,11 @@ test('v3.2 monetary values use each locale, preserve zero and reject missing dat
  assert.equal(formatMoney(null,'it'),'—');
  assert.notEqual(formatMoney(0,'it'),'—');
 });
+
+test('v3.2 invalid currency identifiers fail safely without masking valid currency formatting',()=>{
+ for(const {code,locale} of LANGUAGES){
+  assert.equal(formatMoney(12.5,code,'INVALID-CURRENCY'),'—');
+  assert.equal(formatMoney(12.5,code,''),'—');
+  assert.equal(formatMoney(12.5,code,'USD'),new Intl.NumberFormat(locale,{style:'currency',currency:'USD'}).format(12.5));
+ }
+});
