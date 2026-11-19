@@ -283,3 +283,24 @@ test('V20 HTTP 501 unsupported server feature uses safe six-language guidance',(
  }
  assert.equal(translations.size,6);
 });
+
+
+test('V20 database constraint SQLSTATE codes provide safe six-language feedback',()=>{
+ for(const locale of ['it','en','es','fr','de','pt']){
+  for(const code of ['23505']){
+   assert.equal(v20ErrorCategory({code}),'conflict');
+   assert.equal(v20SafeError(locale,{code,message:'private email token=secret'}),v20SafeError(locale,{status:409}));
+  }
+  for(const code of ['23502','23514','22P02']){
+   assert.equal(v20ErrorCategory({code}),'validation');
+   assert.equal(v20SafeError(locale,{code,details:'private address token=secret'}),v20SafeError(locale,{status:422}));
+  }
+  for(const code of ['23505 ','23505x','23503',23505]){
+   assert.equal(v20ErrorCategory({code}),'generic');
+   assert.equal(v20SafeError(locale,{code,message:'private token=secret'}),v20SafeError(locale));
+  }
+ }
+ // HTTP authorization takes precedence even if the provider also returns an SQLSTATE.
+ assert.equal(v20ErrorCategory({status:403,code:'23505'}),'access');
+ assert.equal(v20ErrorCategory({status:401,code:'23502'}),'auth');
+});
