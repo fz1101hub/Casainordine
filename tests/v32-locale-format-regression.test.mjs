@@ -37,3 +37,26 @@ test('v3.2 invalid currency identifiers fail safely without masking valid curren
   assert.equal(formatMoney(12.5,code,'USD'),new Intl.NumberFormat(locale,{style:'currency',currency:'USD'}).format(12.5));
  }
 });
+
+
+test('v3.2 locale rendering is independent of host timezone at year boundaries',()=>{
+ for(const {code,locale} of LANGUAGES){
+  for(const iso of ['2024-01-01','2024-12-31','2024-02-29']){
+   const expected=new Intl.DateTimeFormat(locale,{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(iso+'T12:00:00Z'));
+   assert.equal(formatDate(iso,code,{day:'numeric',month:'long',year:'numeric'}),expected);
+  }
+  for(const invalid of ['2024-00-01','2024-01-00','2024-04-31','2024-11-31','2024-12-32','2024-01-01T00:00:00Z']){
+   assert.equal(formatDate(invalid,code),'—');
+  }
+ }
+});
+
+test('v3.2 locale money rejects non-finite and non-decimal representations',()=>{
+ for(const {code} of LANGUAGES){
+  for(const invalid of ['1e3','0x10','Infinity','NaN','1_000','1,000','--1',true,false,[],[12],-Infinity]){
+   assert.equal(formatMoney(invalid,code),'—');
+  }
+  assert.notEqual(formatMoney('-0.01',code),'—');
+  assert.notEqual(formatMoney('.5',code),'—');
+ }
+});
