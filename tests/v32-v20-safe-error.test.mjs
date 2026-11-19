@@ -321,3 +321,19 @@ test('V20 foreign-key dependencies provide actionable safe feedback in six langu
  assert.equal(v20ErrorCategory({status:403,code:'23503'}),'access');
  assert.equal(v20ErrorCategory({status:401,code:'23503'}),'auth');
 });
+
+
+test('V20 PostgREST PGRST116 no-row errors use localized not-found guidance',()=>{
+ const translations=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const message=v20SafeError(locale,{code:'PGRST116',message:'private row token=secret'});
+  translations.add(message);
+  assert.equal(v20ErrorCategory({code:'PGRST116'}),'notFound');
+  assert.equal(message,v20SafeError(locale,{status:404}));
+  assert.doesNotMatch(message,/private|token|secret|PGRST116|supabase/i);
+  assert.equal(v20SafeError(locale,{code:'PGRST116 '}),v20SafeError(locale));
+ }
+ assert.equal(translations.size,6);
+ assert.equal(v20ErrorCategory({status:401,code:'PGRST116'}),'auth');
+ assert.equal(v20ErrorCategory({status:403,code:'PGRST116'}),'access');
+});
