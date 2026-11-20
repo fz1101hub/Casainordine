@@ -71,3 +71,13 @@ test('v3.2 counts in advanced modules are localized and reject absent or invalid
   }
  }
 });
+
+
+test('v3.2 monetary formatter rejects unsafe integer amounts in every locale',()=>{
+ for(const {code,locale} of LANGUAGES){
+  for(const invalid of [Number.MAX_SAFE_INTEGER+1,'9007199254740993','-9007199254740993']){
+   assert.equal(formatMoney(invalid,code),'—');
+  }
+  assert.equal(formatMoney(Number.MAX_SAFE_INTEGER,code),new Intl.NumberFormat(locale,{style:'currency',currency:'EUR'}).format(Number.MAX_SAFE_INTEGER));
+ }
+});
