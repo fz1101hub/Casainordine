@@ -11,7 +11,7 @@ async function mailRequest(client,path,method='GET',payload,tr,language){
   const {data:{session}}=await client.auth.getSession();
   if(!session?.access_token)throw new Error(tr('mail.sessionExpired'));
   const response=await fetch(`/api/mail/${path}`,{
-    method,headers:{Authorization:`Bearer ${session.access_token}`,...(payload?{'Content-Type':'application/json'}:{})},
+    method,headers:{Authorization:`Bearer ${session.access_token}`,'Accept-Language':language,...(payload?{'Content-Type':'application/json'}:{})},
     ...(payload?{body:JSON.stringify(payload)}:{})
   });
   const result=await response.json().catch(()=>({}));
