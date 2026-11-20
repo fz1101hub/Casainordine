@@ -17,5 +17,7 @@ export async function POST(request){
   if(last && Date.now()-last<5*60_000)return json({error:message('syncRate')},429);
   if('last_attempt_at' in data)await admin.from('mail_connections').update({last_attempt_at:new Date().toISOString()}).eq('id',data.id).eq('user_id',user.id);
   const result=await syncConnection(admin,data,{messageLimit:25,docLimit:5});
-  return json(result,result.error?502:200);
+  // Non esporre messaggi grezzi del provider o dettagli interni nel client.
+  // Mantieni i contatori già elaborati anche quando la sincronizzazione fallisce.
+  return json(result.error?{...result,error:message('syncFailure')}:result,result.error?502:200);
 }
