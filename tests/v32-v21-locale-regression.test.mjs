@@ -6,7 +6,7 @@ const source=readFileSync(new URL('../app/V21Hub.jsx',import.meta.url),'utf8');
 
 test('V21 uses the active language provider for amounts, dates and counts',()=>{
  assert.match(source,/const \{money,date:formatDate,locale,language,t:tr\}=useLanguage\(\)/);
- assert.match(source,/new Intl\.NumberFormat\(locale,\{maximumFractionDigits:0\}\)/);
+ assert.match(source,/const formatCount=value=>formatLocalizedCount\(value,language\)/);
  assert.match(source,/const asDate=d=>formatDate\(d\)/);
  assert.match(source,/formatV20Timestamp\(s\.expires_at,locale\)/);
 });
