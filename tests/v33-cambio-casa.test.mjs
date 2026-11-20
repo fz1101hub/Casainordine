@@ -8,7 +8,9 @@ test('Cambio casa: ogni caricamento scarta le risposte superate',()=>{
     const s=source(path);
     assert.match(s,/const loadSeq=useRef\(0\);/,path);
     assert.match(s,/const seq=\+\+loadSeq\.current;/,path);
-    const guard=s.indexOf('if(seq!==loadSeq.current)return;');
+    const guard=path==='app/V20Hub.jsx'
+      ? s.indexOf('if(seq!==loadSeq.current||activeAccount.current!==accountId||activeHome.current!==homeId)return;')
+      : s.indexOf('if(seq!==loadSeq.current)return;');
     assert.ok(guard>0&&guard<s.indexOf(setter),path+': controllo prima di usare la risposta');
   }
   const page=source('app/page.jsx');
@@ -30,4 +32,27 @@ test('Spese condivise: solo le quote delle spese della casa aperta',()=>{
   const s=source('app/HouseholdHub.jsx');
   assert.match(s,/from\('home_expense_shares'\)\.select\('expense_id,user_id,amount'\)\.in\('expense_id',expenseIds\)/);
   assert.doesNotMatch(s,/from\('home_expense_shares'\)\.select\('expense_id,user_id,amount'\)\.limit\(1000\)/);
+});
+
+test('V20: assenza account svuota i dati in memoria prima di terminare il caricamento',()=>{
+  const s=source('app/V20Hub.jsx');
+  const start=s.indexOf('if(!client||!accountId){');
+  const end=s.indexOf('setLoading(true);',start);
+  assert.ok(start>=0&&end>start,'ramo senza sessione presente');
+  const branch=s.slice(start,end);
+  assert.match(branch,/setRows\(\{goals:\[\],moves:\[\],steps:\[\],notices:\[\],risk:\[\],audit:\[\],recycle:\[\],alerts:\[\],connections:\[\],preferences:null,people:\[\],former:\[\]\}\)/);
+  assert.ok(branch.indexOf('setRows(')<branch.indexOf('setLoading(false)'));
+});
+
+test('V20: le connessioni email non partono con token assente, account diverso o caricamento superato',()=>{
+  const s=source('app/V20Hub.jsx');
+  const start=s.indexOf('client.auth.getSession().then(');
+  const end=s.indexOf('client.from(\'user_alert_preferences\')',start);
+  assert.ok(start>=0&&end>start,'richiesta connessioni presente');
+  const request=s.slice(start,end);
+  assert.match(request,/seq===loadSeq\.current/);
+  assert.match(request,/activeAccount\.current===accountId/);
+  assert.match(request,/session\?\.user\?\.id===accountId/);
+  assert.match(request,/session\?\.access_token\?fetch\('\/api\/mail\/connections'/);
+  assert.match(request,/\{ok:false,status:401,json:async\(\)=>\(\{\}\)\}/);
 });
