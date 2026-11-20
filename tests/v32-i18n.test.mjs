@@ -23,6 +23,12 @@ test('Accept-Language respects regional preferences and rejects invalid quality 
  assert.equal(acceptedLanguage('ja-JP, it-IT;q=0.5'),'it');
  assert.equal(acceptedLanguage('en-US;q=0, fr-FR;q=0'),'it');
 });
+test('Accept-Language rejects ambiguous and non-HTTP weights without overriding valid preferences',()=>{
+ const invalid=['en;q=0.8;q=0.9','en;q=1e0','en;q=0x1','en;q=0.1234','en;q=-0.1','en;q=1.001','en;foo=bar'];
+ for(const entry of invalid)assert.equal(acceptedLanguage(entry+', fr-FR;q=0.6'),'fr',entry);
+ assert.equal(acceptedLanguage('de-DE;q=0.6, fr-FR;q=0.6'),'de');
+ assert.equal(acceptedLanguage('en-US;q=0, fr-FR;q=0.4'),'fr');
+});
 test('all translations cover the same keys with nonempty text',()=>{
  for(const lang of LANGUAGES){
   assert.deepEqual(Object.keys(TRANSLATIONS[lang.code]).sort(),[...MESSAGE_KEYS].sort());
