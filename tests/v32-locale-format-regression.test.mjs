@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {formatDate,formatMoney,localeFor,LANGUAGES} from '../lib/i18n-core.mjs';
+import {formatDate,formatMoney,formatCount,localeFor,LANGUAGES} from '../lib/i18n-core.mjs';
 
 test('v3.2 dates use six explicit locales and remain calendar-day stable',()=>{
  const expected={it:'it-IT',en:'en-GB',es:'es-ES',fr:'fr-FR',de:'de-DE',pt:'pt-PT'};
@@ -58,5 +58,16 @@ test('v3.2 locale money rejects non-finite and non-decimal representations',()=>
   }
   assert.notEqual(formatMoney('-0.01',code),'—');
   assert.notEqual(formatMoney('.5',code),'—');
+ }
+});
+
+test('v3.2 counts in advanced modules are localized and reject absent or invalid values',()=>{
+ for(const {code,locale} of LANGUAGES){
+  for(const count of [0,1,1234,1234.5,'1234']){
+   assert.equal(formatCount(count,code),new Intl.NumberFormat(locale,{maximumFractionDigits:0}).format(Number(count)));
+  }
+  for(const invalid of [null,undefined,'',' ',NaN,Infinity,-Infinity,'NaN','Infinity','1e3','1,000',{},[],true]){
+   assert.equal(formatCount(invalid,code),'—');
+  }
  }
 });
