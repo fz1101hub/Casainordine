@@ -87,6 +87,6 @@ test('v3.2 money rejects fractional strings rounded to a safe integer boundary',
   for(const invalid of ['9007199254740991.1','-9007199254740991.9','9007199254740992.01']){
    assert.equal(formatMoney(invalid,code),'—');
   }
-  assert.notEqual(formatMoney('9007199254740990.5',code),'—');
+  assert.equal(formatMoney('9007199254740990.5',code),'—');
  }
 });
