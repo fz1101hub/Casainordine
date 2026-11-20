@@ -81,3 +81,12 @@ test('v3.2 monetary formatter rejects unsafe integer amounts in every locale',()
   assert.equal(formatMoney(Number.MAX_SAFE_INTEGER,code),new Intl.NumberFormat(locale,{style:'currency',currency:'EUR'}).format(Number.MAX_SAFE_INTEGER));
  }
 });
+
+test('v3.2 money rejects fractional strings rounded to a safe integer boundary',()=>{
+ for(const {code} of LANGUAGES){
+  for(const invalid of ['9007199254740991.1','-9007199254740991.9','9007199254740992.01']){
+   assert.equal(formatMoney(invalid,code),'—');
+  }
+  assert.notEqual(formatMoney('9007199254740990.5',code),'—');
+ }
+});
