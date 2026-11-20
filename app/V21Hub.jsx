@@ -2,7 +2,7 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {QrCode,Siren,ScanSearch,Calculator,FileCheck2,Plane,Camera,Vote,ClipboardCheck,Plus,Trash2,Download,Share2,KeyRound} from 'lucide-react';
 import {todayRome} from '../lib/dates.mjs';
-import {normalizeLanguage} from '../lib/i18n-core.mjs';
+import {normalizeLanguage,formatCount as formatLocalizedCount} from '../lib/i18n-core.mjs';
 import {formatV20Timestamp} from '../lib/v20-timestamp.mjs';
 import {useLanguage} from './LanguageProvider';
 import {v21BriefingCopy} from '../lib/v21-briefing-copy.mjs';
@@ -48,7 +48,7 @@ function QrPreview({asset,copy,categoryLabel}){
 }
 export default function V21Hub({client,user,homeId,homeName='',canWrite,demo,bills=[],tasks=[],tab,onNotify=()=>{}}){
  const {money,date:formatDate,locale,language,t:tr}=useLanguage();
- const formatCount=value=>new Intl.NumberFormat(locale,{maximumFractionDigits:0}).format(value);
+ const formatCount=value=>formatLocalizedCount(value,language);
  const assetCategory=value=>tr('extra.maint.category.'+({Impianto:'plant',Elettrodomestico:'appliance',Sicurezza:'safety',Arredamento:'furniture',Altro:'other'}[value]||'other'));
  const propertyType=value=>tr('extra.propertyType.'+({principale:'main','seconda casa':'second',affitto:'rental',altro:'other'}[value]||'other'));
  const documentType=value=>tr('extra.documentType.'+({bolletta:'bill',contratto:'contract',ricevuta:'receipt',garanzia:'warranty',manuale:'manual',condominio:'condominium',altro:'other'}[value]||'other'));
