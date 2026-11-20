@@ -66,7 +66,7 @@ test('v3.2 counts in advanced modules are localized and reject absent or invalid
   for(const count of [0,1,1234,1234.5,'1234']){
    assert.equal(formatCount(count,code),new Intl.NumberFormat(locale,{maximumFractionDigits:0}).format(Number(count)));
   }
-  for(const invalid of [null,undefined,'',' ',NaN,Infinity,-Infinity,'NaN','Infinity','1e3','1,000',{},[],true]){
+  for(const invalid of [null,undefined,'',' ',NaN,Infinity,-Infinity,'NaN','Infinity','1e3','1,000',{},[],true,Number.MAX_SAFE_INTEGER+1,'9007199254740993']){
    assert.equal(formatCount(invalid,code),'—');
   }
  }
