@@ -39,3 +39,17 @@ test('mailbox sync API has localized messages for six languages',()=>{
  assert.equal(mailStartMessage('syncId','xx-XX'),'ID non valido');
  assert.equal(mailStartMessage('syncId','fr-FR;q=0.3,de-DE;q=0.9'),'Ungültige ID');
 });
+
+
+test('sync failure is translated in six locales and never falls back to start failure',()=>{
+ const messages=new Set();
+ for(const [header] of cases){
+  const value=mailStartMessage('syncFailure',header);
+  assert.ok(value.length>25,header);
+  assert.notEqual(value,mailStartMessage('failure',header));
+  messages.add(value);
+ }
+ assert.equal(messages.size,6);
+ assert.equal(mailStartMessage('syncFailure','xx-XX'),mailStartMessage('syncFailure','it-IT'));
+ assert.equal(mailStartMessage('syncFailure','es-ES;q=0.2,pt-PT;q=0.8'),mailStartMessage('syncFailure','pt-PT'));
+});
