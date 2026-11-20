@@ -1,19 +1,21 @@
 import { authenticatedUser, getAdmin, json } from '../../../../lib/server.mjs';
 import { supplierKey } from '../../../../lib/payment-recognition.mjs';
 import { canEditBill } from '../../../../lib/home-access.mjs';
+import { mailStartMessage } from '../../../../lib/mail-api-i18n.mjs';
 export const runtime='nodejs';
 const validId=id=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id));
 
 export async function GET(request){
+  const message = key => mailStartMessage(key, request.headers.get('accept-language'));
   const user=await authenticatedUser(request);
-  if(!user)return json({error:'Non autorizzato'},401);
+  if(!user)return json({error:message('connectionsLogin')},401);
   const admin=getAdmin();
   const {data,error}=await admin.from('mail_payment_evidence')
     .select('id,sender_email,subject,amount,received_at,bill_id,status,created_at')
     .eq('user_id',user.id).eq('status','pending').order('created_at',{ascending:false}).limit(100);
-  if(error)return json({error:'Impossibile caricare le conferme. Verifica la migrazione v1.4.'},500);
+  if(error)return json({error:message('paymentsLoad')},500);
   const {data:trusted,error:trustError}=await admin.from('mail_payment_trusted_senders').select('id,sender_email,supplier_key').eq('user_id',user.id).order('created_at',{ascending:false}).limit(100);
-  return trustError?json({error:'Impossibile caricare i mittenti autorizzati.'},500):json({payments:data||[],trusted_senders:trusted||[]});
+  return trustError?json({error:message('paymentsTrustedLoad')},500):json({payments:data||[],trusted_senders:trusted||[]});
 }
 
 export async function PATCH(request){
