@@ -33,7 +33,7 @@ export default function MailImporter({client,onReview,notify,refresh=0,onPayment
       setConnections(c.connections||[]);setDocuments(d.documents||[]);setPayments(p.payments||[]);setTrustedSenders(p.trusted_senders||[]);setBillSenders(s.senders||[]);
     }catch(e){notify(e.message);}finally{setLoading(false);}
   }
-  useEffect(()=>{load();},[client,refresh]);
+  useEffect(()=>{load();},[client,refresh,language]);
   async function act(name,fn){setBusy(name);try{await fn();}catch(e){notify(e.message);}finally{setBusy('');}}
   const connect=provider=>act(`connect-${provider}`,async()=>{
     const {url}=await request('start','POST',{provider});
