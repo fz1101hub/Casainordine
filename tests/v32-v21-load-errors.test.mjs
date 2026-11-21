@@ -22,3 +22,12 @@ test('V21 error classifier never returns provider details',()=>{
   assert.equal(kind,'operationFailed');
   assert.ok(!kind.includes(secret));
 });
+
+
+test('V21 recognizes PostgREST missing table responses without exposing their text',()=>{
+  assert.equal(v21LoadErrorKind([{error:{code:'PGRST205',message:'schema cache private details'}}]),'migrationRequired');
+  assert.equal(v21LoadErrorKind([{error:{code:'42P01'}},{error:{code:'PGRST205'}}]),'migrationRequired');
+  assert.equal(v21LoadErrorKind([{error:{code:'PGRST205'}},{error:{code:'42501'}}]),'operationFailed');
+  assert.equal(v21LoadErrorKind([{error:{code:'PGRST205'}},{error:{message:'unknown'}}]),'operationFailed');
+  assert.equal(v21LoadErrorKind([{error:{code:null}}]),'operationFailed');
+});
