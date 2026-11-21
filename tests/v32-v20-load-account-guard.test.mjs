@@ -11,7 +11,7 @@ test('V20 load captures account identity before async requests',()=>{
 
 test('V20 ignores async results from previous account before applying rows or notifications',()=>{
  const guard=source.indexOf('if(seq!==loadSeq.current||activeAccount.current!==accountId||activeHome.current!==homeId)return;');
- const notify=source.indexOf('const error=res.find(r=>r.error);',guard);
+ const notify=source.indexOf('const errorKind=v21LoadErrorKind(res);',guard);
  const apply=source.indexOf('setRows(next);',guard);
  assert.ok(guard>0&&notify>guard&&apply>guard);
 });
