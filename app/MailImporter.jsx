@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Mail, RefreshCcw, Link2, Trash2, FileText, Eye, ShieldCheck, Info, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { IMAP_PROVIDERS, providerLabel } from '../lib/mail-providers.mjs';
 import {useLanguage} from './LanguageProvider';
@@ -26,14 +26,23 @@ export default function MailImporter({client,onReview,notify,refresh=0,onPayment
   const date=value=>formatMailDate(value,locale,tr('mail.never'));
   const [connections,setConnections]=useState([]),[documents,setDocuments]=useState([]),[payments,setPayments]=useState([]),[trustedSenders,setTrustedSenders]=useState([]),[billSenders,setBillSenders]=useState([]),[choices,setChoices]=useState({}),[trusted,setTrusted]=useState({}),[busy,setBusy]=useState(''),[loading,setLoading]=useState(true);
   const [imapProvider,setImapProvider]=useState('icloud'),[imapEmail,setImapEmail]=useState(''),[imapLogin,setImapLogin]=useState(''),[imapPassword,setImapPassword]=useState(''),[imapOpen,setImapOpen]=useState(false);
+  // Invalidate older responses on refresh, language changes and unmount.
+  const loadGeneration = useRef(0);
   async function load(){
-    if(!client)return;
+    const generation = ++loadGeneration.current;
+    if(!client){setLoading(false);return;}
+    setLoading(true);
     try{
       const [c,d,p,s]=await Promise.all([request('connections'),request('documents'),request('payments'),request('senders')]);
+      if(generation !== loadGeneration.current)return;
       setConnections(c.connections||[]);setDocuments(d.documents||[]);setPayments(p.payments||[]);setTrustedSenders(p.trusted_senders||[]);setBillSenders(s.senders||[]);
-    }catch(e){notify(e.message);}finally{setLoading(false);}
+    }catch(e){if(generation === loadGeneration.current)notify(e.message);}
+    finally{if(generation === loadGeneration.current)setLoading(false);}
   }
-  useEffect(()=>{load();},[client,refresh,language]);
+  useEffect(()=>{
+    load();
+    return ()=>{loadGeneration.current++;};
+  },[client,refresh,language]);
   async function act(name,fn){setBusy(name);try{await fn();}catch(e){notify(e.message);}finally{setBusy('');}}
   const connect=provider=>act(`connect-${provider}`,async()=>{
     const {url}=await request('start','POST',{provider});
