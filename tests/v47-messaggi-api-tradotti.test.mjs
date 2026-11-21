@@ -29,7 +29,8 @@ test('Ogni messaggio delle API delle caselle email ha la traduzione nelle 5 ling
   const mail = messages([...files('app/api/mail'), 'lib/mail-providers.mjs', 'lib/mail-imap.mjs'], ERROR_PATTERNS);
   // Le API localizzate con mailStartMessage non contengono più stringhe letterali.
   // Controlliamo separatamente tali chiavi nei test v32; qui restano gli errori legacy.
-  assert.ok(mail.length >= 20, `trovati ${mail.length} messaggi legacy`);
+  // Remaining literal errors are checked exhaustively; their count decreases as APIs migrate.
+  assert.ok(mail.length > 0, 'expected at least one legacy literal error to exercise this path');
   const missing = [];
   for (const message of mail) for (const lang of LANGS) {
     const translated = safeMailApiMessage(message, lang);
