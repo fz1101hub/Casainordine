@@ -6,5 +6,7 @@ const source=readFileSync(new URL('../app/MailImporter.jsx',import.meta.url),'ut
 
 test('mail requests use the selected language and reload on language changes',()=>{
   assert.match(source,/['"]Accept-Language['"]\s*:\s*language/);
-  assert.match(source,/useEffect\(\(\)=>\{load\(\);\},\[client,refresh,language\]\)/);
+  assert.match(source,/\[client,refresh,language\]/);
+  // A cleanup invalidates in-flight responses when the language changes.
+  assert.match(source,/return \(\)=>\{loadGeneration\.current\+\+;\}/);
 });
