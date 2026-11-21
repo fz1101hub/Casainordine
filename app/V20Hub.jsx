@@ -115,9 +115,17 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   const res=await save('bill_security_reviews',{bill_id:activeBill.id,sender:sender.slice(0,240),sender_auth:auth,iban_fingerprint:riskPreview.iban_fingerprint,iban_suffix:riskPreview.iban_suffix,risk_flags:riskPreview.flags,review_status:'pending'},ui.reviewSaved);
   if(res){setIban('');setRiskPreview(null)}
  }
- async function createMove(e){e.preventDefault();const plan=await save('home_move_plans',move,ui.movePlanCreated);if(!plan)return;
-  const steps=localizedMoveChecklist(moveChecklist(move.move_on),language).map(s=>({...common,plan_id:plan.id,title:s.title,due_on:s.due_on,done_at:null}));
-  const {error}=await client.from('home_move_steps').insert(steps);if(error)onNotify(ui.moveStepsPartial+v20SafeError(language,error));else onNotify(ui.movePlanAndStepsCreated);await load();setMove({title:'',move_on:today(),notes:''});}
+ async function createMove(e){e.preventDefault();
+  const accountId=user?.id,moveHomeId=homeId;
+  const sameContext=()=>activeAccount.current===accountId&&activeHome.current===moveHomeId;
+  const plan=await save('home_move_plans',move,ui.movePlanCreated);
+  // A home/account switch while the plan is saving must not start a second write.
+  if(!plan||!sameContext())return;
+  const steps=localizedMoveChecklist(moveChecklist(move.move_on),language).map(s=>({user_id:accountId,home_id:moveHomeId||null,plan_id:plan.id,title:s.title,due_on:s.due_on,done_at:null}));
+  const {error}=await client.from('home_move_steps').insert(steps);
+  if(!sameContext())return;
+  if(error)onNotify(ui.moveStepsPartial+v20SafeError(language,error));else onNotify(ui.movePlanAndStepsCreated);
+  await load();if(sameContext())setMove({title:'',move_on:today(),notes:''});}
  async function parseNoticeText(value){const guess=parsePagoPA(value);setNotice(o=>({...o,notice_code:guess.noticeCode||o.notice_code,creditor_code:guess.creditorCode||o.creditor_code}));
   setNoticeMessage(guess.ambiguous?ui.multipleNoticeCodes:guess.noticeCode?ui.suggestedNoticeCode:ui.unrecognizedNoticeCode);}
  async function captureNotice(file){if(!file)return;if(file.size>10485760||!['application/pdf','image/jpeg','image/png','image/webp'].includes(file.type))return setNoticeMessage(ui.noticeFileTypes);setNoticeMessage(ui.noticeReadingLocal);try{if(file.type.startsWith('image/')&&typeof BarcodeDetector!=='undefined'){
