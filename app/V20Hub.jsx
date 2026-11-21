@@ -10,6 +10,7 @@ import {v20MailHealthLabel} from '../lib/v20-alert-copy.mjs';
 import {localizedFraudFlag} from '../lib/v20-fraud-i18n.mjs';
 import {v20OcrProgress,v20OcrError} from '../lib/v20-ocr-i18n.mjs';
 import {v20SafeError} from '../lib/v20-safe-error.mjs';
+import {v21LoadErrorKind} from '../lib/v21-load-errors.mjs';
 import {memberName} from '../lib/member-names.mjs';
 import {missingBillCandidates,billFraudSignals,parsePagoPA,moveChecklist,savingsProjection,mailHealth} from '../lib/v20-core.mjs';
 import {readRatePlanDocument} from '../lib/document-reader.js';
@@ -62,7 +63,8 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   ]);
   // Cambiando casa in fretta può arrivare per ultima la risposta della casa precedente: si scarta.
   if(seq!==loadSeq.current||activeAccount.current!==accountId||activeHome.current!==homeId)return;
-  const error=res.find(r=>r.error);if(error)onNotify(ui.migrationRequired+v20SafeError(language,error.error));
+  const errorKind=v21LoadErrorKind(res);
+  if(errorKind)onNotify((errorKind==='migrationRequired'?ui.migrationRequired:ui.operationFailed+': ')+v20SafeError(language,res.find(r=>r.error)?.error));
   const next={};for(let i=0;i<specs.length;i++)next[specs[i][0]]=res[i].data||[];
   next.alerts=res[specs.length].data||[];next.connections=res[specs.length+1].data||[];next.preferences=res[specs.length+2].data||null;
   next.people=res[specs.length+3].data||[];next.former=res[specs.length+4].data||[];
