@@ -68,7 +68,8 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   next.people=res[specs.length+3].data||[];next.former=res[specs.length+4].data||[];
   setRows(next);setLoading(false);
  },[client,homeId,user?.id,language]);
- useEffect(()=>{load();},[load]);
+ // Invalidate pending reads when the component unmounts or its language/context changes.
+ useEffect(()=>{load();return ()=>{loadSeq.current+=1;draftSeq.current+=1;}},[load]);
   useEffect(()=>{
   const seq=++draftSeq.current;
   setDrafts([]);setOfflineError('');
