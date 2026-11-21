@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 const source=path=>readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
 
 test('Cambio casa: ogni caricamento scarta le risposte superate',()=>{
-  for(const [path,setter] of [['app/HomeExtra.jsx','const errors=responses'],['app/V20Hub.jsx','const error=res.find'],['app/V21Hub.jsx','setRows(newRows)'],['app/HouseholdHub.jsx','const err=[m,e,s,b,sh,v,d]']]){
+  for(const [path,setter] of [['app/HomeExtra.jsx','const errors=responses'],['app/V20Hub.jsx','const errorKind=v21LoadErrorKind(res)'],['app/V21Hub.jsx','setRows(newRows)'],['app/HouseholdHub.jsx','const err=[m,e,s,b,sh,v,d]']]){
     const s=source(path);
     assert.match(s,/const loadSeq=useRef\(0\);/,path);
     assert.match(s,/const seq=\+\+loadSeq\.current;/,path);
