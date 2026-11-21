@@ -9,5 +9,5 @@ test('V21 passport date-only fields use the selected locale formatter',()=>{
   assert.ok(source.includes(`${field}?formatDate(${field}):'—'`),`missing localized ${field}`);
  }
  assert.ok(source.includes('formatDate(passport.generated_at.slice(0,10))'));
- assert.match(source,/date:formatDate,locale,language\}=useLanguage\(\)/);
+ assert.match(source,/date:formatDate,locale,language,t:tr\}=useLanguage\(\)/);
 });

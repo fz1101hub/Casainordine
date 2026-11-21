@@ -7,6 +7,10 @@ const source=readFileSync(new URL('../app/V21Hub.jsx',import.meta.url),'utf8');
 test('V21 mutations are scoped to the selected personal or shared home',()=>{
  assert.match(source,/const scopedMutation=query=>homeId\?query\.eq\('home_id',homeId\):query\.eq\('user_id',user\?\.id\)\.is\('home_id',null\)/);
  assert.match(source,/scopedMutation\(client\.from\(table\)\.update\(patch\)\.eq\('id',id\)\)/);
- assert.match(source,/scopedMutation\(client\.from\(table\)\.delete\(\)\.eq\('id',id\)\)/);
- assert.match(source,/if\(!canWrite\|\|!user\?\.id\|\|!\(await askConfirm/);
+ assert.match(source,/const accountId=user\.id, targetHomeId=homeId\|\|null/);
+ assert.match(source,/shareContextRef\.current\.userId!==accountId/);
+ assert.match(source,/targetHomeId\?query\.eq\('home_id',targetHomeId\):query\.eq\('user_id',accountId\)\.is\('home_id',null\)/);
+ assert.doesNotMatch(source,/scopedMutation\(client\.from\(table\)\.delete\(\)\.eq\('id',id\)\)/);
+ assert.match(source,/if\(!canWrite\|\|!user\?\.id\)return/);
+ assert.match(source,/if\(!\(await askConfirm/);
 });

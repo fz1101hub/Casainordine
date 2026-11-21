@@ -4,8 +4,8 @@ import {readFileSync} from 'node:fs';
 
 const source=readFileSync(new URL('../app/V21Hub.jsx',import.meta.url),'utf8');
 test('V21 renders dates using the active account language',()=>{
- assert.match(source,/date:formatDate,locale(?:,language)?\}=useLanguage\(\)/);
+ assert.match(source,/date:formatDate,locale,language,t:tr\}=useLanguage\(\)/);
  assert.match(source,/const asDate=d=>formatDate\(d\)/);
  assert.doesNotMatch(source,/toLocale(?:Date)?String\('it-IT'/);
- assert.match(source,/expires_at\)\.toLocaleString\(locale\)/);
+ assert.match(source,/formatV20Timestamp\(s\.expires_at,locale\)/);
 });

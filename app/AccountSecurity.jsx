@@ -25,10 +25,16 @@ export function PasswordRecoveryDialog({ client, t, onDone }) {
     e.preventDefault(); setError('');
     if (password.length < 8) { setError(t('account.newPassword')); return; }
     setPending(true);
-    const { error: err } = await client.auth.updateUser({ password });
-    setPending(false);
-    if (err) { setError(t('account.passwordFailed')); return; }
-    onDone(t('account.passwordSaved'));
+    try {
+      const { error: err } = await client.auth.updateUser({ password });
+      if (err) { setError(t('account.passwordFailed')); return; }
+      onDone(t('account.passwordSaved'));
+    } catch {
+      // Anche un errore di rete deve lasciare la finestra utilizzabile e localizzata.
+      setError(t('account.passwordFailed'));
+    } finally {
+      setPending(false);
+    }
   }
   return <div className="modal-overlay"><div className="modal" role="dialog" aria-modal="true" aria-labelledby="recovery-title">
     <div className="modal-head"><div><h2 id="recovery-title"><KeyRound size={20}/> {t('account.newPasswordTitle')}</h2></div></div>
