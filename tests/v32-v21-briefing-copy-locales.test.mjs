@@ -18,7 +18,8 @@ test('V21: all six locales expose usable text for critical dialogs, privacy and 
 
 test('V21: interpolation parameters stay consistent across translations',()=>{
  const reference=v21BriefingCopy('it');
- const placeholders=s=>[...s.matchAll(/\\{([a-zA-Z][a-zA-Z0-9_]*)\\}/g)].map(x=>x[1]).sort();
+ const placeholders=s=>[...s.matchAll(/\{([a-zA-Z][a-zA-Z0-9_]*)\}/g)].map(x=>x[1]).sort();
+ assert.deepEqual(placeholders('Importo {amount} entro {date}'),['amount','date'],'the placeholder detector must match real templates');
  for(const language of languages.slice(1)){
   const translated=v21BriefingCopy(language);
   for(const [key,value] of Object.entries(reference)){
