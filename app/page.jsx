@@ -5,7 +5,7 @@ import {
   Plus, Search, CheckCircle2, CalendarDays, LogOut, ArrowUpRight, TrendingDown,
   Wallet, LockKeyhole, Trash2, Mail, ShieldCheck, RefreshCcw, Link2,
   Menu, X, UserRound, Download, Cloud, Info, Clock, AlertCircle, Check,
-  Filter, ChevronRight, Zap, CircleHelp, Send, Eye, EyeOff, FileImage, FileText, Users, ShoppingBasket, Car, Archive, BarChart3, Wrench, Building2, ClipboardList, ScanSearch
+  Filter, ChevronRight, Zap, CircleHelp, Send, Eye, EyeOff, FileImage, FileText, Users, ShoppingBasket, Car, Archive, BarChart3, Wrench, Building2, ClipboardList, ScanSearch, HardHat
 } from 'lucide-react';
 import { db } from '../lib/supabase-browser';
 import { addDaysISO, nextRecurringDue, todayRome, normalizeDate, euro } from '../lib/dates.mjs';
@@ -35,6 +35,7 @@ const PushSettings=lazy(()=>import('./PushSettings'));
 const CalendarFeed=lazy(()=>import('./CalendarFeed'));
 const HomeExtra=lazy(()=>import('./HomeExtra'));
 const Automations=lazy(()=>import('./Automations'));
+const Professionals=lazy(()=>import('./Professionals'));
 const V20Hub=lazy(()=>import('./V20Hub'));
 const V21Hub=lazy(()=>import('./V21Hub'));
 const SampleAccountSetup=lazy(()=>import('./SampleAccountSetup'));
@@ -55,6 +56,7 @@ const menu = [
   {id:'archive',icon:Archive},
   {id:'properties',icon:Building2},
   {id:'maintenance',icon:Wrench},
+  {id:'professionals',icon:HardHat},
   {id:'contracts',icon:ClipboardList},
   {id:'payments',icon:CheckCircle2},
   {id:'alerts',icon:Bell},
@@ -134,7 +136,7 @@ function Auth({client}) {
   }
   return <div className="auth-wrap"><div className="auth-decoration"><span className="auth-logo"><House size={23}/></span><p>{t('auth.brandLine')}</p><h1>{t('auth.tagline')}</h1><p className="auth-intro">{t('auth.intro')}</p><div className="auth-quote"><Bell size={21}/> {t('auth.reminder')}</div></div>
     <div className="auth-card"><LanguageSelector id="auth-language" className="auth-language" label={true}/><div className="brand auth-mobile"><span className="brand-icon"><House size={22}/></span><b>Casa<span>inOrdine</span></b></div><div className="eyebrow">{t('v32.notifications.authEyebrow')}</div><h2>{t(signup?'auth.signupTitle':'auth.title')}</h2><p className="muted">{t(signup?'auth.signupHelp':'auth.loginHelp')}</p>
-      <form onSubmit={submit}><label>{t('auth.email')}<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="tu@esempio.it"/></label><label>{t('auth.password')}<input type="password" minLength={6} required value={password} onChange={e=>setPassword(e.target.value)} placeholder={t('auth.passwordHint')}/></label>{!signup&&<ForgotPasswordButton client={client} email={email} t={t} onMessage={message=>{setError('');setInfo(message);}}/>}<button className="btn btn-primary full" disabled={pending}>{t(pending?'auth.signingIn':signup?'auth.signUp':'auth.signIn')}<ChevronRight size={17}/></button></form>
+      <form onSubmit={submit}><label>{t('auth.email')}<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder={t('ui.emailPlaceholder')}/></label><label>{t('auth.password')}<input type="password" minLength={6} required value={password} onChange={e=>setPassword(e.target.value)} placeholder={t('auth.passwordHint')}/></label>{!signup&&<ForgotPasswordButton client={client} email={email} t={t} onMessage={message=>{setError('');setInfo(message);}}/>}<button className="btn btn-primary full" disabled={pending}>{t(pending?'auth.signingIn':signup?'auth.signUp':'auth.signIn')}<ChevronRight size={17}/></button></form>
       <div className="auth-separator">{t('auth.or')}</div><a className="btn btn-soft full" href="/prova" style={{textDecoration:'none',justifyContent:'center'}}><House size={18}/> {t('auth.demo')}</a><button className="btn btn-soft full" onClick={google}><span className="google-dot">G</span> {t('auth.google')}</button>
       {error&&<p className="auth-error">{error}</p>}{info&&!error&&<p className="auth-info" role="status">{info}</p>}<p className="auth-switch">{t(signup?'auth.hasAccount':'auth.noAccount')} <button onClick={()=>{setSignup(!signup);setError('');}}>{t(signup?'auth.signIn':'auth.signUp')}</button></p><p className="privacy-line"><LockKeyhole size={13}/> {t('auth.privacy')}</p>
     </div></div>;
@@ -597,6 +599,7 @@ export default function Page() {
         {activeHomeId&&!canWrite&&<div className="informative"><ShieldCheck size={17}/><p>{tr('v32.shell.readOnly')}</p></div>}
         {demo&&<div className="demo-banner"><Info size={17}/><div><b>{tr('v32.batch.demoTitle')}</b> {tr('v32.batch.demoHelp')}</div><button onClick={()=>{localStorage.removeItem('casainordine-demo-v1');setData(fakeData());notify(tr('v32.batch.demoResetDone'));}} >{tr('v32.batch.demoReset')}</button></div>}
         {['insights','archive','properties','maintenance','contracts','payments','alerts'].includes(tab)&&<HomeExtra client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} bills={bills} utilities={utilities} tab={tab} onNotify={notify} onRefresh={reload} intent={captureIntent} onIntentUsed={()=>setCaptureIntent(null)}/>}
+        {tab==='professionals'&&<Professionals client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} onNotify={notify}/>}
         {tab==='automations'&&<Automations client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} bills={bills} onNotify={notify}/>}
         {['tags','sos','radar','simulator','passport','vacation','inventory','decisions','briefing'].includes(tab)&&<V21Hub client={client} user={user} homeId={activeHomeId} homeName={homeMembership?.homes?.name||''} canWrite={canWrite} demo={demo} bills={bills} tasks={tasks} tab={tab} onNotify={notify}/>}
         {['monitor','fraud','pagopa','history','moving','savings','offline'].includes(tab)&&<V20Hub client={client} user={user} homeId={activeHomeId} canWrite={canWrite} demo={demo} bills={bills} utilities={utilities} tab={tab} onNotify={notify} onRefresh={reload}/>}

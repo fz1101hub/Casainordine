@@ -24,6 +24,7 @@ Ordine completo di installazione su un database nuovo, in quest'ordine:
 10. `migrate_v41_ex_membri.sql`: quello che un membro aveva inserito in una casa condivisa resta alla casa anche se lascia la casa o cancella l'account: nell'app compare con il suo nome e la scritta «ex membro». Le voci passano al proprietario, i file dei documenti restano.
 11. `migrate_v42_permessi.sql`: toglie i permessi che l'app non usa. Chi non ha fatto l'accesso non ha più permessi sul database; chi l'ha fatto non può svuotare tabelle né creare trigger. Le regole di accesso restano quelle di prima.
 12. `migrate_v43_automazioni.sql`: automazioni personalizzate (soglie delle bollette, rinnovi dei contratti, promemoria periodici). Proprietario ed editor creano le regole della casa, tutti i membri le vedono; al massimo 30 per spazio. Finché non è eseguita, la sezione Automazioni dice che va attivata e il controllo programmato le salta.
+13. `migrate_v44_professionisti.sql`: professionisti di fiducia con contatti e nota condivisa, nota privata di ciascuno e collegamento degli interventi di manutenzione. Finché non è eseguita, la sezione Professionisti dice che va attivata e il registro delle manutenzioni funziona come prima.
 
 Ogni script è in una sola transazione e si può rieseguire.
 

@@ -92,7 +92,7 @@ test('Il browser non scarica il dizionario intero: nessun componente lo importa'
 test('Dizionari per il browser: una lingua alla volta, sezione V20 a parte, niente testi del server', () => {
   const all = dictionaries();
   assert.deepEqual(Object.keys(all), LANGS);
-  assert.deepEqual(SECTIONS, ['v20', 'automation']);
+  assert.deepEqual(SECTIONS, ['v20', 'automation', 'professional']);
   for (const lang of LANGS) {
     const { app, v20, automation, offline, server } = all[lang];
     assert.ok(Object.keys(app).length > 1000);
@@ -147,4 +147,18 @@ test('I dizionari si generano da soli prima di build e dev e dopo l’installazi
   // Finché la lingua scelta non è arrivata si usa l'italiano (incluso nell'app).
   assert.match(read('app/LanguageProvider.jsx'), /\(dictionaries\[lang\]\|\|italian\)\[key\]\?\?italian\[key\]/);
   assert.doesNotMatch(read('app/LanguageProvider.jsx'), /from '\.\.\/lib\/i18n\.mjs'/);
+});
+
+test('Niente testo scritto direttamente negli attributi visibili dei componenti', () => {
+  // label, placeholder, title, aria-label e alt mostrano testo: vanno presi dal dizionario.
+  // Unica eccezione: LocalizedTitle riceve la chiave («meta.*»), non il testo.
+  const offenders = [];
+  for (const file of readdirSync(new URL('../app/', import.meta.url)).filter(name => name.endsWith('.jsx'))) {
+    const source = read('app/' + file);
+    for (const match of source.matchAll(/\b(label|placeholder|title|aria-label|alt|description)="([^"]*\p{L}[^"]*)"/gu)) {
+      if (/^meta\.[\w.]+$/.test(match[2])) continue;
+      offenders.push(`${file}: ${match[0]}`);
+    }
+  }
+  assert.deepEqual(offenders, []);
 });

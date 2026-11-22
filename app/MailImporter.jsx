@@ -109,7 +109,7 @@ export default function MailImporter({client,onReview,notify,refresh=0,onPayment
         <label>{tr('mail.emailService')}
           <select value={imapProvider} onChange={e=>setImapProvider(e.target.value)}>{Object.entries(IMAP_PROVIDERS).map(([id])=><option key={id} value={id}>{providerName(id)}</option>)}</select>
         </label>
-        <div className="mail-imap-fields"><label>{tr('mail.address')}<input type="email" autoComplete="email" required value={imapEmail} onChange={e=>setImapEmail(e.target.value)} placeholder="tuoindirizzo@esempio.it"/></label>
+        <div className="mail-imap-fields"><label>{tr('mail.address')}<input type="email" autoComplete="email" required value={imapEmail} onChange={e=>setImapEmail(e.target.value)} placeholder={tr('ui.emailPlaceholder')}/></label>
         <label>{tr('mail.login')}<input autoComplete="username" value={imapLogin} onChange={e=>setImapLogin(e.target.value)} placeholder={tr('mail.loginHint')}/></label></div>
         <label>{tr('mail.password')}<input type="password" minLength={4} autoComplete="new-password" required value={imapPassword} onChange={e=>setImapPassword(e.target.value)} placeholder={tr('mail.passwordHint')}/></label>
         <p className="mail-imap-tip"><Info size={15}/> Server: {IMAP_PROVIDERS[imapProvider].host}:993 (TLS). {tr('mail.imap.tip.'+imapProvider)}</p>
