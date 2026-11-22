@@ -5,10 +5,10 @@ import {formatDate} from '../lib/i18n.mjs';
 
 const source=readFileSync(new URL('../app/V20Hub.jsx',import.meta.url),'utf8');
 test('V20 uses account locale for date and timestamp rendering',()=>{
- assert.match(source,/date:formatDate,locale(?:,language)?\}=useLanguage\(\)/);
+ assert.match(source,/date:formatDate,locale,language,t\}=useLanguage\(\)/);
  assert.doesNotMatch(source,/toLocale(?:Date)?String\('it-IT'/);
- assert.match(source,/toLocaleString\(locale\)/);
- assert.match(source,/toLocaleDateString\(locale\)/);
+ assert.match(source,/formatV20Timestamp\(/);
+ assert.match(source,/formatV20Date\(/);
 });
 test('date formats are distinct across six supported locales',()=>{
  const values=['it','en','es','fr','de','pt'].map(lang=>formatDate('2026-12-03',lang));

@@ -233,3 +233,30 @@ test('regional reminder locales accept real leap days and preserve calendar boun
   }
  }
 });
+
+
+test('German bill reminder uses consistent informal address without altering dates or names',()=>{
+ const name='Strom';
+ const {subject,text}=billReminderCopy({language:'de-DE',name,dueDate:'2026-12-31'});
+ assert.match(subject,/Rechnungsfälligkeit/);
+ assert.match(text,/Die Rechnung Strom ist am/);
+ assert.match(text,/Öffne Casa in Ordine, um die Details zu prüfen\./);
+ assert.doesNotMatch(text,/Öffnen Sie Casa in Ordine/);
+ assert.equal(text.split('\n').length,3);
+ assert.equal(name,'Strom');
+});
+
+
+test('French and Portuguese reminder footers use the same register as the app (vous / formal pt-PT)',()=>{
+ const cases=[
+  {language:'fr-FR',expected:'Ouvrez Casa in Ordine pour vérifier les détails.',other:/Ouvre Casa in Ordine/},
+  {language:'pt-PT',expected:'Abra Casa in Ordine para consultar os detalhes.',other:/Abre Casa in Ordine/}
+ ];
+ for(const {language,expected,other} of cases){
+  const {text}=billReminderCopy({language,name:'Energia',dueDate:'2026-12-31'});
+  assert.ok(text.endsWith(expected),language);
+  assert.doesNotMatch(text,other,language);
+  assert.match(text,/Energia/,language);
+  assert.equal(text.split('\n').length,3,language);
+ }
+});

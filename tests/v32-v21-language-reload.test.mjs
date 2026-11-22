@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 const source=readFileSync(new URL('../app/V21Hub.jsx',import.meta.url),'utf8');
 
 test('V21 data reload uses current language for database error messages',()=>{
- assert.match(source,/const \{money,date:formatDate,locale,language\}=useLanguage\(\)/);
+ assert.match(source,/const \{money,date:formatDate,locale,language,t:tr\}=useLanguage\(\)/);
  assert.match(source,/const errorKind=v21LoadErrorKind\(errors\)/);
  assert.match(source,/if\(errorKind\)onNotify\(briefingCopy\[errorKind\]\)/);
  assert.doesNotMatch(source,/onNotify\(briefingCopy\.migrationRequired\+errors\[0\]\.error\.message\)/);

@@ -1,19 +1,23 @@
 import { authenticatedUser, getAdmin, json } from '../../../../lib/server.mjs';
 import { syncConnection } from '../../../../lib/mail-sync.mjs';
+import { mailStartMessage } from '../../../../lib/mail-api-i18n.mjs';
 export const runtime='nodejs';
 export const maxDuration=60;
 export async function POST(request){
-  const user=await authenticatedUser(request);if(!user)return json({error:'Non autorizzato'},401);
+  const message=key=>mailStartMessage(key,request.headers.get('accept-language'));
+  const user=await authenticatedUser(request);if(!user)return json({error:message('syncLogin')},401);
   const {id}=await request.json().catch(()=>({}));
-  if(!/^[0-9a-f-]{36}$/i.test(String(id)))return json({error:'ID non valido'},400);
+  if(!/^[0-9a-f-]{36}$/i.test(String(id)))return json({error:message('syncId')},400);
   const admin=getAdmin();
   const {data,error}=await admin.from('mail_connections').select('*').eq('id',id).eq('user_id',user.id).maybeSingle();
-  if(error||!data)return json({error:'Casella non trovata'},404);
-  if(data.status==='reconnect')return json({error:'Ricollega l’account prima di sincronizzare.'},409);
+  if(error||!data)return json({error:message('syncMissing')},404);
+  if(data.status==='reconnect')return json({error:message('syncReconnect')},409);
   // Anche i tentativi falliti contano (last_attempt_at, v3.3): niente richieste ripetute al provider.
   const last=[data.last_sync_at,data.last_attempt_at].filter(Boolean).map(x=>new Date(x).getTime()).sort((a,b)=>b-a)[0];
-  if(last && Date.now()-last<5*60_000)return json({error:'Sincronizzazione già eseguita recentemente. Riprova tra 5 minuti.'},429);
+  if(last && Date.now()-last<5*60_000)return json({error:message('syncRate')},429);
   if('last_attempt_at' in data)await admin.from('mail_connections').update({last_attempt_at:new Date().toISOString()}).eq('id',data.id).eq('user_id',user.id);
   const result=await syncConnection(admin,data,{messageLimit:25,docLimit:5});
-  return json(result,result.error?502:200);
+  // Non esporre messaggi grezzi del provider o dettagli interni nel client.
+  // Mantieni i contatori già elaborati anche quando la sincronizzazione fallisce.
+  return json(result.error?{...result,error:message('syncFailure')}:result,result.error?502:200);
 }

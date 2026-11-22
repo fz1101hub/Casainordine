@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
+import {normalizeLanguage} from '../lib/i18n-core.mjs';
 
 const source=readFileSync(new URL('../app/V21Hub.jsx',import.meta.url),'utf8');
 const start=source.indexOf('const exportNames=');
@@ -10,7 +11,7 @@ assert.ok(start>=0&&end>start,'V21 filename helper must exist');
 // Execute only the self-contained filename helper, not the React component.
 const filename=(language,type,date)=>runInNewContext(
  source.slice(start,end)+'\n v21ExportName(language,type,date)',
- {language,type,date}
+ {language,type,date,normalizeLanguage}
 );
 
 test('V21 filenames work in all six languages without changing JSON extension',()=>{

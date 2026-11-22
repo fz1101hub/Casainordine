@@ -203,3 +203,174 @@ test('V20 HTTP 400 invalid requests reuse localized validation guidance safely',
  }
  assert.equal(translations.size,6);
 });
+
+test('V20 error locale parsing agrees with shared language normalization',()=>{
+ for(const [input,expected] of [[' EN_gb ','en'],['FR-fr','fr'],['pt_PT','pt'],['de-DE','de'],['es-ES','es']]){
+  assert.equal(v20SafeError(input,{status:403}),v20SafeError(expected,{status:403}));
+ }
+ for(const invalid of ['en--GB','fr!','pt/../../secret','en GB','xx-YY']){
+  assert.equal(v20SafeError(invalid,{status:403}),v20SafeError('it',{status:403}));
+ }
+});
+
+test('V20 HTTP 507 insufficient storage shows localized recovery without exposing provider details',()=>{
+ const translated=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const message=v20SafeError(locale,{status:507,message:'private bucket token=secret'});
+  translated.add(message);
+  assert.equal(v20ErrorCategory({status:507}),'storage');
+  assert.notEqual(message,v20SafeError(locale));
+  assert.doesNotMatch(message,/private|bucket|token|secret|507|supabase/i);
+  assert.equal(v20SafeError(locale,{status:'507'}),v20SafeError(locale));
+ }
+ assert.equal(translated.size,6);
+});
+
+
+test('V20 HTTP 423 locked resources show safe recovery in six languages',()=>{
+ const translated=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const message=v20SafeError(locale,{status:423,message:'private lock token=secret'});
+  translated.add(message);
+  assert.equal(v20ErrorCategory({status:423}),'locked');
+  assert.notEqual(message,v20SafeError(locale));
+  assert.notEqual(message,v20SafeError(locale,{status:409}));
+  assert.doesNotMatch(message,/private|token|secret|423|supabase/i);
+  assert.equal(v20SafeError(locale,{status:'423'}),v20SafeError(locale));
+ }
+ assert.equal(translated.size,6);
+});
+
+
+test('V20 HTTP 412 failed precondition uses safe localized concurrent-edit guidance',()=>{
+ const translations=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const message=v20SafeError(locale,{status:412,message:'private ETag token=secret'});
+  translations.add(message);
+  assert.equal(v20ErrorCategory({status:412}),'conflict');
+  assert.equal(message,v20SafeError(locale,{status:409}));
+  assert.doesNotMatch(message,/private|ETag|token|secret|412|supabase/i);
+  assert.equal(v20SafeError(locale,{status:'412'}),v20SafeError(locale));
+ }
+ assert.equal(translations.size,6);
+});
+
+
+test('V20 HTTP 428 required precondition preserves localized conflict guidance',()=>{
+ const translations=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const message=v20SafeError(locale,{status:428,message:'private If-Match token=secret'});
+  translations.add(message);
+  assert.equal(v20ErrorCategory({status:428}),'conflict');
+  assert.equal(message,v20SafeError(locale,{status:412}));
+  assert.doesNotMatch(message,/private|If-Match|token|secret|428|supabase/i);
+  assert.equal(v20SafeError(locale,{status:'428'}),v20SafeError(locale));
+ }
+ assert.equal(translations.size,6);
+});
+
+
+test('V20 HTTP 501 unsupported server feature uses safe six-language guidance',()=>{
+ const translations=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const message=v20SafeError(locale,{status:501,message:'private server route token=secret'});
+  translations.add(message);
+  assert.equal(v20ErrorCategory({status:501}),'schema');
+  assert.equal(message,v20SafeError(locale,{code:'PGRST202'}));
+  assert.notEqual(message,v20SafeError(locale,{status:503}));
+  assert.doesNotMatch(message,/private|route|token|secret|501|supabase/i);
+  assert.equal(v20SafeError(locale,{status:'501'}),v20SafeError(locale));
+ }
+ assert.equal(translations.size,6);
+});
+
+
+test('V20 database constraint SQLSTATE codes provide safe six-language feedback',()=>{
+ for(const locale of ['it','en','es','fr','de','pt']){
+  for(const code of ['23505']){
+   assert.equal(v20ErrorCategory({code}),'conflict');
+   assert.equal(v20SafeError(locale,{code,message:'private email token=secret'}),v20SafeError(locale,{status:409}));
+  }
+  for(const code of ['23502','23514','22P02']){
+   assert.equal(v20ErrorCategory({code}),'validation');
+   assert.equal(v20SafeError(locale,{code,details:'private address token=secret'}),v20SafeError(locale,{status:422}));
+  }
+  for(const code of ['23505 ','23505x','23503 ',23505]){
+   assert.equal(v20ErrorCategory({code}),'generic');
+   assert.equal(v20SafeError(locale,{code,message:'private token=secret'}),v20SafeError(locale));
+  }
+ }
+ // HTTP authorization takes precedence even if the provider also returns an SQLSTATE.
+ assert.equal(v20ErrorCategory({status:403,code:'23505'}),'access');
+ assert.equal(v20ErrorCategory({status:401,code:'23502'}),'auth');
+});
+
+
+test('V20 foreign-key dependencies provide actionable safe feedback in six languages',()=>{
+ const messages=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const message=v20SafeError(locale,{code:'23503',message:'private table and key token=secret'});
+  messages.add(message);
+  assert.equal(v20ErrorCategory({code:'23503'}),'dependency');
+  assert.notEqual(message,v20SafeError(locale));
+  assert.notEqual(message,v20SafeError(locale,{status:422}));
+  assert.doesNotMatch(message,/private|token|secret|23503|postgres|supabase/i);
+  assert.equal(v20SafeError(locale,{code:'23503 '}),v20SafeError(locale));
+ }
+ assert.equal(messages.size,6);
+ assert.equal(v20ErrorCategory({status:403,code:'23503'}),'access');
+ assert.equal(v20ErrorCategory({status:401,code:'23503'}),'auth');
+});
+
+
+test('V20 PostgREST PGRST116 no-row errors use localized not-found guidance',()=>{
+ const translations=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const message=v20SafeError(locale,{code:'PGRST116',message:'private row token=secret'});
+  translations.add(message);
+  assert.equal(v20ErrorCategory({code:'PGRST116'}),'notFound');
+  assert.equal(message,v20SafeError(locale,{status:404}));
+  assert.doesNotMatch(message,/private|token|secret|PGRST116|supabase/i);
+  assert.equal(v20SafeError(locale,{code:'PGRST116 '}),v20SafeError(locale));
+ }
+ assert.equal(translations.size,6);
+ assert.equal(v20ErrorCategory({status:401,code:'PGRST116'}),'auth');
+ assert.equal(v20ErrorCategory({status:403,code:'PGRST116'}),'access');
+});
+
+
+test('V20 PostgreSQL data exceptions show localized validation without leaking provider details',()=>{
+ const translations=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  for(const code of ['22001','22003','22007']){
+   assert.equal(v20ErrorCategory({code}),'validation');
+   const message=v20SafeError(locale,{code,message:'private account token=secret',details:'internal database value'});
+   assert.equal(message,v20SafeError(locale,{status:422}));
+   assert.doesNotMatch(message,/private|account|token|secret|internal|database|22001|22003|22007/i);
+   translations.add(message);
+   assert.equal(v20ErrorCategory({code:code+' '}),'generic');
+  }
+ }
+ assert.equal(translations.size,6);
+ assert.equal(v20ErrorCategory({status:401,code:'22001'}),'auth');
+ assert.equal(v20ErrorCategory({status:403,code:'22003'}),'access');
+});
+
+
+test('V20 PostgreSQL lock and cancelled-query SQLSTATEs use localized safe recovery',()=>{
+ const locked=new Set(),timedOut=new Set();
+ for(const locale of ['it','en','es','fr','de','pt']){
+  const lock=v20SafeError(locale,{code:'55P03',message:'private lock token=secret'});
+  const timeout=v20SafeError(locale,{code:'57014',details:'private SQL query token=secret'});
+  locked.add(lock);timedOut.add(timeout);
+  assert.equal(v20ErrorCategory({code:'55P03'}),'locked');
+  assert.equal(v20ErrorCategory({code:'57014'}),'timeout');
+  assert.equal(lock,v20SafeError(locale,{status:423}));
+  assert.equal(timeout,v20SafeError(locale,{status:408}));
+  assert.doesNotMatch(lock+' '+timeout,/private|token|secret|55P03|57014|postgres|supabase/i);
+  for(const code of ['55P03 ','57014x',55])assert.equal(v20SafeError(locale,{code}),v20SafeError(locale));
+ }
+ assert.equal(locked.size,6);assert.equal(timedOut.size,6);
+ assert.equal(v20ErrorCategory({status:401,code:'55P03'}),'auth');
+ assert.equal(v20ErrorCategory({status:403,code:'57014'}),'access');
+});
