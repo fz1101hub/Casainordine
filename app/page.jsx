@@ -10,6 +10,7 @@ import {
 import { db } from '../lib/supabase-browser';
 import { addDaysISO, nextRecurringDue, todayRome, normalizeDate, euro } from '../lib/dates.mjs';
 import { parseBillsCsv } from '../lib/csv.mjs';
+import { BILL_CATEGORIES } from '../lib/bill-categories.mjs';
 import { parseRatePlanText, rateItemsWithKeys } from '../lib/rate-plan.mjs';
 import { extractBillFields, billTitle } from '../lib/document-import.mjs';
 import { ForgotPasswordButton, PasswordRecoveryDialog, DeleteAccountPanel } from './AccountSecurity';
@@ -33,11 +34,12 @@ const HouseholdHub=lazy(()=>import('./HouseholdHub'));
 const PushSettings=lazy(()=>import('./PushSettings'));
 const CalendarFeed=lazy(()=>import('./CalendarFeed'));
 const HomeExtra=lazy(()=>import('./HomeExtra'));
+const Automations=lazy(()=>import('./Automations'));
 const V20Hub=lazy(()=>import('./V20Hub'));
 const V21Hub=lazy(()=>import('./V21Hub'));
 const SampleAccountSetup=lazy(()=>import('./SampleAccountSetup'));
 
-const categories = ['Luce','Gas','Acqua','Internet','Telefono','Rifiuti','Condominio','Affitto / Mutuo','Assicurazione','Tasse','Auto','Altro'];
+const categories = BILL_CATEGORIES;
 const frequencies = [{value:'none'},{value:'monthly'},{value:'bimonthly'},{value:'quarterly'},{value:'yearly'},{value:'biennial'}];
 const menu = [
   {id:'dashboard',icon:LayoutDashboard},
@@ -56,6 +58,7 @@ const menu = [
   {id:'contracts',icon:ClipboardList},
   {id:'payments',icon:CheckCircle2},
   {id:'alerts',icon:Bell},
+  {id:'automations',icon:Zap},
   {id:'monitor',icon:Mail},
   {id:'fraud',icon:ShieldCheck},
   {id:'pagopa',icon:ReceiptText},
@@ -594,6 +597,7 @@ export default function Page() {
         {activeHomeId&&!canWrite&&<div className="informative"><ShieldCheck size={17}/><p>{tr('v32.shell.readOnly')}</p></div>}
         {demo&&<div className="demo-banner"><Info size={17}/><div><b>{tr('v32.batch.demoTitle')}</b> {tr('v32.batch.demoHelp')}</div><button onClick={()=>{localStorage.removeItem('casainordine-demo-v1');setData(fakeData());notify(tr('v32.batch.demoResetDone'));}} >{tr('v32.batch.demoReset')}</button></div>}
         {['insights','archive','properties','maintenance','contracts','payments','alerts'].includes(tab)&&<HomeExtra client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} bills={bills} utilities={utilities} tab={tab} onNotify={notify} onRefresh={reload} intent={captureIntent} onIntentUsed={()=>setCaptureIntent(null)}/>}
+        {tab==='automations'&&<Automations client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} bills={bills} onNotify={notify}/>}
         {['tags','sos','radar','simulator','passport','vacation','inventory','decisions','briefing'].includes(tab)&&<V21Hub client={client} user={user} homeId={activeHomeId} homeName={homeMembership?.homes?.name||''} canWrite={canWrite} demo={demo} bills={bills} tasks={tasks} tab={tab} onNotify={notify}/>}
         {['monitor','fraud','pagopa','history','moving','savings','offline'].includes(tab)&&<V20Hub client={client} user={user} homeId={activeHomeId} canWrite={canWrite} demo={demo} bills={bills} utilities={utilities} tab={tab} onNotify={notify} onRefresh={reload}/>}
         {tab==='dashboard'&&<PersonalizedHome client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} bills={bills} tasks={tasks} displayName={displayName} onNavigate={changePage} onNewBill={()=>openModal('bill')} onNewTask={()=>openModal('task')} onPay={pay} onToggleTask={toggleTask} onRefresh={reload} onNotify={notify}/>}
