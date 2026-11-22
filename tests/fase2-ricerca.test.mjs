@@ -19,7 +19,7 @@ function fakeClient(rows = {}, failing = new Set()) {
         is(column, value) { chain.steps.push(['is', column, value]); return builder; },
         or(filter) { chain.steps.push(['or', filter]); return builder; },
         order(column, options) { chain.steps.push(['order', column, options]); return builder; },
-        limit(n) { chain.steps.push(['limit', n]); return Promise.resolve(failing.has(table) ? { data: null, error: { code: '42P01' } } : { data: rows[table] || [], error: null }); }
+        limit(n) { chain.steps.push(['limit', n]); return Promise.resolve(failing.has(table) ? { data: null, error: { code: failing instanceof Map ? failing.get(table) : '57014' } } : { data: rows[table] || [], error: null }); }
       };
       return builder;
     }
@@ -66,6 +66,10 @@ test('Una sezione che non risponde non blocca le altre', async () => {
   const found = await searchEverything(client, { text: 'luce', userId: 'u1' });
   assert.equal(found.failed, 1);
   assert.equal(found.results.length, 1);
+  // Una tabella non ancora creata (migrazione da eseguire) non conta come sezione che non risponde.
+  const early = await searchEverything(fakeClient({ bills: [{ id: 'b1', title: 'Luce' }] }, new Map([['home_professionals', 'PGRST205']])), { text: 'luce', userId: 'u1' });
+  assert.equal(early.failed, 0);
+  assert.equal(early.results.length, 1);
 });
 
 test('Testo troppo corto o nessun account: nessuna richiesta', async () => {

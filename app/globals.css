@@ -360,3 +360,14 @@
 .automation-notify{border:0;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:.4rem 1.2rem}
 .automation-notify legend{font-size:.83rem;font-weight:600;margin-bottom:.4rem;padding:0}
 .automation-notify input[type=radio]{width:18px;height:18px;accent-color:var(--green)}
+/* Professionisti di fiducia (Fase 2) */
+.professional-card{border-bottom:1px solid #e8e9e8;padding-bottom:.4rem}
+.professional-card .extra-item{border-bottom:0}
+.professional-card .extra-item b{display:flex;flex-wrap:wrap;gap:.45rem;align-items:center}
+.extra-item small.professional-contacts{display:flex;flex-wrap:wrap;gap:.3rem 1rem}
+.professional-contacts a{display:inline-flex;align-items:center;gap:.3rem;color:var(--green);font-weight:600;text-decoration:none;overflow-wrap:anywhere}
+.professional-notes{white-space:pre-line}
+.professional-card details{margin:.1rem 0 .5rem;font-size:.86rem}
+.professional-card summary{cursor:pointer;color:var(--green);font-weight:600;padding:.25rem 0}
+.professional-events{margin:.4rem 0 .7rem;padding-left:1.1rem;display:flex;flex-direction:column;gap:.3rem;line-height:1.45}
+.professional-private span{display:inline-flex;align-items:center;gap:.35rem}
