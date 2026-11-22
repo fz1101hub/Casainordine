@@ -58,3 +58,14 @@ test('monthly email summaries agree in number across all six recipient languages
   assert.equal(two.rows.length,2);
  }
 });
+
+test('monthly email subject uses the recipient locale for month and year',()=>{
+ const expected={it:'novembre 2026',en:'November 2026',es:'noviembre de 2026',fr:'novembre 2026',de:'November 2026',pt:'novembro de 2026'};
+ for(const [language,month] of Object.entries(expected)){
+  const copy=billSummaryCopy({language,today:'2026-11-04',bills});
+  assert.ok(copy.subject.includes(month),language+': '+copy.subject);
+  assert.ok(!copy.subject.includes('(2026-11)'),language);
+ }
+ const january=billSummaryCopy({language:'en',today:'2027-01-01',bills});
+ assert.ok(january.subject.includes('January 2027'));
+});
