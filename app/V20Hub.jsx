@@ -87,7 +87,7 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   const sameContext=()=>activeAccount.current===accountId&&activeHome.current===saveHomeId;
   setWorking(true);
   try{
-   const {data,error}=await client.from(table).insert({user_id:accountId,home_id:saveHomeId||null,...content}).select('*').single();
+   const {data,error}=await client.from(table).insert({...content,user_id:accountId,home_id:saveHomeId||null}).select('*').single();
    if(!sameContext())return null;
    if(error)throw error;
    onNotify(message);await load();
