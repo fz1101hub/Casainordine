@@ -70,3 +70,9 @@ Verificare CI e build del nuovo HEAD; poi continuare la localizzazione di V20/V2
 - Corretto `lib/notification-summary.mjs`: importi di singole bollette e totali che `formatMoney` non può rappresentare con precisione affidabile vengono rifiutati, anziché produrre `—` in un'email di riepilogo o un totale apparentemente preciso. Nessun importo persistito viene modificato.
 - Aggiunti casi in `tests/v32-notification-summary.test.mjs` per importi fuori intervallo sicuro, stringhe decimali oltre la precisione rappresentabile, overflow del totale e importi normali. Commit funzionale `0900f4f`, test `79b9606`.
 - **CI/build sul nuovo HEAD ancora da verificare.** Nessuna email reale inviata; restano collaudi staging, RLS multiaccount, browser nelle sei lingue, accessibilità/mobile, traduzioni residue e anteprima Vercel. Fase 1 aperta; Fasi 2 e 3 non avviate. Nessun merge o deploy.
+
+## Aggiornamento 22 novembre 2026 — grammatica email mensili
+
+- Verificata la pipeline del precedente commit `a57677f5216168a2158ca863c3d89685f5e54cd5`: [Actions #45045123734](https://github.com/fz1101hub/Casainordine/actions/runs/45045123734), `completed/success`. Non è prova dei commit seguenti.
+- Corretto `lib/notification-summary.mjs` (commit `4756b29`): il riepilogo con una sola bolletta ora usa la forma singolare in it/en/es/fr/de/pt, mantenendo il plurale per più bollette e senza cambiare importi o dati. Aggiunta regressione per tutte le lingue in `tests/v32-notification-summary.test.mjs` (commit `7914274`).
+- **CI e build sui nuovi commit non ancora verificate**; nessuna email reale inviata. Gate aperti: revisione traduzioni V20/V21/API/email, browser sei lingue, RLS multiaccount, privacy, accessibilità/mobile e anteprima Vercel. Nessun merge/deploy/migrazione. Fase 1 aperta; Fasi 2 e 3 non avviate.
