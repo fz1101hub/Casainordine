@@ -76,3 +76,11 @@ Verificare CI e build del nuovo HEAD; poi continuare la localizzazione di V20/V2
 - Verificata la pipeline del precedente commit `a57677f5216168a2158ca863c3d89685f5e54cd5`: [Actions #45045123734](https://github.com/fz1101hub/Casainordine/actions/runs/45045123734), `completed/success`. Non è prova dei commit seguenti.
 - Corretto `lib/notification-summary.mjs` (commit `4756b29`): il riepilogo con una sola bolletta ora usa la forma singolare in it/en/es/fr/de/pt, mantenendo il plurale per più bollette e senza cambiare importi o dati. Aggiunta regressione per tutte le lingue in `tests/v32-notification-summary.test.mjs` (commit `7914274`).
 - **CI e build sui nuovi commit non ancora verificate**; nessuna email reale inviata. Gate aperti: revisione traduzioni V20/V21/API/email, browser sei lingue, RLS multiaccount, privacy, accessibilità/mobile e anteprima Vercel. Nessun merge/deploy/migrazione. Fase 1 aperta; Fasi 2 e 3 non avviate.
+
+
+## Aggiornamento 22 novembre 2026 — riallineamento dopo merge PR
+
+- Verifica GitHub: la PR originaria [#3](https://github.com/fz1101hub/Casainordine/pull/3) risulta **closed / merged**; anche la successiva [#54](https://github.com/fz1101hub/Casainordine/pull/54) risulta **closed / merged** (22 novembre 2026, 17:44:03 UTC). Le indicazioni precedenti «PR #54 aperta/draft» sono storiche e **non più attuali**.
+- La CI del commit `1c1ad11896bb70cbf1856b8d31ead994f894d20e` è [#45050522772](https://github.com/fz1101hub/Casainordine/actions/runs/45050522772), **completed / success**. Questo non prova collaudi E2E, deploy anteprima, RLS multiaccount né copertura totale delle traduzioni.
+- Il merge della PR #54 **non equivale** al superamento dei gate della versione 3.2. Fase 1 resta attiva, Fasi 2 e 3 bloccate. Proseguire su una nuova PR draft di follow-up, senza ulteriori merge o release finché i gate non sono verificati.
+- Resta necessario verificare sul nuovo HEAD: tutti i flussi V20/V21 e API/email, preferenze e privacy su due account reali, accessibilità/mobile, test browser per sei lingue, build e preview Vercel. Nessuna migrazione o operazione sui dati in questo aggiornamento.
