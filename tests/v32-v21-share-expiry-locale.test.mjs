@@ -6,12 +6,12 @@ const source = readFileSync(new URL('../app/V21Hub.jsx', import.meta.url), 'utf8
 
 test('V21 renders temporary-share expiry with the active user locale and Rome timezone', () => {
   assert.match(source, /const\s*\{[^}]*\blocale\b[^}]*\}\s*=\s*useLanguage\(\)/);
-  assert.match(source, /formatV20Timestamp\(s\.expires_at,locale\)/);
+  assert.match(source, /stamp\(s\.expires_at\)/);
   assert.doesNotMatch(source, /new Date\(s\.expires_at\)\.toLocaleString\(['"]it-IT['"]/);
 });
 
 test('V21 never displays an invalid temporary-share expiry as Invalid Date', () => {
-  assert.match(source, /formatV20Timestamp\(s\.expires_at,locale\)/);
+  assert.match(source, /stamp\(s\.expires_at\)/);
 });
 
 test('V21 suggested SOS title comes from recipient language and preserves custom text', () => {

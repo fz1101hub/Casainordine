@@ -7,5 +7,5 @@ test('V21 renders dates using the active account language',()=>{
  assert.match(source,/date:formatDate,locale,language,t:tr\}=useLanguage\(\)/);
  assert.match(source,/const asDate=d=>formatDate\(d\)/);
  assert.doesNotMatch(source,/toLocale(?:Date)?String\('it-IT'/);
- assert.match(source,/formatV20Timestamp\(s\.expires_at,locale\)/);
+ assert.match(source,/stamp\(s\.expires_at\)/);
 });

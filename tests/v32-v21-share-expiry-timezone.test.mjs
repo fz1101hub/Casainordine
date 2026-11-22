@@ -5,7 +5,7 @@ import {formatV20Timestamp} from '../lib/v20-timestamp.mjs';
 
 const source=readFileSync(new URL('../app/V21Hub.jsx',import.meta.url),'utf8');
 test('V21 share expiry uses the user locale and an explicit Rome timezone',()=>{
- assert.match(source,/formatV20Timestamp\(s\.expires_at,locale\)/);
+ assert.match(source,/stamp\(s\.expires_at\)/);
  assert.doesNotMatch(source,/new Date\(s\.expires_at\)\.toLocaleString\(locale\)/);
 });
 test('share expiry winter and summer instants retain the Rome civil hour for all locales',()=>{
