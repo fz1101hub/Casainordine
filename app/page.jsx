@@ -5,7 +5,7 @@ import {
   Plus, Search, CheckCircle2, CalendarDays, LogOut, ArrowUpRight, TrendingDown,
   Wallet, LockKeyhole, Trash2, Mail, ShieldCheck, RefreshCcw, Link2,
   Menu, X, UserRound, Download, Cloud, Info, Clock, AlertCircle, Check,
-  Filter, ChevronRight, Zap, CircleHelp, Send, Eye, EyeOff, FileImage, FileText, Users, ShoppingBasket, Car, Archive, BarChart3, Wrench, Building2, ClipboardList, ScanSearch, HardHat, SunSnow
+  Filter, ChevronRight, Zap, CircleHelp, Send, Eye, EyeOff, FileImage, FileText, Users, ShoppingBasket, Car, Archive, BarChart3, Wrench, Building2, ClipboardList, ScanSearch, HardHat, SunSnow, Package
 } from 'lucide-react';
 import { db } from '../lib/supabase-browser';
 import { addDaysISO, nextRecurringDue, todayRome, normalizeDate, euro } from '../lib/dates.mjs';
@@ -37,6 +37,7 @@ const HomeExtra=lazy(()=>import('./HomeExtra'));
 const Automations=lazy(()=>import('./Automations'));
 const Professionals=lazy(()=>import('./Professionals'));
 const Seasonal=lazy(()=>import('./Seasonal'));
+const Stock=lazy(()=>import('./Stock'));
 const V20Hub=lazy(()=>import('./V20Hub'));
 const V21Hub=lazy(()=>import('./V21Hub'));
 const SampleAccountSetup=lazy(()=>import('./SampleAccountSetup'));
@@ -53,6 +54,7 @@ const menu = [
   {id:'household',icon:Users},
   {id:'budget',icon:Wallet},
   {id:'shopping',icon:ShoppingBasket},
+  {id:'stock',icon:Package},
   {id:'vehicles',icon:Car},
   {id:'insights',icon:BarChart3},
   {id:'archive',icon:Archive},
@@ -611,6 +613,7 @@ export default function Page() {
         {activeHomeId&&!canWrite&&<div className="informative"><ShieldCheck size={17}/><p>{tr('v32.shell.readOnly')}</p></div>}
         {demo&&<div className="demo-banner"><Info size={17}/><div><b>{tr('v32.batch.demoTitle')}</b> {tr('v32.batch.demoHelp')}</div><button onClick={()=>{localStorage.removeItem('casainordine-demo-v1');setData(fakeData());notify(tr('v32.batch.demoResetDone'));}} >{tr('v32.batch.demoReset')}</button></div>}
         {['insights','archive','properties','maintenance','contracts','payments','alerts'].includes(tab)&&<HomeExtra client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} bills={bills} utilities={utilities} tab={tab} onNotify={notify} onRefresh={reload} intent={captureIntent} onIntentUsed={()=>setCaptureIntent(null)}/>}
+        {tab==='stock'&&<Stock client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} onNotify={notify}/>}
         {tab==='seasonal'&&<Seasonal client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} onNotify={notify} onAddTask={addTaskQuick}/>}
         {tab==='professionals'&&<Professionals client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} onNotify={notify}/>}
         {tab==='automations'&&<Automations client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} bills={bills} onNotify={notify}/>}

@@ -386,3 +386,13 @@
 .seasonal-item.is-done b{color:var(--muted)}
 .seasonal-item .extra-buttons{flex-wrap:wrap}
 @media (max-width:900px){.seasonal .extra-layout{grid-template-columns:1fr}}
+/* Scorte domestiche (Fase 2) */
+.stock-proposal{background:#fbf7ee;border:1px solid #efe3c6;border-radius:12px;padding:.9rem 1rem;margin-bottom:1.1rem}
+.stock-proposal h2{margin-top:0}
+.stock-proposal ul{list-style:none;margin:.4rem 0 .8rem;padding:0;display:flex;flex-direction:column;gap:.5rem}
+.stock-proposal li{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:.4rem 1rem}
+.extra-pill.stock-out{background:#fbe9e7;color:#9b2c1f}
+.extra-pill.stock-low{background:#fdf1dc;color:#8a5a10}
+.stock-item b{display:flex;flex-wrap:wrap;gap:.45rem;align-items:center}
+.stock-actions{display:flex;align-items:center;gap:.35rem;flex-shrink:0}
+.stock-actions strong{min-width:2.2rem;text-align:center;font-variant-numeric:tabular-nums}
