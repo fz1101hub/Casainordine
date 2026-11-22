@@ -85,8 +85,12 @@ test('Prova senza account: stessi criteri sui dati di esempio', () => {
 test('Ogni tipo di risultato ha l’etichetta della sua sezione e la ricerca ha i suoi testi', () => {
   for (const source of SEARCH_SOURCES) assert.ok(MESSAGE_KEYS.includes('nav.' + source.tab), source.tab);
   for (const key of ['open', 'title', 'placeholder', 'hint', 'loading', 'empty', 'scope', 'partial', 'demoNote']) assert.ok(MESSAGE_KEYS.includes('search.' + key), key);
-  const component = readFileSync(new URL('../app/UniversalSearch.jsx', import.meta.url), 'utf8');
-  assert.match(component, /role="dialog" aria-modal="true"/);
-  assert.match(component, /\(e\.ctrlKey\|\|e\.metaKey\)&&e\.key\.toLowerCase\(\)==='k'/);
-  assert.match(component, /if\(ticket===sequence\.current\)setState/, 'le risposte vecchie non sovrascrivono quelle nuove');
+  const button = readFileSync(new URL('../app/UniversalSearch.jsx', import.meta.url), 'utf8');
+  const dialog = readFileSync(new URL('../app/SearchDialog.jsx', import.meta.url), 'utf8');
+  assert.match(button, /\(e\.ctrlKey\|\|e\.metaKey\)&&e\.key\.toLowerCase\(\)==='k'/);
+  // La finestra e la logica arrivano solo alla prima apertura: la prima pagina resta leggera.
+  assert.match(button, /dynamic\(\(\)=>import\('\.\/SearchDialog'\)/);
+  assert.doesNotMatch(button, /lib\/search\.mjs/);
+  assert.match(dialog, /role="dialog" aria-modal="true"/);
+  assert.match(dialog, /if\(ticket===sequence\.current\)setState/, 'le risposte vecchie non sovrascrivono quelle nuove');
 });
