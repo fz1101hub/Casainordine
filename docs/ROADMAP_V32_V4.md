@@ -28,7 +28,7 @@ Ogni funzione richiede flusso realmente utilizzabile, permessi per utente/casa c
 ### 3.4 — Cura quotidiana
 
 - [x] **Professionisti di fiducia**: contatti, professione, note private/condivise, costi e interventi associati a manutenzioni. — #62; serve `migrate_v44_professionisti.sql` sul database.
-- [ ] **Programma stagionale**: checklist adattabili per stagione, località e tipi d'immobile; azioni ricorrenti e completamento.
+- [x] **Programma stagionale**: checklist adattabili per stagione, località e tipi d'immobile; azioni ricorrenti e completamento. — #63; serve `migrate_v45_stagionale.sql` sul database.
 - [ ] **Scorte domestiche**: scorte, soglie, decrementi, proposta prodotto in lista spesa senza aggiunte silenziose.
 
 ### 4.0 — Evoluzione completa

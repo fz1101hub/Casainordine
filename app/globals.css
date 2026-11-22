@@ -371,3 +371,18 @@
 .professional-card summary{cursor:pointer;color:var(--green);font-weight:600;padding:.25rem 0}
 .professional-events{margin:.4rem 0 .7rem;padding-left:1.1rem;display:flex;flex-direction:column;gap:.3rem;line-height:1.45}
 .professional-private span{display:inline-flex;align-items:center;gap:.35rem}
+/* Programma stagionale (Fase 2) */
+.seasonal-features{border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:.45rem}
+.seasonal-features legend{font-size:.83rem;font-weight:600;margin-bottom:.45rem;padding:0}
+.seasonal-plan h2{margin-top:.2rem}
+.seasonal-group{margin-bottom:1.1rem}
+.seasonal-group>summary{cursor:pointer;font-weight:700;color:var(--green);padding:.3rem 0}
+.seasonal .extra-layout{grid-template-columns:minmax(260px,1fr) minmax(0,2fr)}
+.seasonal-item{display:flex;flex-wrap:wrap;justify-content:space-between;gap:.6rem 1rem;align-items:flex-start;padding:.75rem 0;border-bottom:1px solid #e8e9e8}
+.seasonal-item>div:first-child{display:flex;flex-direction:column;gap:.25rem;min-width:0;flex:1 1 300px}
+.seasonal-item small{color:var(--muted);line-height:1.45}
+.seasonal-item .seasonal-when{color:#2e5d52;font-weight:600}
+.seasonal-item.late .seasonal-when{color:#9a5b12}
+.seasonal-item.is-done b{color:var(--muted)}
+.seasonal-item .extra-buttons{flex-wrap:wrap}
+@media (max-width:900px){.seasonal .extra-layout{grid-template-columns:1fr}}

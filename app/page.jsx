@@ -5,7 +5,7 @@ import {
   Plus, Search, CheckCircle2, CalendarDays, LogOut, ArrowUpRight, TrendingDown,
   Wallet, LockKeyhole, Trash2, Mail, ShieldCheck, RefreshCcw, Link2,
   Menu, X, UserRound, Download, Cloud, Info, Clock, AlertCircle, Check,
-  Filter, ChevronRight, Zap, CircleHelp, Send, Eye, EyeOff, FileImage, FileText, Users, ShoppingBasket, Car, Archive, BarChart3, Wrench, Building2, ClipboardList, ScanSearch, HardHat
+  Filter, ChevronRight, Zap, CircleHelp, Send, Eye, EyeOff, FileImage, FileText, Users, ShoppingBasket, Car, Archive, BarChart3, Wrench, Building2, ClipboardList, ScanSearch, HardHat, SunSnow
 } from 'lucide-react';
 import { db } from '../lib/supabase-browser';
 import { addDaysISO, nextRecurringDue, todayRome, normalizeDate, euro } from '../lib/dates.mjs';
@@ -36,6 +36,7 @@ const CalendarFeed=lazy(()=>import('./CalendarFeed'));
 const HomeExtra=lazy(()=>import('./HomeExtra'));
 const Automations=lazy(()=>import('./Automations'));
 const Professionals=lazy(()=>import('./Professionals'));
+const Seasonal=lazy(()=>import('./Seasonal'));
 const V20Hub=lazy(()=>import('./V20Hub'));
 const V21Hub=lazy(()=>import('./V21Hub'));
 const SampleAccountSetup=lazy(()=>import('./SampleAccountSetup'));
@@ -48,6 +49,7 @@ const menu = [
   {id:'bills',icon:ReceiptText},
   {id:'utilities',icon:PlugZap},
   {id:'tasks',icon:House},
+  {id:'seasonal',icon:SunSnow},
   {id:'household',icon:Users},
   {id:'budget',icon:Wallet},
   {id:'shopping',icon:ShoppingBasket},
@@ -358,6 +360,16 @@ export default function Page() {
     }
     setModal(null);setBusy(false);notify(tr('v32.feedback.7'));
   }
+  // Attività aggiunta da un'altra sezione (programma stagionale): titolo e scadenza già pronti.
+  async function addTaskQuick({title,due_date}) {
+    if(!canWrite){notify(tr('v32.feedback.3'));return false;}
+    const item={title:String(title||'').trim().slice(0,200),due_date:due_date||null,done_at:null};
+    if(!item.title)return false;
+    if(demo){localUpdate('tasks',x=>[...x,{...item,id:uuid()}]);return true;}
+    const {error}=await client.from('house_tasks').insert({...item,user_id:user.id,home_id:activeHomeId});
+    if(error){notify(friendlyError(error,tr));return false;}
+    await reload();return true;
+  }
   async function saveTask(e) {
     e.preventDefault();if(!canWrite)return notify(tr('v32.feedback.3'));setBusy(true);
     const item={title:form.title.trim(),due_date:form.due_date||null,done_at:null,...(activeHomeId?{assigned_to:form.assigned_to||null}:{})};
@@ -599,6 +611,7 @@ export default function Page() {
         {activeHomeId&&!canWrite&&<div className="informative"><ShieldCheck size={17}/><p>{tr('v32.shell.readOnly')}</p></div>}
         {demo&&<div className="demo-banner"><Info size={17}/><div><b>{tr('v32.batch.demoTitle')}</b> {tr('v32.batch.demoHelp')}</div><button onClick={()=>{localStorage.removeItem('casainordine-demo-v1');setData(fakeData());notify(tr('v32.batch.demoResetDone'));}} >{tr('v32.batch.demoReset')}</button></div>}
         {['insights','archive','properties','maintenance','contracts','payments','alerts'].includes(tab)&&<HomeExtra client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} bills={bills} utilities={utilities} tab={tab} onNotify={notify} onRefresh={reload} intent={captureIntent} onIntentUsed={()=>setCaptureIntent(null)}/>}
+        {tab==='seasonal'&&<Seasonal client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} onNotify={notify} onAddTask={addTaskQuick}/>}
         {tab==='professionals'&&<Professionals client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} onNotify={notify}/>}
         {tab==='automations'&&<Automations client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} bills={bills} onNotify={notify}/>}
         {['tags','sos','radar','simulator','passport','vacation','inventory','decisions','briefing'].includes(tab)&&<V21Hub client={client} user={user} homeId={activeHomeId} homeName={homeMembership?.homes?.name||''} canWrite={canWrite} demo={demo} bills={bills} tasks={tasks} tab={tab} onNotify={notify}/>}
