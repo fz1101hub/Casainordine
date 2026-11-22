@@ -3,28 +3,28 @@ import {useEffect,useMemo,useState} from 'react';
 import Link from 'next/link';
 import {ArrowLeft,Bell,Check,CheckCircle2,ChevronRight,ClipboardCheck,House,LayoutDashboard,ListChecks,ReceiptText,RotateCcw,ShoppingBasket,ShieldCheck,X} from 'lucide-react';
 import PersonalizedHome from './PersonalizedHome';
+import LocalizedTitle from './LocalizedTitle';
 import {createDemoFixtures,restoreDemoFixtures,DEMO_STORAGE_KEY} from '../lib/test-fixtures.mjs';
 import {buildFiveMinuteBriefing} from '../lib/v21-core.mjs';
 import {todayRome} from '../lib/dates.mjs';
-import {v21BriefingCopy} from '../lib/v21-briefing-copy.mjs';
-import {v32DemoCopy} from '../lib/v32-demo-copy.mjs';
+import {textGroup} from '../lib/i18n-core.mjs';
 import {localizeDemoFixtures} from '../lib/v32-demo-fixture-labels.mjs';
 import {useLanguage,LanguageSelector} from './LanguageProvider';
 import { askConfirm, askText } from './ConfirmDialog';
 
 const NAV=[
- {id:'dashboard',title:'La mia Home',icon:House},
- {id:'bills',title:'Bollette',icon:ReceiptText},
- {id:'shopping',title:'Spesa',icon:ShoppingBasket},
- {id:'tasks',title:'Attività',icon:ListChecks},
- {id:'briefing',title:'5 minuti',icon:ClipboardCheck},
- {id:'overview',title:'Panoramica',icon:LayoutDashboard}
+ {id:'dashboard',icon:House},
+ {id:'bills',icon:ReceiptText},
+ {id:'shopping',icon:ShoppingBasket},
+ {id:'tasks',icon:ListChecks},
+ {id:'briefing',icon:ClipboardCheck},
+ {id:'overview',icon:LayoutDashboard}
 ];
 const HOME_DEMO_PREFS_KEY='casainordine-home-v3-demo';
 
 export default function TestDrive(){
  const {t:tr,date,money,language}=useLanguage();
- const copy=v32DemoCopy(language);
+ const copy=textGroup(tr,'demo.copy.');
  const when=d=>date(d,{day:'numeric',month:'short',year:'numeric'});
  const [data,setData]=useState(()=>createDemoFixtures());
  const [screen,setScreen]=useState('dashboard');
@@ -42,10 +42,10 @@ export default function TestDrive(){
   if(!loaded)return;
   try{localStorage.setItem(DEMO_STORAGE_KEY,JSON.stringify(data));}catch{}
  },[data,loaded]);
- const displayData=useMemo(()=>localizeDemoFixtures(data,language),[data,language]);
+ const displayData=useMemo(()=>localizeDemoFixtures(data,tr),[data,tr]);
  const extras=useMemo(()=>({shopping:displayData.shopping,assets:displayData.assets,contracts:displayData.contracts,decisions:displayData.decisions,inventory:displayData.inventory}),[displayData]);
  const tasksOpen=data.tasks.filter(t=>!t.done_at), billsOpen=data.bills.filter(b=>!b.paid_at);
- const briefing=useMemo(()=>buildFiveMinuteBriefing({bills:displayData.bills,tasks:displayData.tasks,assets:displayData.assets,contracts:displayData.contracts,decisions:displayData.decisions,inventory:displayData.inventory,today:todayRome(),copy:v21BriefingCopy(language)}),[displayData,language]);
+ const briefing=useMemo(()=>buildFiveMinuteBriefing({bills:displayData.bills,tasks:displayData.tasks,assets:displayData.assets,contracts:displayData.contracts,decisions:displayData.decisions,inventory:displayData.inventory,today:todayRome(),copy:textGroup(tr,'briefing.')}),[displayData,tr]);
  const nav=id=>{setScreen(NAV.some(n=>n.id===id)?id:'overview');setNotice('');if(typeof window!=='undefined')window.scrollTo({top:0,behavior:'smooth'});};
  const toggleBill=(bill)=>{setData(old=>({...old,bills:old.bills.map(b=>b.id===bill.id?{...b,paid_at:b.paid_at?null:new Date().toISOString()}:b)}));setNotice(tr('demo.updated.bill'));};
  const toggleTask=(task)=>{setData(old=>({...old,tasks:old.tasks.map(t=>t.id===task.id?{...t,done_at:t.done_at?null:new Date().toISOString()}:t)}));setNotice(tr('demo.updated.task'));};
@@ -57,7 +57,7 @@ export default function TestDrive(){
   setData(createDemoFixtures());setHomeKey(x=>x+1);setScreen('dashboard');setNotice(tr('demo.reset.done'));
  };
  const current=NAV.find(x=>x.id===screen);
- return <div className="testdrive">
+ return <div className="testdrive"><LocalizedTitle title="meta.demoTitle" description="meta.demoDescription"/>
   {/* Intestazione: logo, lingua e pulsanti restano in una zona che i lettori di schermo riconoscono. */}
   <header>
   <div className="testdrive-top">

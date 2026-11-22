@@ -11,15 +11,14 @@ import { db } from '../lib/supabase-browser';
 import { addDaysISO, nextRecurringDue, todayRome, normalizeDate, euro } from '../lib/dates.mjs';
 import { parseBillsCsv } from '../lib/csv.mjs';
 import { parseRatePlanText, rateItemsWithKeys } from '../lib/rate-plan.mjs';
-import { extractBillFields } from '../lib/document-import.mjs';
+import { extractBillFields, billTitle } from '../lib/document-import.mjs';
 import { ForgotPasswordButton, PasswordRecoveryDialog, DeleteAccountPanel } from './AccountSecurity';
 import PersonalizedHome from './PersonalizedHome';
 import {useLanguage,LanguageSelector} from './LanguageProvider';
-import { downloadCalendar } from '../lib/calendar.mjs';
+import {useLocalizedTitle} from './LocalizedTitle';
 import { billFraudSignals } from '../lib/v20-core.mjs';
 import {localizeMainDemo} from '../lib/v32-demo-fixture-labels.mjs';
-import { friendlyError } from '../lib/friendly-error.mjs';
-import { localizeSettingsApiError } from '../lib/settings-api-errors.mjs';
+import { friendlyError, apiErrorText, apiText, authErrorKey, shownError } from '../lib/friendly-error.mjs';
 import { memberName } from '../lib/member-names.mjs';
 import dynamic from 'next/dynamic';
 import { askConfirm, askText } from './ConfirmDialog';
@@ -38,42 +37,42 @@ const V21Hub=lazy(()=>import('./V21Hub'));
 const SampleAccountSetup=lazy(()=>import('./SampleAccountSetup'));
 
 const categories = ['Luce','Gas','Acqua','Internet','Telefono','Rifiuti','Condominio','Affitto / Mutuo','Assicurazione','Tasse','Auto','Altro'];
-const frequencies = [{value:'none',label:'Non ricorrente'},{value:'monthly',label:'Ogni mese'},{value:'bimonthly',label:'Ogni 2 mesi'},{value:'quarterly',label:'Ogni 3 mesi'},{value:'yearly',label:'Ogni anno'},{value:'biennial',label:'Ogni 2 anni'}];
+const frequencies = [{value:'none'},{value:'monthly'},{value:'bimonthly'},{value:'quarterly'},{value:'yearly'},{value:'biennial'}];
 const menu = [
-  {id:'dashboard',title:'La mia Home',icon:LayoutDashboard},
-  {id:'overview',title:'Panoramica completa',icon:BarChart3},
-  {id:'bills',title:'Bollette',icon:ReceiptText},
-  {id:'utilities',title:'Le mie utenze',icon:PlugZap},
-  {id:'tasks',title:'Attività casa',icon:House},
-  {id:'household',title:'Famiglia e inviti',icon:Users},
-  {id:'budget',title:'Budget e spese',icon:Wallet},
-  {id:'shopping',title:'Lista della spesa',icon:ShoppingBasket},
-  {id:'vehicles',title:'Auto e scadenze',icon:Car},
-  {id:'insights',title:'Consumi e previsioni',icon:BarChart3},
-  {id:'archive',title:'Archivio documenti',icon:Archive},
-  {id:'properties',title:'Immobili',icon:Building2},
-  {id:'maintenance',title:'Manutenzioni',icon:Wrench},
-  {id:'contracts',title:'Contratti',icon:ClipboardList},
-  {id:'payments',title:'Ricevute',icon:CheckCircle2},
-  {id:'alerts',title:'Notifiche e backup',icon:Bell},
-  {id:'monitor',title:'Monitoraggio email',icon:Mail},
-  {id:'fraud',title:'Controllo antifrode',icon:ShieldCheck},
-  {id:'pagopa',title:'Avvisi pagoPA',icon:ReceiptText},
-  {id:'history',title:'Cronologia e recupero',icon:Clock},
-  {id:'moving',title:'Assistente trasloco',icon:House},
-  {id:'savings',title:'Obiettivi risparmio',icon:Wallet},
-  {id:'offline',title:'Bozze offline',icon:Cloud},
-  {id:'briefing',title:'La casa in 5 minuti',icon:ClipboardList},
-  {id:'tags',title:'QR degli oggetti',icon:ScanSearch},
-  {id:'sos',title:'SOS Casa',icon:ShieldCheck},
-  {id:'radar',title:'Radar incongruenze',icon:Search},
-  {id:'simulator',title:'Simulatore spese',icon:BarChart3},
-  {id:'passport',title:'Passaporto immobile',icon:FileText},
-  {id:'vacation',title:'Modalità vacanza',icon:House},
-  {id:'inventory',title:'Inventario assicurativo',icon:Archive},
-  {id:'decisions',title:'Decisioni di famiglia',icon:Users},
-  {id:'connect',title:'Importa e collega',icon:Link2},
-  {id:'settings',title:'Impostazioni',icon:Settings},
+  {id:'dashboard',icon:LayoutDashboard},
+  {id:'overview',icon:BarChart3},
+  {id:'bills',icon:ReceiptText},
+  {id:'utilities',icon:PlugZap},
+  {id:'tasks',icon:House},
+  {id:'household',icon:Users},
+  {id:'budget',icon:Wallet},
+  {id:'shopping',icon:ShoppingBasket},
+  {id:'vehicles',icon:Car},
+  {id:'insights',icon:BarChart3},
+  {id:'archive',icon:Archive},
+  {id:'properties',icon:Building2},
+  {id:'maintenance',icon:Wrench},
+  {id:'contracts',icon:ClipboardList},
+  {id:'payments',icon:CheckCircle2},
+  {id:'alerts',icon:Bell},
+  {id:'monitor',icon:Mail},
+  {id:'fraud',icon:ShieldCheck},
+  {id:'pagopa',icon:ReceiptText},
+  {id:'history',icon:Clock},
+  {id:'moving',icon:House},
+  {id:'savings',icon:Wallet},
+  {id:'offline',icon:Cloud},
+  {id:'briefing',icon:ClipboardList},
+  {id:'tags',icon:ScanSearch},
+  {id:'sos',icon:ShieldCheck},
+  {id:'radar',icon:Search},
+  {id:'simulator',icon:BarChart3},
+  {id:'passport',icon:FileText},
+  {id:'vacation',icon:House},
+  {id:'inventory',icon:Archive},
+  {id:'decisions',icon:Users},
+  {id:'connect',icon:Link2},
+  {id:'settings',icon:Settings},
 ];
 const billDefault = {title:'',supplier:'',category:'Luce',amount:'',due_date:addDaysISO(todayRome(),7),paid:false};
 const utilityDefault = {supplier:'',category:'Luce',account_reference:'',estimated_amount:'',frequency:'monthly',next_due_date:addDaysISO(todayRome(),14)};
@@ -83,14 +82,14 @@ const uuid = () => crypto.randomUUID();
 function fakeData() {
   const today = todayRome();
   const bills = [
-    {id:'demo-1',title:'Bolletta elettricità',supplier:'Energia di esempio',category:'Luce',amount:84.50,due_date:addDaysISO(today,3),paid_at:null,source:'manual',is_estimate:false},
-    {id:'demo-2',title:'Fibra casa',supplier:'Internet di esempio',category:'Internet',amount:29.90,due_date:addDaysISO(today,8),paid_at:null,source:'recurring',is_estimate:true},
-    {id:'demo-3',title:'Acqua e fognatura',supplier:'Acquedotto di esempio',category:'Acqua',amount:46.20,due_date:addDaysISO(today,16),paid_at:null,source:'csv',is_estimate:false},
-    {id:'demo-4',title:'Gas',supplier:'Gas di esempio',category:'Gas',amount:97.80,due_date:addDaysISO(today,-5),paid_at:new Date().toISOString(),source:'manual',is_estimate:false},
+    {id:'demo-1',title:'Bolletta luce',supplier:'Energia Esempio',category:'Luce',amount:84.50,due_date:addDaysISO(today,3),paid_at:null,source:'manual',is_estimate:false},
+    {id:'demo-2',title:'Fibra internet',supplier:'Rete Demo',category:'Internet',amount:29.90,due_date:addDaysISO(today,8),paid_at:null,source:'recurring',is_estimate:true},
+    {id:'demo-3',title:'Acqua e fognatura',supplier:'Acquedotto Esempio',category:'Acqua',amount:46.20,due_date:addDaysISO(today,16),paid_at:null,source:'csv',is_estimate:false},
+    {id:'demo-4',title:'Bolletta gas',supplier:'Gas di Prova',category:'Gas',amount:97.80,due_date:addDaysISO(today,-5),paid_at:new Date().toISOString(),source:'manual',is_estimate:false},
   ];
-  return {bills,utilities:[{id:'demo-u1',supplier:'Internet di esempio',category:'Internet',estimated_amount:29.9,frequency:'monthly',next_due_date:addDaysISO(today,38),billing_day:12,active:true,account_reference:'Codice cliente ••••42'}],
-    tasks:[{id:'demo-t1',title:'Controllare il filtro del condizionatore',due_date:addDaysISO(today,5),done_at:null}],
-    suppliers:[],summaries:[],profile:{full_name:'',reminders_enabled:true,auto_confirm_payments:false,summary_frequency:'off',summary_weekday:1,summary_month_day:1,email:''},reminders:[{id:'demo-rem1',reminder_date:today,email_sent_at:null,bills:{id:'demo-1',title:'Bolletta elettricità',due_date:addDaysISO(today,3),amount:84.50,paid_at:null}}]};
+  return {bills,utilities:[{id:'demo-u1',supplier:'Rete Demo',category:'Internet',estimated_amount:29.9,frequency:'monthly',next_due_date:addDaysISO(today,38),billing_day:12,active:true,account_reference:'••••42'}],
+    tasks:[{id:'demo-t1',title:'Pulire il filtro del climatizzatore',due_date:addDaysISO(today,5),done_at:null}],
+    suppliers:[],summaries:[],profile:{full_name:'',reminders_enabled:true,auto_confirm_payments:false,summary_frequency:'off',summary_weekday:1,summary_month_day:1,email:''},reminders:[{id:'demo-rem1',reminder_date:today,email_sent_at:null,bills:{id:'demo-1',title:'Bolletta luce',due_date:addDaysISO(today,3),amount:84.50,paid_at:null}}]};
 }
 
 function Tag({children,tone='neutral'}) { return <span className={`tag tag-${tone}`}>{children}</span>; }
@@ -120,14 +119,14 @@ function Auth({client}) {
     e.preventDefault(); setError(''); setPending(true);
     const {data,error:err} = signup ? await client.auth.signUp({email,password}) : await client.auth.signInWithPassword({email,password});
     setPending(false);
-    if (err) setError(err.message);
+    if (err) setError(t(authErrorKey(err)));
     else if (signup && !data.session) setError(t('auth.confirm'));
   }
   async function google() {
     const invite=new URLSearchParams(window.location.search).get('invite');
     if(invite && /^[a-f0-9]{64}$/.test(invite))sessionStorage.setItem('pending_house_invite',invite);
     const {error:err} = await client.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin}});
-    if (err) setError(err.message);
+    if (err) setError(t(authErrorKey(err)));
   }
   return <div className="auth-wrap"><div className="auth-decoration"><span className="auth-logo"><House size={23}/></span><p>{t('auth.brandLine')}</p><h1>{t('auth.tagline')}</h1><p className="auth-intro">{t('auth.intro')}</p><div className="auth-quote"><Bell size={21}/> {t('auth.reminder')}</div></div>
     <div className="auth-card"><LanguageSelector id="auth-language" className="auth-language" label={true}/><div className="brand auth-mobile"><span className="brand-icon"><House size={22}/></span><b>Casa<span>inOrdine</span></b></div><div className="eyebrow">{t('v32.notifications.authEyebrow')}</div><h2>{t(signup?'auth.signupTitle':'auth.title')}</h2><p className="muted">{t(signup?'auth.signupHelp':'auth.loginHelp')}</p>
@@ -143,6 +142,7 @@ function mailStatusMessage(status,tr){return tr(MAIL_STATUS[status]||'mail.statu
 
 export default function Page() {
   const {t:tr,money,locale,language}=useLanguage();
+  useLocalizedTitle('meta.title','meta.description');
   const weekdayLabel=day=>new Intl.DateTimeFormat(locale,{weekday:'long',timeZone:'UTC'}).format(new Date(Date.UTC(2023,0,1+day)));
   const client = useMemo(()=>db(),[]), demo = !client;
   const [user,setUser] = useState(null), [initializing,setInitializing] = useState(!demo);
@@ -169,7 +169,7 @@ export default function Page() {
     const seq=++homesSeq.current;
     const {data:membership,error}=await client.from('home_members').select('home_id,role,homes(id,name,owner_id)').order('joined_at');
     if(seq!==homesSeq.current)return;
-    if(error){if(error.code!=='42P01')notify(tr('v32.flow.homesError',{error:error.message}));return;}
+    if(error){if(error.code!=='42P01')notify(tr('v32.flow.homesError',{error:friendlyError(error,tr)}));return;}
     const allowed=membership||[];
     setHomes(allowed);
     setActiveHomeId(old=>old && !allowed.some(h=>h.home_id===old)?null:old);
@@ -195,7 +195,7 @@ export default function Page() {
     // liste vuote farebbero credere che non ci sia nessuna bolletta da pagare. Quelli di un'altra
     // casa invece non devono restare sotto il nome di questa.
     if (err) {
-      notify(tr('v32.flow.loadError',{error:err.error.message}));
+      notify(tr('v32.flow.loadError',{error:friendlyError(err.error,tr)}));
       if (dataHome.current===(activeHomeId||null)) return;
     }
     dataHome.current=err?undefined:(activeHomeId||null);
@@ -324,10 +324,10 @@ export default function Page() {
         const {error:riskError}=await client.from('bill_security_reviews').insert({user_id:user.id,home_id:activeHomeId,bill_id:savedBillId,iban_fingerprint:ibanHash,iban_suffix:form.ibanCandidate.slice(-4),sender:form.mailSender||'',sender_auth:form.mailSenderAuth||'unknown',risk_flags:flags,review_status:'pending'});
         if(riskError)throw riskError;
         if(flags.length)postSaveWarning=tr('v32.payment.fraudReview');
-      }catch(err){postSaveWarning=tr('v32.payment.ibanFailure',{error:err.message});}
+      }catch(err){postSaveWarning=tr('v32.payment.ibanFailure',{error:friendlyError(err,tr)});}
     }
     if(form.mail_doc_id && !demo){
-      try {const {data:{session}}=await client.auth.getSession();const response=await fetch('/api/mail/documents',{method:'PATCH',headers:{Authorization:`Bearer ${session?.access_token||''}`,'Content-Type':'application/json'},body:JSON.stringify({id:form.mail_doc_id,action:'imported',bill_id:savedBillId})});const outcome=await response.json().catch(()=>({}));if(!response.ok)throw new Error(outcome.error||'Impossibile archiviare il documento importato');if(outcome.warning)postSaveWarning=[postSaveWarning,outcome.warning].filter(Boolean).join(' · ');setMailRefresh(x=>x+1);}catch(error){postSaveWarning=`Bolletta salvata; il documento email è ancora in attesa: ${error.message}`;}
+      try {const {data:{session}}=await client.auth.getSession();const response=await fetch('/api/mail/documents',{method:'PATCH',headers:{Authorization:`Bearer ${session?.access_token||''}`,'Content-Type':'application/json'},body:JSON.stringify({id:form.mail_doc_id,action:'imported',bill_id:savedBillId})});const outcome=await response.json().catch(()=>({}));if(!response.ok)throw shownError(apiErrorText(outcome,tr,'import.mailArchiveFailed'));const warning=apiText(outcome.warning,tr);if(warning)postSaveWarning=[postSaveWarning,warning].filter(Boolean).join(' · ');setMailRefresh(x=>x+1);}catch(error){postSaveWarning=tr('import.mailStillPending',{detail:friendlyError(error,tr)});}
     }
     setModal(null);setBusy(false);notify(postSaveWarning||tr('v32.payment.saved'));
   }
@@ -369,7 +369,7 @@ export default function Page() {
     setSupplierForm({...supplierForm,name:'',sender_email:''});notify(tr('v32.feedback.12'));
   }
   function prepareRatePlan(text,source,partial=false){
-    const result=parseRatePlanText(text,{unitFilter:rateUnit});
+    const result=parseRatePlanText(text,{unitFilter:rateUnit,t:tr});
     if(!result.rows.length){notify(tr('v32.flow.noRates'));return;}
     setRatePlan({rows:result.rows,warnings:[...result.warnings,...(partial?[tr('import.pdfTruncated')]:[])],source});
     notify(tr('v32.import.rateProposed',{count:result.rows.length}));
@@ -381,14 +381,14 @@ export default function Page() {
     const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(billPaste));
     const fingerprint=Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
     if(data.bills.some(b=>b.source==='document'&&b.external_id===fingerprint)){notify(tr('v32.feedback.15'));return;}
-    setForm({...billDefault,title:details.title,supplier:details.supplier,category:details.category,amount:details.amount??'',due_date:details.due_date||'',paid:false,source:'document',external_id:fingerprint,import_file:'Testo incollato',import_document_type:details.documentType,import_warnings:details.warnings,ibanCandidate:details.ibanCandidate});
+    setForm({...billDefault,title:billTitle(tr,details),supplier:details.supplier,category:details.category,amount:details.amount??'',due_date:details.due_date||'',paid:false,source:'document',external_id:fingerprint,import_file:'Testo incollato',import_document_type:details.documentType,import_warnings:details.warnings.map(key=>tr(key)),ibanCandidate:details.ibanCandidate});
     setModal('bill');notify(tr('v32.feedback.16'));
   }
   async function rateFileImport(event){
     const file=event.target.files?.[0];event.target.value='';if(!file)return;
     setDocumentState({busy:true,message:tr('import.readingRatePlan')});
-    try{const {readRatePlanDocument}=await import('../lib/document-reader.js');const result=await readRatePlanDocument(file,message=>setDocumentState({busy:true,message}));prepareRatePlan(result.text,file.name,result.partial);}
-    catch(e){notify(tr('v32.import.rateReadError',{detail:e.message}));}
+    try{const {readRatePlanDocument}=await import('../lib/document-reader.js');const result=await readRatePlanDocument(file,progress=>setDocumentState({busy:true,message:tr(progress.key,progress.params)}));prepareRatePlan(result.text,file.name,result.partial);}
+    catch(e){notify(tr('v32.import.rateReadError',{detail:friendlyError(e,tr)}));}
     finally{setDocumentState({busy:false,message:''});}
   }
   async function saveRatePlan(){
@@ -413,7 +413,7 @@ export default function Page() {
       if(demo)localUpdate('bills',rows=>[...rows,...todo.map(row=>({...row,id:uuid()}))]);
       else {const {error}=await client.from('bills').upsert(todo.map(item=>({...item,user_id:user.id,home_id:activeHomeId})),{onConflict:'user_id,source,external_id',ignoreDuplicates:true});if(error)throw error;await reload();}
       setRatePlan(null);notify(tr('v32.import.rateSaved',{count:todo.length}));
-    }catch(e){notify(tr('v32.import.rateSaveError',{detail:e.message}));}
+    }catch(e){notify(tr('v32.import.rateSaveError',{detail:friendlyError(e,tr)}));}
     finally{setBusy(false);}
   }
   async function updateSummaryPrefs(patch){
@@ -423,17 +423,20 @@ export default function Page() {
   }
   async function pay(bill) {const ok=await updateRow('bills',bill.id,{paid_at:bill.paid_at?null:new Date().toISOString()});if(ok)notify(bill.paid_at?tr('v32.payment.reopened'):tr('v32.payment.paid'));}
   async function toggleTask(t) {await updateRow('house_tasks',t.id,{done_at:t.done_at?null:new Date().toISOString()},'tasks');}
+  const categoryCode=value=>{const v=String(value||'').trim().toLowerCase();return categories.find(c=>c.toLowerCase()===v||tr('billCategory.'+c).toLowerCase()===v)||'Altro';};
   async function csvImport(event) {
     if(!canWrite)return notify(tr('v32.feedback.3'));
     const file=event.target.files?.[0];if(!file)return;
     try {
-      const text=await file.text(),{bills,errors}=parseBillsCsv(text);
-      if(!bills.length) throw new Error(errors.slice(0,3).join(' · ') || 'Nessuna riga valida');
+      const text=await file.text(),parsed=parseBillsCsv(text),errors=parsed.errors.map(e=>tr(e.key,e.params));
+      // Categorie scritte nella lingua dell'app («Electricity», «Strom»…) → codice; il titolo mancante si propone.
+      const bills=parsed.bills.map(b=>{const category=categoryCode(b.category);return {...b,category,title:b.title||billTitle(tr,{category,supplier:b.supplier})};});
+      if(!bills.length) throw new Error(errors.slice(0,3).join(' · ') || tr('csv.noValidRows'));
       if(!(await askConfirm(tr('v32.import.csvConfirm',{count:bills.length,excluded:errors.length?tr('v32.import.csvExcluded',{count:errors.length}):''}))))return;
       if(demo)localUpdate('bills',x=>[...x,...bills.map(b=>({...b,id:uuid()}))]);
       else {const {error}=await client.from('bills').insert(bills.map(b=>({...b,user_id:user.id,home_id:activeHomeId})));if(error)throw error;await reload();}
       notify(tr('v32.import.csvSaved',{count:bills.length,ignored:errors.length?tr('v32.import.csvIgnored',{count:errors.length}):''}));
-    } catch(e){notify(tr('v32.import.csvError',{detail:e.message}));}
+    } catch(e){notify(tr('v32.import.csvError',{detail:friendlyError(e,tr)}));}
     finally{event.target.value='';}
   }
   async function documentImport(event) {
@@ -450,16 +453,16 @@ export default function Page() {
       if(already){notify(tr('v32.feedback.23'));return;}
       if(!demo){
         const {data:existing,error}=await client.from('bills').select('id').eq('source','document').eq('external_id',fingerprint).maybeSingle();
-        if(error)throw new Error(error.message);
+        if(error)throw error;
         if(existing){notify(tr('v32.feedback.23'));return;}
       }
-      const extracted=await readBillDocument(file,message=>setDocumentState({busy:true,message}));
-      setForm({...billDefault,title:extracted.title,supplier:extracted.supplier,category:extracted.category,
+      const extracted=await readBillDocument(file,progress=>setDocumentState({busy:true,message:tr(progress.key,progress.params)}));
+      setForm({...billDefault,title:billTitle(tr,extracted),supplier:extracted.supplier,category:extracted.category,
         amount:extracted.amount??'',due_date:extracted.due_date||'',paid:false,
-        source:'document',external_id:fingerprint,import_file:file.name,import_document_type:extracted.documentType,import_warnings:extracted.warnings,ibanCandidate:extracted.ibanCandidate});
+        source:'document',external_id:fingerprint,import_file:file.name,import_document_type:extracted.documentType,import_warnings:extracted.warnings.map(key=>tr(key)),ibanCandidate:extracted.ibanCandidate});
       setModal('bill');
       notify(tr('v32.feedback.24'));
-    }catch(error){notify(tr('v32.import.documentReadError',{detail:error.message}));}
+    }catch(error){notify(tr('v32.import.documentReadError',{detail:friendlyError(error,tr)}));}
     finally{setDocumentState({busy:false,message:''});}
   }
   async function reviewEmailDocument(document, file){
@@ -473,25 +476,26 @@ export default function Page() {
       const {data:existing,error}=await client.from('bills').select('id').eq('source','document').eq('external_id',fingerprint).maybeSingle();
       if(error)throw error;
       if(existing){notify(tr('v32.feedback.26'));return;}
-      const extracted=await readBillDocument(file,message=>setDocumentState({busy:true,message}));
+      const extracted=await readBillDocument(file,progress=>setDocumentState({busy:true,message:tr(progress.key,progress.params)}));
       const suggested=document.suggestion||{};
-      setForm({...billDefault,title:extracted.title||suggested.title||'',supplier:extracted.supplier||suggested.supplier||suggested.learned_supplier_hint||'',
-        category:extracted.category!=='Altro'?extracted.category:(suggested.category||'Altro'),
+      const supplier=extracted.supplier||suggested.supplier||suggested.learned_supplier_hint||'',category=extracted.category!=='Altro'?extracted.category:(suggested.category||'Altro');
+      setForm({...billDefault,title:billTitle(tr,{category,supplier}),supplier,
+        category,
         amount:extracted.amount??suggested.amount??'',due_date:extracted.due_date||suggested.due_date||'',
         paid:false,source:'document',external_id:fingerprint,mail_doc_id:document.id,import_file:file.name,
-        import_document_type:extracted.documentType,ibanCandidate:extracted.ibanCandidate,mailSender:document.sender||'',mailSenderAuth:suggested.sender_auth==='reported_fail'?'fail':'unknown',import_warnings:[...(extracted.warnings||[]),...(suggested.learned_supplier_hint?[tr(suggested.sender_match==='exact'?'import.senderHintExact':'import.senderHintDomain',{supplier:suggested.learned_supplier_hint})]:[]),...(suggested.sender_auth==='reported_fail'?[tr('import.senderAuthFailed')]:[])]});
+        import_document_type:extracted.documentType,ibanCandidate:extracted.ibanCandidate,mailSender:document.sender||'',mailSenderAuth:suggested.sender_auth==='reported_fail'?'fail':'unknown',import_warnings:[...(extracted.warnings||[]).map(key=>tr(key)),...(suggested.learned_supplier_hint?[tr(suggested.sender_match==='exact'?'import.senderHintExact':'import.senderHintDomain',{supplier:suggested.learned_supplier_hint})]:[]),...(suggested.sender_auth==='reported_fail'?[tr('import.senderAuthFailed')]:[])]});
       setModal('bill');notify(tr('v32.feedback.27'));
-    }catch(e){notify(tr('v32.import.emailReadError',{detail:e.message}));}
+    }catch(e){notify(tr('v32.import.emailReadError',{detail:friendlyError(e,tr)}));}
     finally{setDocumentState({busy:false,message:''});}
   }
   async function authApi(method='GET') {
     const {data:{session}}=await client.auth.getSession();
     const response=await fetch('/api/integration-key',{method,headers:{Authorization:`Bearer ${session?.access_token||''}`}});
-    const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error?localizeSettingsApiError(payload.error,language):tr('errors.generic'));return payload;
+    const payload=await response.json().catch(()=>({}));if(!response.ok)throw shownError(apiErrorText(payload,tr));return payload;
   }
-  async function loadIntegration() {if(demo)return;try{setIntegration(await authApi());}catch(e){notify(e.message);}}
-  async function generateToken() {try{const p=await authApi('POST');setNewToken(p.token);await loadIntegration();notify(tr('v32.feedback.28'));}catch(e){notify(e.message);}}
-  async function revokeToken() {if(!(await askConfirm(tr('v32.flow.revokeConfirm'),{danger:true})))return;try{await authApi('DELETE');setNewToken('');await loadIntegration();notify(tr('v32.feedback.29'));}catch(e){notify(e.message);}}
+  async function loadIntegration() {if(demo)return;try{setIntegration(await authApi());}catch(e){notify(friendlyError(e,tr));}}
+  async function generateToken() {try{const p=await authApi('POST');setNewToken(p.token);await loadIntegration();notify(tr('v32.feedback.28'));}catch(e){notify(friendlyError(e,tr));}}
+  async function revokeToken() {if(!(await askConfirm(tr('v32.flow.revokeConfirm'),{danger:true})))return;try{await authApi('DELETE');setNewToken('');await loadIntegration();notify(tr('v32.feedback.29'));}catch(e){notify(friendlyError(e,tr));}}
   async function toggleEmails() {
     const enabled=!data.profile?.reminders_enabled;
     if(demo){writeDemo({...data,profile:{...data.profile,reminders_enabled:enabled}});return;}
@@ -510,7 +514,7 @@ export default function Page() {
 
   const today=todayRome(), soon=addDaysISO(today,7);
   // Nella prova senza account i dati di esempio si mostrano nella lingua scelta; quelli salvati restano invariati.
-  const shown=demo?localizeMainDemo(data,language):data;
+  const shown=demo?localizeMainDemo(data,tr):data;
   const bills=shown.bills||[], utilities=shown.utilities||[],tasks=shown.tasks||[],suppliers=shown.suppliers||[];
   const open=bills.filter(b=>!b.paid_at), urgent=open.filter(b=>b.due_date<=soon);
   const currentMonth=today.slice(0,7), monthBills=bills.filter(b=>b.due_date.startsWith(currentMonth));
@@ -562,7 +566,7 @@ export default function Page() {
     {mobile&&<button className="mobile-backdrop" onClick={()=>setMobile(false)} aria-label={tr('ui.closeMenu')}/>}
     <aside className={`sidebar ${mobile?'sidebar-show':''}`}>
       <div className="brand"><span className="brand-icon"><House size={22}/></span><b>Casa<span>inOrdine</span></b></div>
-      <div className="sidebar-label">{activeHomeId?homeMembership?.homes?.name||tr('v32.overview.sharedHome').toUpperCase():tr('v32.overview.personalSpace').toUpperCase()}</div><nav className="nav">{menu.map(({id,title,icon:Icon})=><button key={id} className={`nav-item ${tab===id?'active':''}`} onClick={()=>changePage(id)}><Icon size={19}/><span>{tr('nav.'+id)}</span>{tab===id&&<span className="nav-active-indicator"/>}</button>)}</nav>
+      <div className="sidebar-label">{activeHomeId?homeMembership?.homes?.name||tr('v32.overview.sharedHome').toUpperCase():tr('v32.overview.personalSpace').toUpperCase()}</div><nav className="nav">{menu.map(({id,icon:Icon})=><button key={id} className={`nav-item ${tab===id?'active':''}`} onClick={()=>changePage(id)}><Icon size={19}/><span>{tr('nav.'+id)}</span>{tab===id&&<span className="nav-active-indicator"/>}</button>)}</nav>
       <div className="sidebar-spacer"/><div className="sidebar-info"><div className="sidebar-info-icon"><Bell size={18}/></div><b>{tr('v32.shell.reminderTitle')}</b><p>{tr('v32.shell.reminderHelp')}</p></div>
       <div className="sidebar-profile"><span className="avatar"><UserRound size={18}/></span><div className="profile-copy"><b>{demo?tr('v32.overview.demoMode'):user?.email?.split('@')[0]}</b><small>{demo?tr('v32.overview.localData'):tr('v32.overview.privateSpace')}</small></div>{!demo&&<button title={tr('ui.signOut')} className="icon-button" onClick={signOut}><LogOut size={17}/></button>}</div>
     </aside>
@@ -594,20 +598,20 @@ export default function Page() {
         </>}
         {tab==='bills'&&<><div className="page-heading"><div><div className="eyebrow">{tr('bills.eyebrow')}</div><h1>{tr('bills.heading')}</h1><p>{tr('bills.help')}</p></div><div className="heading-actions"><label className="btn btn-soft upload-label"><FileImage size={17}/> {tr('bills.upload')}<input type="file" accept=".pdf,application/pdf,.jpg,.jpeg,image/jpeg,.png,image/png,.webp,image/webp" onChange={documentImport} disabled={documentState.busy} hidden/></label><button className="btn btn-primary" onClick={()=>openModal('bill')}><Plus size={18}/> {tr('bills.add')}</button></div></div>
           <section className="panel padded"><div className="table-controls"><div className="searchbox"><Search size={18}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder={tr('bills.search')}/></div><div className="filter-tabs">{[['all',tr('general.all')],['unpaid',tr('bills.filter.unpaid')],['soon',tr('bills.filter.soon')],['paid',tr('bills.filter.paid')]].map(([k,label])=><button key={k} onClick={()=>setBillFilter(k)} className={billFilter===k?'selected':''}>{label}</button>)}</div></div>
-            {filteredBills.length?<div className="table-scroll"><table className="bills-table"><thead><tr><th>{tr('bills.column.bill')}</th><th>{tr('bills.column.due')}</th><th>{tr('bills.column.amount')}</th><th>{tr('bills.column.status')}</th><th>{tr('bills.column.actions')}</th></tr></thead><tbody>{filteredBills.map(b=><tr key={b.id}><td><div className="table-identity"><CategoryIcon value={b.category}/><div><b>{b.title}</b><small>{b.supplier||tr('billCategory.'+b.category)} {b.is_estimate?' · '+tr('bills.estimated'):''}</small></div></div></td><td><DateText iso={b.due_date}/></td><td className="amount-cell">{money(b.amount)}</td><td><Status bill={b}/></td><td><div className="actions"><button className={`action-btn ${b.paid_at?'muted-action':'pay-action'}`} title={b.paid_at?tr('demo.bill.reopen'):tr('demo.bill.markPaid')} onClick={()=>pay(b)}>{b.paid_at?<RefreshCcw size={16}/>:<Check size={17}/>}</button><button className="action-btn muted-action" title={tr('ui.delete')} onClick={()=>deleteRow('bills',b.id)}><Trash2 size={16}/></button></div></td></tr>)}</tbody></table></div>:<Empty icon={Filter} title={tr('bills.empty.title')} body={tr('bills.empty.help')} action={()=>openModal('bill')} button="Nuova bolletta"/>}</section>
+            {filteredBills.length?<div className="table-scroll"><table className="bills-table"><thead><tr><th>{tr('bills.column.bill')}</th><th>{tr('bills.column.due')}</th><th>{tr('bills.column.amount')}</th><th>{tr('bills.column.status')}</th><th>{tr('bills.column.actions')}</th></tr></thead><tbody>{filteredBills.map(b=><tr key={b.id}><td><div className="table-identity"><CategoryIcon value={b.category}/><div><b>{b.title}</b><small>{b.supplier||tr('billCategory.'+b.category)} {b.is_estimate?' · '+tr('bills.estimated'):''}</small></div></div></td><td><DateText iso={b.due_date}/></td><td className="amount-cell">{money(b.amount)}</td><td><Status bill={b}/></td><td><div className="actions"><button className={`action-btn ${b.paid_at?'muted-action':'pay-action'}`} title={b.paid_at?tr('demo.bill.reopen'):tr('demo.bill.markPaid')} onClick={()=>pay(b)}>{b.paid_at?<RefreshCcw size={16}/>:<Check size={17}/>}</button><button className="action-btn muted-action" title={tr('ui.delete')} onClick={()=>deleteRow('bills',b.id)}><Trash2 size={16}/></button></div></td></tr>)}</tbody></table></div>:<Empty icon={Filter} title={tr('bills.empty.title')} body={tr('bills.empty.help')} action={()=>openModal('bill')} button={tr('form.addBill')}/>}</section>
         </>}
         {tab==='utilities'&&<><div className="page-heading"><div><div className="eyebrow">{tr('utilities.eyebrow')}</div><h1>{tr('utilities.heading')}</h1><p>{tr('utilities.help')}</p></div><button className="btn btn-primary" onClick={()=>openModal('utility')}><Plus size={18}/> {tr('utilities.new')}</button></div>
           <section className="panel supplier-panel"><div className="panel-header"><div><h2>{tr('utilities.supplierHeading')}</h2><p>{tr('utilities.supplierHelp')}</p></div></div>
-            <form className="supplier-form" onSubmit={addSupplier}><label>{tr('utilities.supplier')}<input required maxLength={120} placeholder="Es. Enel Energia" value={supplierForm.name} onChange={e=>setSupplierForm({...supplierForm,name:e.target.value})}/></label>
+            <form className="supplier-form" onSubmit={addSupplier}><label>{tr('utilities.supplier')}<input required maxLength={120} placeholder={tr('utilities.supplierExample')} value={supplierForm.name} onChange={e=>setSupplierForm({...supplierForm,name:e.target.value})}/></label>
             <label>{tr('utilities.service')}<select value={supplierForm.category} onChange={e=>setSupplierForm({...supplierForm,category:e.target.value})}>{categories.map(cat=><option key={cat} value={cat}>{tr('billCategory.'+cat)}</option>)}</select></label>
-            <label>{tr('utilities.sender')}<input type="email" placeholder="bollette@esempio.it" value={supplierForm.sender_email} onChange={e=>setSupplierForm({...supplierForm,sender_email:e.target.value})}/></label><button className="btn btn-primary" type="submit"><Plus size={17}/> {tr('utilities.add')}</button></form>
+            <label>{tr('utilities.sender')}<input type="email" placeholder={tr('utilities.senderPlaceholder')} value={supplierForm.sender_email} onChange={e=>setSupplierForm({...supplierForm,sender_email:e.target.value})}/></label><button className="btn btn-primary" type="submit"><Plus size={17}/> {tr('utilities.add')}</button></form>
             <div className="supplier-list">{suppliers.map(sp=><div className="supplier-row" key={sp.id}><span><b>{sp.name}</b><small>{tr('billCategory.'+sp.category)}{sp.sender_email?` · ${sp.sender_email}`:''}</small></span><button className="icon-button danger" title={tr('ui.deleteSupplier')} onClick={()=>deleteRow('user_suppliers',sp.id,'suppliers')}><Trash2 size={16}/></button></div>)}{!suppliers.length&&<p className="muted" style={{padding:'0 20px 16px'}}>{tr('utilities.noSuppliers')}</p>}</div>
             <p className="helper-text" style={{padding:'0 20px 18px'}}>{tr('utilities.supplierPrivacy')}</p>
           </section>
           {utilities.length?<div className="utility-grid">{utilities.map(u=><div className="utility-card" key={u.id}><div className="utility-card-head"><CategoryIcon value={u.category}/><span><Tag tone={u.active?'green':'neutral'}>{u.active?tr('utilities.active'):tr('utilities.paused')}</Tag></span></div><h3>{u.supplier}</h3><p>{tr('billCategory.'+u.category)} {u.account_reference&&`· ${u.account_reference}`}</p><div className="utility-detail"><span>{tr('utilities.estimated')}</span><strong>{money(u.estimated_amount)}</strong></div><div className="utility-detail"><span>{tr('utilities.frequency')}</span><strong>{frequencies.some(x=>x.value===u.frequency)?tr('billFrequency.'+u.frequency):'—'}</strong></div><div className="utility-detail"><span>{tr('utilities.next')}</span><strong><DateText iso={u.next_due_date}/></strong></div><div className="utility-footer"><button className="btn btn-soft" onClick={()=>updateRow('utilities',u.id,{active:!u.active})}>{u.active?tr('utilities.pause'):tr('utilities.resume')}</button><button className="icon-button danger" title={tr('ui.deleteUtility')} onClick={()=>deleteRow('utilities',u.id)}><Trash2 size={17}/></button></div></div>)}</div>:<div className="panel"><Empty icon={PlugZap} title={tr('ui.addFirstUtility')} body={tr('utilities.empty')} action={()=>openModal('utility')} button={tr('utilities.addUtility')}/></div>}
           <div className="informative"><Info size={19}/><p>{tr('utilities.disclaimer')}</p></div>
         </>}
-        {tab==='tasks'&&<><div className="page-heading"><div><div className="eyebrow">{tr('tasks.eyebrow')}</div><h1>{tr('tasks.heading')}</h1><p>{tr('tasks.help')}</p></div><button className="btn btn-primary" onClick={()=>openModal('task')}><Plus size={18}/> {tr('home.widget.tasks.new')}</button></div><section className="panel tasks-panel">{tasks.length?tasks.slice().sort((a,b)=>(a.done_at?1:0)-(b.done_at?1:0)).map(t=><div className="task-row" key={t.id}><button className={`task-check ${t.done_at?'done':''}`} onClick={()=>toggleTask(t)} aria-label={tr('tasks.complete')}>{t.done_at&&<Check size={16}/>}</button><div className={`task-title ${t.done_at?'completed':''}`}><b>{t.title}</b><small>{t.due_date?<>{tr('tasks.due')} <DateText iso={t.due_date}/></>:tr('home.task.noDate')}{t.assigned_to?' · '+tr('tasks.assignedTo',{name:homeMembers.find(m=>m.user_id===t.assigned_to)?.email||memberName(t.assigned_to,{former:formerMembers,formerLabel:tr('family.formerMember')})}):''}</small></div>{t.done_at?<Tag tone="green">{tr('tasks.done')}</Tag>:t.due_date<today?<Tag tone="red">{tr('tasks.late')}</Tag>:<Tag>{tr('tasks.todo')}</Tag>}<button className="icon-button danger" onClick={()=>deleteRow('house_tasks',t.id,'tasks')} title={tr('ui.delete')}><Trash2 size={17}/></button></div>):<Empty icon={House} title={tr('tasks.empty.title')} body={tr('tasks.empty.help')} action={()=>openModal('task')} button="Aggiungi attività"/>}</section></>}
+        {tab==='tasks'&&<><div className="page-heading"><div><div className="eyebrow">{tr('tasks.eyebrow')}</div><h1>{tr('tasks.heading')}</h1><p>{tr('tasks.help')}</p></div><button className="btn btn-primary" onClick={()=>openModal('task')}><Plus size={18}/> {tr('home.widget.tasks.new')}</button></div><section className="panel tasks-panel">{tasks.length?tasks.slice().sort((a,b)=>(a.done_at?1:0)-(b.done_at?1:0)).map(t=><div className="task-row" key={t.id}><button className={`task-check ${t.done_at?'done':''}`} onClick={()=>toggleTask(t)} aria-label={tr('tasks.complete')}>{t.done_at&&<Check size={16}/>}</button><div className={`task-title ${t.done_at?'completed':''}`}><b>{t.title}</b><small>{t.due_date?<>{tr('tasks.due')} <DateText iso={t.due_date}/></>:tr('home.task.noDate')}{t.assigned_to?' · '+tr('tasks.assignedTo',{name:homeMembers.find(m=>m.user_id===t.assigned_to)?.email||memberName(t.assigned_to,{former:formerMembers,formerLabel:tr('family.formerMember')})}):''}</small></div>{t.done_at?<Tag tone="green">{tr('tasks.done')}</Tag>:t.due_date<today?<Tag tone="red">{tr('tasks.late')}</Tag>:<Tag>{tr('tasks.todo')}</Tag>}<button className="icon-button danger" onClick={()=>deleteRow('house_tasks',t.id,'tasks')} title={tr('ui.delete')}><Trash2 size={17}/></button></div>):<Empty icon={House} title={tr('tasks.empty.title')} body={tr('tasks.empty.help')} action={()=>openModal('task')} button={tr('home.widget.tasks.new')}/>}</section></>}
         {tab==='connect'&&<><div className="page-heading"><div><div className="eyebrow">{tr('connect.eyebrow')}</div><h1>{tr('connect.title')}</h1><p>{tr('connect.help')}</p></div></div>
           {!demo?<MailImporter client={client} notify={notify} onReview={reviewEmailDocument} onPaymentsChanged={reload} bills={bills} refresh={mailRefresh}/>:<section className="panel mail-panel"><h2>{tr('connect.demoMailTitle')}</h2><p>{tr('connect.demoMailHelp')}</p></section>}
           <div className="connect-grid"><section className="panel connect-card document-card"><span className="connect-icon"><FileImage size={25}/></span><Tag tone="green">{tr('connect.recommended')}</Tag><h2>{tr('connect.uploadTitle')}</h2><p>{tr('connect.uploadHelp')}</p><label className="btn btn-primary upload-label"><UploadCloud size={17}/> {documentState.busy?tr('connect.analyzing'):tr('connect.selectImage')}<input type="file" accept=".pdf,application/pdf,.jpg,.jpeg,image/jpeg,.png,image/png,.webp,image/webp" onChange={documentImport} disabled={documentState.busy} hidden/></label>{documentState.busy&&<div className="import-progress" role="status"><RefreshCcw size={15} className="spin"/>{documentState.message}</div>}<p className="document-privacy"><ShieldCheck size={16}/> {tr('connect.privacy')}</p></section>
@@ -616,14 +620,14 @@ export default function Page() {
           <section className="panel rate-import-panel"><div className="panel-header"><div><h2>{tr('rateImport.title')}</h2><p>{tr('rateImport.help')}</p></div></div>
             <div className="rate-import-controls"><label>{tr('rateImport.supplier')}<input maxLength={120} value={rateSupplier} onChange={e=>setRateSupplier(e.target.value)} placeholder={tr('rateImport.supplierPlaceholder')}/></label><label>{tr('rateImport.unit')}<input value={rateUnit} onChange={e=>setRateUnit(e.target.value)} placeholder={tr('rateImport.unitPlaceholder')}/></label></div>
             <div className="rate-import-controls"><label className="btn btn-primary upload-label"><FileImage size={16}/> {tr('rateImport.upload')}<input hidden type="file" accept=".pdf,application/pdf,.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" onChange={rateFileImport} disabled={documentState.busy}/></label><span>{tr('rateImport.localPrivacy')}</span></div>
-            <details className="rate-paste"><summary>{tr('rateImport.paste')}</summary><textarea rows={4} value={ratePaste} onChange={e=>setRatePaste(e.target.value)} placeholder="Rata 1 - 10/12/2026 - € 125,00\nRata 2 - 10/03/2027 - € 125,00"/><button className="btn btn-soft" onClick={()=>prepareRatePlan(ratePaste,tr('rateImport.pastedSource'))}>{tr('rateImport.recognize')}</button></details>
+            <details className="rate-paste"><summary>{tr('rateImport.paste')}</summary><textarea rows={4} value={ratePaste} onChange={e=>setRatePaste(e.target.value)} placeholder={tr('rates.pastePlaceholder')}/><button className="btn btn-soft" onClick={()=>prepareRatePlan(ratePaste,tr('rateImport.pastedSource'))}>{tr('rateImport.recognize')}</button></details>
             {documentState.busy&&<p className="import-progress">{documentState.message}</p>}
           </section>
-          <details className="csv-secondary"><summary><FileText size={18}/> {tr('connect.csvTitle')}</summary><p>{tr('connect.csvHelp')}</p><div className="csv-actions"><label className="btn btn-soft upload-label"><UploadCloud size={16}/> {tr('connect.csvSelect')}<input type="file" accept=".csv,text/csv" onChange={csvImport} hidden/></label><button className="text-link" onClick={()=>{const csv='fornitore;importo;scadenza;categoria;descrizione;stato\nEsempio Energia;75,50;25/11/2026;Luce;Bolletta luce;da pagare\n';const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='esempio-bollette.csv';a.click();URL.revokeObjectURL(url);}}><Download size={16}/> {tr('connect.csvExample')}</button></div></details>
+          <details className="csv-secondary"><summary><FileText size={18}/> {tr('connect.csvTitle')}</summary><p>{tr('connect.csvHelp')}</p><div className="csv-actions"><label className="btn btn-soft upload-label"><UploadCloud size={16}/> {tr('connect.csvSelect')}<input type="file" accept=".csv,text/csv" onChange={csvImport} hidden/></label><button className="text-link" onClick={()=>{const csv=tr('csv.templateHeader')+'\n'+tr('csv.templateRow')+'\n';const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=tr('csv.templateFile')+'.csv';a.click();URL.revokeObjectURL(url);}}><Download size={16}/> {tr('connect.csvExample')}</button></div></details>
           <section className="panel api-panel"><div className="api-head"><div className="connect-icon turquoise"><Link2 size={23}/></div><div><h2>{tr('connect.apiTitle')}</h2><p>{tr('connect.apiHelp')}</p></div><Tag tone={integration?.connected?'green':'neutral'}>{integration?.connected?tr('connect.keyActive'):tr('connect.optional')}</Tag></div>
           {demo?<div className="api-muted"><LockKeyhole size={17}/> {tr('connect.keyDemo')}</div>:<><div className="api-buttons"><button className="btn btn-primary" onClick={generateToken}>{integration?.connected?tr('connect.keyRegenerate'):tr('connect.keyGenerate')}</button>{integration?.connected&&<button className="btn btn-soft danger-text" onClick={revokeToken}>{tr('connect.keyRevoke')}</button>}</div>
             {newToken&&<div className="token-box"><label>{tr('connect.keyOnce')}</label><code>{newToken}</code><button className="btn btn-soft" onClick={()=>{navigator.clipboard.writeText(newToken);notify(tr('connect.keyCopied'));}}>{tr('connect.keyCopy')}</button></div>}
-            <div className="endpoint-box"><small>{tr('connect.endpoint')}</small><code>{typeof window!=='undefined'?window.location.origin:''}/api/ingest</code><small>{tr('connect.method')}</small></div><details className="api-example"><summary>{tr('connect.example')}</summary><pre>{JSON.stringify({external_id:'fattura-2026-001',title:'Bolletta luce',supplier:'Mio fornitore',category:'Luce',amount:89.50,due_date:'2026-11-25',paid:false},null,2)}</pre></details>
+            <div className="endpoint-box"><small>{tr('connect.endpoint')}</small><code>{typeof window!=='undefined'?window.location.origin:''}/api/ingest</code><small>{tr('connect.method')}</small></div><details className="api-example"><summary>{tr('connect.example')}</summary><pre>{JSON.stringify({external_id:'2026-001',title:tr('billTitle.Luce'),supplier:'Energia Esempio',category:'Luce',amount:89.50,due_date:'2026-11-25',paid:false},null,2)}</pre></details>
           </>}
           <div className="api-footnote"><ShieldCheck size={18}/> {tr('connect.keyWarning')}</div></section>
           <div className="informative"><Info size={19}/><p>{tr('connect.gmailNotice')}</p></div>
@@ -631,7 +635,7 @@ export default function Page() {
         {['household','budget','shopping','vehicles'].includes(tab)&&<><div className="page-heading"><div><div className="eyebrow">{tr('v32.batch.familyEyebrow')}</div><h1>{tr('nav.'+tab)}</h1><p>{activeHomeId?`${homeMembership?.homes?.name||tr('general.house')} · ${tr('v32.overview.familyRole'+(homeMembership?.role==='owner'?'Owner':homeMembership?.role==='editor'?'Editor':homeMembership?.role==='viewer'?'Viewer':'Member'))}`:tr('v32.batch.familyHelp')}</p></div></div>
           <HouseholdHub client={client} demo={demo} user={user} homes={homes} homeId={activeHomeId} role={homeMembership?.role} onChangeHome={switchHome} onHomesReload={async()=>{await reloadHomes();await reload();}} onNotify={notify} section={tab} bills={bills}/></>}
         {tab==='settings'&&<><div className="page-heading"><div><div className="eyebrow">{tr('settings.eyebrow')}</div><h1>{tr('nav.settings')}</h1><p>{tr('settings.help')}</p></div></div>{!demo&&user&&<SampleAccountSetup client={client} user={user} homes={homes} onNotify={notify} onCreated={async id=>{await reloadHomes();setActiveHomeId(id);setTab('dashboard');}}/>}<section className="panel settings-panel lang-settings"><div className="settings-heading"><span className="settings-icon"><Settings size={20}/></span><div><h2>{tr('settings.language')}</h2><p>{tr('settings.language.help')}</p></div></div><LanguageSelector label={false} id="settings-language"/><p className="muted">{tr('general.currencyNote')}</p></section><div className="settings-grid"><section className="panel settings-panel"><div className="settings-heading"><span className="settings-icon"><Bell size={20}/></span><div><h2>{tr('settings.reminders')}</h2><p>{tr('settings.remindersHelp')}</p></div></div><div className="setting-row"><div><b>{tr('settings.remindersEnabled')}</b><small>{tr('settings.remindersChannels')}</small></div><button className={`toggle ${data.profile?.reminders_enabled?'on':''}`} onClick={toggleEmails} aria-label={tr('settings.toggleReminders')} aria-pressed={!!data.profile?.reminders_enabled}><span/></button></div><div className="setting-row"><div><b>{tr('settings.reminderAdvance')}</b><small>{tr('settings.unpaidNote')}</small></div><Tag tone="green">{tr('settings.threeDays')}</Tag></div><div className="summary-settings"><h3>{tr('settings.monthSummary')}</h3><p>{tr('settings.monthSummaryHelp')}</p>
-            <label>{tr('settings.summaryFrequency')}<select value={data.profile?.summary_frequency||'off'} onChange={e=>updateSummaryPrefs({summary_frequency:e.target.value})}>{[['off','Disattivato'],['daily','Ogni giorno'],['weekly','Ogni settimana'],['biweekly','Ogni 2 settimane'],['monthly','Ogni mese']].map(([v])=><option value={v} key={v}>{tr('settings.freq.'+v)}</option>)}</select></label>
+            <label>{tr('settings.summaryFrequency')}<select value={data.profile?.summary_frequency||'off'} onChange={e=>updateSummaryPrefs({summary_frequency:e.target.value})}>{['off','daily','weekly','biweekly','monthly'].map(v=><option value={v} key={v}>{tr('settings.freq.'+v)}</option>)}</select></label>
             {['weekly','biweekly'].includes(data.profile?.summary_frequency)&&<label>{tr('settings.weekday')}<select value={data.profile?.summary_weekday??1} onChange={e=>updateSummaryPrefs({summary_weekday:Number(e.target.value)})}>{[0,1,2,3,4,5,6].map(i=><option key={i} value={i}>{weekdayLabel(i)}</option>)}</select></label>}
             {data.profile?.summary_frequency==='monthly'&&<label>{tr('settings.monthDay')}<input type="number" min="1" max="28" value={data.profile?.summary_month_day??1} onChange={e=>{const d=Number(e.target.value);if(d>=1&&d<=28)updateSummaryPrefs({summary_month_day:d});}}/></label>}
             <small>{tr('settings.summaryNote')}</small></div>

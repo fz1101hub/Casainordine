@@ -11,12 +11,16 @@ test('V21 uses the active language provider for amounts, dates and counts',()=>{
  assert.match(source,/stamp\(s\.expires_at\)/);
 });
 
-test('V21 export filenames support six languages without leaking user titles',()=>{
+test('V21 export filenames come from the dictionary and keep only valid dates',async()=>{
+ const {v21ExportName}=await import('../lib/v21-core.mjs');
+ const {translate}=await import('../lib/i18n.mjs');
  for(const code of ['it','en','es','fr','de','pt']){
-  assert.match(source,new RegExp('\\b'+code+':\\{property:'));
+  const t=key=>translate(code,key);
+  assert.equal(v21ExportName(t,'property'),translate(code,'briefing.file.property')+'.json');
+  assert.equal(v21ExportName(t,'briefing','2028-02-29'),translate(code,'briefing.file.briefing')+'-2028-02-29.json');
+  assert.equal(v21ExportName(t,'briefing','2027-02-29'),translate(code,'briefing.file.briefing')+'.json');
  }
- assert.match(source,/Object\.hasOwn\(exportNames,baseLanguage\)/);
- assert.match(source,/validExportDate\(date\)/);
+ assert.equal(v21ExportName(key=>key,'toString'),null);
  assert.match(source,/JSON\.stringify\(object,null,2\)/);
 });
 

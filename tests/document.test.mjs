@@ -20,7 +20,7 @@ test('does not invent missing amounts or payment due dates',()=>{
   const result=extractBillFields('Operatore Telecom\nFattura emessa in data 01/10/2026\nCodice cliente 3052382\nImponibile netto');
   assert.equal(result.amount,null);
   assert.equal(result.due_date,null);
-  assert.ok(result.warnings.some(x=>x.includes('Scadenza')));
+  assert.ok(result.warnings.includes('import.warn.dueMissing'));
 });
 test('rejects impossible dates',()=>{
   const result=extractBillFields('Bolletta Gas\nTotale da pagare 58,90 €\nScadenza: 31/02/2027');
@@ -41,12 +41,12 @@ test('ignores invoice issue dates and VAT when extracting due amount and date',(
 test('does not invent a selection when two different due dates share the best label',()=>{
   const x=extractBillFields('Energia Verde\nScadenza: 21/11/2026\nScadenza: 28/11/2026\nTotale da pagare € 99,80');
   assert.equal(x.due_date,null);
-  assert.match(x.warnings.join(' '),/Più scadenze/i);
+  assert.ok(x.warnings.includes('import.warn.dueAmbiguous'));
 });
 test('does not guess among different amount totals',()=>{
   const x=extractBillFields('Fornitore: Rete Casa\nScadenza pagamento: 28/11/2026\nTotale da pagare: € 55,00\nTotale da pagare: € 75,00');
   assert.equal(x.amount,null);
-  assert.match(x.warnings.join(' '),/Più importi/i);
+  assert.ok(x.warnings.includes('import.warn.amountAmbiguous'));
 });
 test('supports OCR spaced thousands and international decimal with currency',()=>{
   const a=extractBillFields('Fornitore: Gas Casa\nTotale da pagare € 1 234,56\nScadenza pagamento: 25/12/2026');

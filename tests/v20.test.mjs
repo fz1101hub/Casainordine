@@ -102,5 +102,5 @@ test('documento OCR non trasmette IBAN o testo grezzo a servizi esterni',async()
  const {extractBillFields}=await import('../lib/document-import.mjs');
  const x=extractBillFields('ENEL\nTotale da pagare: 99,20 EUR\nScadenza: 21/11/2026\nIBAN: IT60 X05428 11101 00000 0123456');
  assert.equal(x.ibanCandidate,'IT60X0542811101000000123456');
- assert.ok(x.warnings.some(x=>x.includes('IBAN')));
+ assert.ok(x.warnings.includes('import.warn.ibanFound'));
 });

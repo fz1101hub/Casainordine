@@ -7,8 +7,8 @@ import {
 import {todayRome} from '../lib/dates.mjs';
 import {useLanguage} from './LanguageProvider';
 import {buildFiveMinuteBriefing} from '../lib/v21-core.mjs';
-import {v21BriefingCopy} from '../lib/v21-briefing-copy.mjs';
-import { friendlyError } from '../lib/friendly-error.mjs';
+import {textGroup} from '../lib/i18n-core.mjs';
+import { friendlyError, shownError } from '../lib/friendly-error.mjs';
 import {
   DEFAULT_HOME_PREFERENCES,HOME_WIDGETS,normalizeHomePreferences,
   moveHomeWidget,toggleHomeWidget
@@ -97,8 +97,8 @@ export default function PersonalizedHome({
   bills,tasks,assets:extras.assets,contracts:extras.contracts,
   decisions:extras.decisions,inventory:extras.inventory,today:todayRome(),
   // Senza i testi della lingua scelta il riquadro usava quelli italiani di riserva.
-  copy:v21BriefingCopy(language)
- }),[bills,tasks,extras,language]);
+  copy:textGroup(tr,'briefing.')
+ }),[bills,tasks,extras,tr]);
  const limit=expanded?5:3;
  const dueAmount=openBills.reduce((sum,b)=>sum+(Number(b.amount)||0),0);
  const urgent=openBills.filter(b=>b.due_date&&b.due_date<=todayRome()).length;
@@ -111,7 +111,7 @@ export default function PersonalizedHome({
   try{
    if(demo)localStorage.setItem(DEMO_KEY,JSON.stringify(next));
    else {
-    if(!client||!user?.id)throw new Error(tr('home.signInToSave'));
+    if(!client||!user?.id)throw shownError(tr('home.signInToSave'));
     const {error:saveError}=await client.from('user_home_preferences').upsert({
      user_id:user.id,widget_order:next.widgets,layout:next.layout,updated_at:new Date().toISOString()
     },{onConflict:'user_id'});
@@ -189,12 +189,12 @@ export default function PersonalizedHome({
    <p>{tr('home.editor.help')}</p>
    <div className="home3-editor-list">
     {available.map(id=>{
-     const item=HOME_WIDGETS.find(x=>x.id===id),index=selected.indexOf(id),enabled=index>=0;
+     const name=tr('home.widget.'+(id==='five_minutes'?'briefing':id)),index=selected.indexOf(id),enabled=index>=0;
      return <div className="home3-editor-row" key={id}>
-      <label><input type="checkbox" checked={enabled} disabled={enabled&&selected.length===1} onChange={()=>{setPrefs(old=>toggleHomeWidget(old,id));setStatus('');}}/><span>{tr('home.widget.'+(id==='five_minutes'?'briefing':id))}</span></label>
+      <label><input type="checkbox" checked={enabled} disabled={enabled&&selected.length===1} onChange={()=>{setPrefs(old=>toggleHomeWidget(old,id));setStatus('');}}/><span>{name}</span></label>
       <div className="home3-order">
-       <button type="button" title={tr('home.moveUp')+': '+item.title} aria-label={tr('home.moveUp')+': '+item.title} disabled={!enabled||index===0} onClick={()=>setPrefs(old=>moveHomeWidget(old,id,-1))}><ArrowUp size={17}/></button>
-       <button type="button" title={tr('home.moveDown')+': '+item.title} aria-label={tr('home.moveDown')+': '+item.title} disabled={!enabled||index===selected.length-1} onClick={()=>setPrefs(old=>moveHomeWidget(old,id,1))}><ArrowDown size={17}/></button>
+       <button type="button" title={tr('home.moveUp')+': '+name} aria-label={tr('home.moveUp')+': '+name} disabled={!enabled||index===0} onClick={()=>setPrefs(old=>moveHomeWidget(old,id,-1))}><ArrowUp size={17}/></button>
+       <button type="button" title={tr('home.moveDown')+': '+name} aria-label={tr('home.moveDown')+': '+name} disabled={!enabled||index===selected.length-1} onClick={()=>setPrefs(old=>moveHomeWidget(old,id,1))}><ArrowDown size={17}/></button>
       </div>
      </div>;
     })}

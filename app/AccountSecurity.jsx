@@ -66,7 +66,7 @@ export function DeleteAccountPanel({ client, user, t, onNotify }) {
         window.location.replace('/');
         return;
       }
-      onNotify(body.code === 'owner' ? t('account.deleteOwner', { homes: (body.homes || []).join(', ') }) : t('account.deleteFailed'));
+      onNotify(body.error === 'accountOwner' ? t('account.deleteOwner', { homes: (body.homes || []).join(', ') }) : t('account.deleteFailed'));
     } catch { onNotify(t('account.deleteFailed')); }
     setPending(false);
   }

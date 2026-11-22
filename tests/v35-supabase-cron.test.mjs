@@ -46,6 +46,6 @@ test('Supabase Cron: migrazione con chiave nel Vault, job giornaliero e ogni 3 o
   assert.match(sql,/cron\.schedule\('casa-email', '17 \*\/3 \* \* \*', \$job\$select public\.v35_call_app\('\/api\/mail\/cron', 300000\)/);
   assert.doesNotMatch(sql,/[0-9a-f]{64}/,'nessuna chiave scritta nel file');
   for(const path of ['app/api/cron/route.js','app/api/mail/cron/route.js'])
-  {const s=source(path);assert.ok(s.indexOf('getAdmin()')<s.indexOf('scheduledCallAuthorized(request'),path);assert.match(s,/catch\s*\{\s*return json\(\{error:'Configurazione del database incompleta'\},503\);\s*\}/,path);}
+  {const s=source(path);assert.ok(s.indexOf('getAdmin()')<s.indexOf('scheduledCallAuthorized(request'),path);assert.match(s,/catch\s*\{\s*return json\(\{error:'databaseConfig'\},503\);\s*\}/,path);}
   assert.ok(JSON.parse(source('vercel.json')).crons.length===2,'i cron di Vercel restano come riserva');
 });

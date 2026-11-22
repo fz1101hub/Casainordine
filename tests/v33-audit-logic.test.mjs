@@ -174,10 +174,10 @@ test('document: dates near complaint, self-reading, withdrawal or cancellation a
 });
 test('document: different dates under the two highest priorities are flagged as ambiguous', () => {
   const x = extractBillFields('Fornitore: Energia Casa\nTotale da pagare € 80,00\nScadenza: 25/11/2026\nDa pagare entro il 30/11/2026');
-  assert.match(x.warnings.join(' '), /Più scadenze/);
+  assert.ok(x.warnings.includes('import.warn.dueAmbiguous'));
   const y = extractBillFields('Fornitore: Energia Casa\nTotale da pagare € 80,00\nScadenza: 25/11/2026\nDa pagare entro il 25/11/2026');
   assert.equal(y.due_date, '2026-11-25');
-  assert.doesNotMatch(y.warnings.join(' '), /Più scadenze/);
+  assert.ok(!y.warnings.includes('import.warn.dueAmbiguous'));
 });
 
 // 3b. "IVA inclusa"
@@ -202,7 +202,7 @@ test('document: credit notes and negative totals never become an amount to pay',
     const x = extractBillFields(text);
     assert.equal(x.amount, null, text);
     assert.equal(x.documentType, 'nota_credito', text);
-    assert.match(x.warnings[0], /nota di credito/i, text);
+    assert.equal(x.warnings[0], 'import.warn.credit', text);
   }
 });
 test('document: a dash used as a separator is not a minus sign', () => {
@@ -216,7 +216,7 @@ test('document: reminders, formal notices and suspension notices are not new bil
   for (const title of ['Secondo sollecito', 'Sollecito', 'Primo sollecito di pagamento', 'Messa in mora', 'Avviso di sospensione della fornitura', 'Avviso di morosità']) {
     const x = extractBillFields(`${title}\nFornitore: Energia Casa\nTotale da pagare € 80,00\nScadenza: 25/11/2026`);
     assert.equal(x.documentType, 'sollecito', title);
-    assert.match(x.warnings[0], /sollecito/, title);
+    assert.equal(x.warnings[0], 'import.warn.reminder', title);
   }
 });
 
@@ -236,13 +236,13 @@ test('rate plan: distinct rows with the same date and amount are both kept', () 
   assert.equal(out.rows.length, 3);
   assert.deepEqual(out.rows.map(r => r.amount), [100, 100, 50]);
   assert.equal(out.discarded, 0);
-  assert.ok(out.warnings.some(w => /stessa data e lo stesso importo/.test(w)));
+  assert.ok(out.warnings.includes('rates.warn.sameDateAmount'));
 });
 test('rate plan: only textually identical rows are de-duplicated, and it is reported', () => {
   const out = parseRatePlanText('Piano rate condominio\nRata 1 10/12/2026 € 100,00\nRata 1 10/12/2026 € 100,00\nRata 2 10/02/2027 € 100,00');
   assert.equal(out.rows.length, 2);
   assert.equal(out.discarded, 1);
-  assert.ok(out.warnings.some(w => /1 righe/.test(w)));
+  assert.ok(out.warnings.includes('rates.warn.duplicates'));
 });
 
 // 4c. Credits
@@ -250,7 +250,7 @@ test('rate plan: credit adjustments and negative amounts are not instalments to 
   const out = parseRatePlanText('Piano rate condominio\nRata 1 10/12/2026 € 100,00\nRata 2 10/02/2027 € 100,00\nConguaglio a credito 10/03/2027 -50,00 €\nRata 3 10/04/2027 € -30,00\nConguaglio a vostro credito 10/05/2027 € 20,00');
   assert.deepEqual(out.rows.map(r => r.amount), [100, 100]);
   assert.equal(out.discarded, 3);
-  assert.ok(out.warnings.some(w => /credito/.test(w)));
+  assert.ok(out.warnings.includes('rates.warn.credits'));
   // A dash as a separator is not a minus sign.
   assert.deepEqual(parseRatePlanText('Piano rate condominio\nRata 1 - 10/12/2026 - € 100,00\nRata 2 - 10/02/2027 - 100,00 €').rows.map(r => r.amount), [100, 100]);
 });
@@ -268,7 +268,7 @@ test('CSV: English and underscore header aliases are recognised', () => {
 test('CSV: zero or invalid amounts are rejected with a row error', () => {
   const r = parseBillsCsv('scadenza;importo\n12/12/2026;0\n12/12/2026;abc\n12/12/2026;0,00\n12/12/2026;1e3\n12/12/2026;1.200');
   assert.deepEqual(r.bills.map(b => b.amount), [1200]);
-  assert.deepEqual(r.errors, ['Riga 2: importo o data non validi', 'Riga 3: importo o data non validi', 'Riga 4: importo o data non validi', 'Riga 5: importo o data non validi']);
+  assert.deepEqual(r.errors, [2, 3, 4, 5].map(row => ({ key: 'csv.rowInvalid', params: { row } })));
 });
 
 // 6. Consumption

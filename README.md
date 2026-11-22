@@ -404,6 +404,10 @@ curl -X POST 'https://TUO-DOMINIO.it/api/ingest' \
 
 `npm test` esegue oltre 400 test automatici (novembre 2026) su date italiane, rinnovi, CSV, estrazione dei campi, OAuth Google/Microsoft (state/PKCE), validazione provider IMAP, cifratura credenziali, sicurezza degli allegati, riconoscimento prudente delle conferme di pagamento e apprendimento isolato dei mittenti. L’OCR reale va provato in un browser con file di esempio; il riconoscimento è probabilistico.
 
+## Lingue
+
+L'app è in italiano, inglese, spagnolo, francese, tedesco e portoghese. Tutti i testi stanno in `lib/i18n.mjs`; come si aggiunge o si cambia un testo è spiegato in `docs/I18N_V32.md`. `npm run test:languages` (con l'app avviata) apre ogni sezione in italiano e in inglese e segnala i testi rimasti non tradotti; la CI lo esegue a ogni PR.
+
 ## Verifica e stato attuale
 
 I test automatici con `npm test` passano e `npm run build` compila (verificato a novembre 2026; la stessa verifica gira su GitHub a ogni push, `.github/workflows/tests.yml`). Il collaudo end-to-end con caselle reali, telefoni veri e Supabase resta da effettuare. Il sistema non è già in produzione: per attivare scansioni e notifiche è necessario pubblicarlo, configurare le credenziali e controllare i log dei cron.

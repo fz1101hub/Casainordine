@@ -39,3 +39,6 @@ jobs:
           npm start -- -p 3000 > next.log 2>&1 &
           for i in $(seq 1 60); do curl -sf -o /dev/null http://localhost:3000/ && break; sleep 1; done
           node scripts/smoke-browser.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
+      - name: Lingue (nessun testo rimasto in italiano nella versione inglese)
+        timeout-minutes: 6
+        run: node scripts/check-languages.mjs http://localhost:3000

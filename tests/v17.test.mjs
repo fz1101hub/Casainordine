@@ -17,7 +17,7 @@ test('plan: unit filter prevents mixing households',()=>{
 });
 test('plan: ambiguous or date-only rows are omitted',()=>{
  const out=parseRatePlanText('Piano rate condominio\nRata 1 10/12/2026 100,00 200,00\nRata 2 10/03/2027\nRata 3 10/06/2027 € 100,00');
- assert.equal(out.rows.length,1);assert.ok(out.warnings.some(w=>/ambigui/.test(w)));
+ assert.equal(out.rows.length,1);assert.ok(out.warnings.includes('rates.warn.ambiguous'));
 });
 test('summary: schedule respects weekdays, every two weeks and month dates',()=>{
  assert.ok(shouldSendSummary({summary_frequency:'daily'},'2026-11-02'));

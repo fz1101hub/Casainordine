@@ -17,5 +17,5 @@ test('manual refresh discards late results and errors after a newer request or a
  assert.match(source,/async function refreshDrafts\(\)\{if\(tab!=='offline'\|\|!user\?\.id\)return;const seq=\+\+draftSeq\.current/);
  assert.match(source,/const accountId=user\.id;try\{const items=await listDrafts\(accountId\)/);
  assert.match(source,/if\(seq!==draftSeq\.current\|\|activeAccount\.current!==accountId\)return;setDrafts\(items\)/);
- assert.match(source,/if\(seq===draftSeq\.current&&activeAccount\.current===accountId\)setOfflineError\(v20SafeError\(language\)\)/);
+ assert.match(source,/if\(seq===draftSeq\.current&&activeAccount\.current===accountId\)setOfflineError\(t\('errors\.generic'\)\)/);
 });
