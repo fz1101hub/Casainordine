@@ -5,6 +5,7 @@ import { reminderWindow, daysUntil, firstRecurringFrom } from '../../../lib/remi
 import { shouldSendSummary, monthEndISO, upcomingSummaryBills } from '../../../lib/summary-schedule.mjs';
 import { sendPush, configuredPush } from '../../../lib/push.mjs';
 import { processExtraAlerts, pushAllowed } from '../../../lib/extra-alerts.mjs';
+import { processAutomations } from '../../../lib/automation-alerts.mjs';
 import { processV20Alerts } from '../../../lib/v20-alerts.mjs';
 import { billReminderCopy } from '../../../lib/notification-copy.mjs';
 import { billSummaryCopy } from '../../../lib/notification-summary.mjs';
@@ -223,6 +224,7 @@ export async function GET(request) {
       }
     }
     await processExtraAlerts(admin,today,counts,{sendPush,configuredPush});
+    await processAutomations(admin,today,counts,{sendPush,configuredPush});
     await processV20Alerts(admin,today,counts,{sendPush,configuredPush});
     // Limit retention of recoverable deleted rows and household audit records.
     await admin.from('home_recycle_bin').delete().lt('deleted_at',new Date(Date.now()-30*86400000).toISOString());

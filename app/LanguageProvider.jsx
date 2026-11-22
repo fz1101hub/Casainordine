@@ -1,7 +1,7 @@
 'use client';
 import {createContext,useCallback,useContext,useEffect,useMemo,useRef,useState} from 'react';
 import {db} from '../lib/supabase-browser';
-import {browserLanguage,DEFAULT_LANGUAGE,formatDate,formatMoney,interpolate,LANGUAGES,localeFor,normalizeLanguage,languageStorageKey} from '../lib/i18n-core.mjs';
+import {browserLanguage,DEFAULT_LANGUAGE,SECTIONS,formatDate,formatMoney,interpolate,LANGUAGES,localeFor,normalizeLanguage,languageStorageKey} from '../lib/i18n-core.mjs';
 // Solo l'italiano arriva con l'app (serve per la prima pagina, che è in italiano); le altre lingue
 // si scaricano quando servono, una alla volta (lib/i18n-dicts/, generati da scripts/build-i18n.mjs).
 import italian from '../lib/i18n-dicts/it.json';
@@ -11,7 +11,7 @@ function loadDictionary(lang){
  if(dictionaries[lang])return Promise.resolve(dictionaries[lang]);
  return import(`../lib/i18n-dicts/${lang}.json`).then(module=>(dictionaries[lang]=module.default||module));
 }
-// I testi delle sezioni a parte (chiavi «v20.*») arrivano solo quando le apri (vedi useSection).
+// I testi delle sezioni a parte (chiavi «v20.*», «automation.*») arrivano solo quando le apri (vedi useSection).
 const sections={};
 function loadSection(lang,section){
  const id=lang+'.'+section;
@@ -20,7 +20,7 @@ function loadSection(lang,section){
 }
 // Finché la lingua scelta non è arrivata (pochi millisecondi, una volta sola) si usa l'italiano.
 function translate(lang,key,params){
- const section=key.startsWith('v20.')?'v20':'';
+ const prefix=key.slice(0,key.indexOf('.')),section=SECTIONS.includes(prefix)?prefix:'';
  const text=section?sections[lang+'.'+section]?.[key]??sections['it.'+section]?.[key]
   :(dictionaries[lang]||italian)[key]??italian[key];
  return interpolate(text??key,params);

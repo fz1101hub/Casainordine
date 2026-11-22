@@ -23,7 +23,7 @@ Ogni funzione richiede flusso realmente utilizzabile, permessi per utente/casa c
 
 - [x] **Ricerca universale**: ricerca trasversale di bollette, attività, contratti, documenti e oggetti; risultati per tipo e permessi rispettati; nessuna ricerca indiscriminata fra account. — #59 (Ctrl/Cmd+K o «/»).
 - [x] **Acquisizione intelligente unica**: unica azione foto/PDF con classificazione locale e suggerimento di destinazione bolletta, ricevuta o garanzia, con conferma prima di scrivere. — #60.
-- [ ] **Automazioni personalizzate**: regole soglia importi, rinnovi, frequenze; simulazione, sospensione, cron e deduplica avvisi; autorizzazione di proprietario/editor.
+- [x] **Automazioni personalizzate**: regole soglia importi, rinnovi, frequenze; simulazione, sospensione, cron e deduplica avvisi; autorizzazione di proprietario/editor. — #61; serve `migrate_v43_automazioni.sql` sul database.
 
 ### 3.4 — Cura quotidiana
 

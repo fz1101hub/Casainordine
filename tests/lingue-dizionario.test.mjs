@@ -92,14 +92,15 @@ test('Il browser non scarica il dizionario intero: nessun componente lo importa'
 test('Dizionari per il browser: una lingua alla volta, sezione V20 a parte, niente testi del server', () => {
   const all = dictionaries();
   assert.deepEqual(Object.keys(all), LANGS);
-  assert.deepEqual(SECTIONS, ['v20']);
+  assert.deepEqual(SECTIONS, ['v20', 'automation']);
   for (const lang of LANGS) {
-    const { app, v20, offline, server } = all[lang];
+    const { app, v20, automation, offline, server } = all[lang];
     assert.ok(Object.keys(app).length > 1000);
     assert.ok(Object.keys(v20).length > 150);
     assert.ok(Object.keys(server).length > 20);
     assert.ok(Object.keys(app).every(key => groupOf(key) === 'app'));
     assert.ok(Object.keys(v20).every(key => key.startsWith('v20.')));
+    assert.ok(Object.keys(automation).length > 50 && Object.keys(automation).every(key => key.startsWith('automation.')));
     assert.equal(app['general.loading'], TRANSLATIONS[lang]['general.loading']);
     assert.equal(Object.keys(offline).length, Object.keys(offlineCopy()[lang]).length);
   }

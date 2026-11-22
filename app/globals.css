@@ -346,3 +346,17 @@
 .capture-option .capture-facts{color:#2e5d52}
 .capture-note{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:#f3faf7;border:1px solid #d6ebe3;border-radius:10px;padding:10px 12px;margin:10px 0}
 .capture-note p{margin:0;flex-basis:100%;font-size:12.5px}
+/* Automazioni personalizzate (Fase 2) */
+.automation-rule{border-bottom:1px solid #e8e9e8}
+.automation-rule .extra-item{border-bottom:0}
+.automation-rule .extra-item b{display:flex;flex-wrap:wrap;gap:.45rem;align-items:center}
+.extra-pill.paused{background:#f1efe9;color:#6b5f45}
+.extra-pill.later{background:#eef2f7;color:#3c5675}
+.automation-sim{background:#f6faf8;border:1px solid #dcece4;border-radius:10px;padding:.8rem .9rem;margin:.2rem 0 .8rem;display:flex;flex-direction:column;gap:.45rem;font-size:.85rem}
+.automation-sim ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:.4rem}
+.automation-sim li{line-height:1.45;overflow-wrap:anywhere}
+.automation-sim p{margin:0}
+.automation-sim small{color:var(--muted);line-height:1.4}
+.automation-notify{border:0;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:.4rem 1.2rem}
+.automation-notify legend{font-size:.83rem;font-weight:600;margin-bottom:.4rem;padding:0}
+.automation-notify input[type=radio]{width:18px;height:18px;accent-color:var(--green)}

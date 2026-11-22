@@ -1,14 +1,15 @@
 // Genera i dizionari per il browser dal catalogo lib/i18n.mjs, che resta l'unica fonte dei testi.
 // - lib/i18n-dicts/<lingua>.json: testi dell'app (il browser scarica solo la lingua scelta);
-// - lib/i18n-dicts/<lingua>.<sezione>.json: testi delle sezioni che si aprono a parte (oggi V20), scaricati quando le apri;
+// - lib/i18n-dicts/<lingua>.<sezione>.json: testi delle sezioni che si aprono a parte (V20 e Automazioni, SECTIONS in lib/i18n-core.mjs), scaricati quando le apri;
 // - public/offline-copy.js: testi della pagina offline (funziona senza rete, quindi tutte le lingue).
 // Le chiavi «server.*» (email, notifiche, avvisi del cron) restano solo sul server.
 // Parte da solo con npm install, npm run build e npm run dev; i file generati non si committano.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { TRANSLATIONS } from '../lib/i18n.mjs';
+import { SECTIONS } from '../lib/i18n-core.mjs';
 
-export const SECTIONS = ['v20'];
+export { SECTIONS };
 export function groupOf(key) {
   const prefix = key.split('.', 1)[0];
   if (prefix === 'server' || prefix === 'offline' || SECTIONS.includes(prefix)) return prefix;
