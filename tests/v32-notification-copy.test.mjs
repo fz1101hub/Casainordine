@@ -247,15 +247,15 @@ test('German bill reminder uses consistent informal address without altering dat
 });
 
 
-test('French and Portuguese reminder footers use informal address consistently',()=>{
+test('French and Portuguese reminder footers use the same register as the app (vous / formal pt-PT)',()=>{
  const cases=[
-  {language:'fr-FR',expected:'Ouvre Casa in Ordine pour vérifier les détails.',formal:/Ouvrez Casa in Ordine/},
-  {language:'pt-PT',expected:'Abre Casa in Ordine para consultar os detalhes.',formal:/Abra Casa in Ordine/}
+  {language:'fr-FR',expected:'Ouvrez Casa in Ordine pour vérifier les détails.',other:/Ouvre Casa in Ordine/},
+  {language:'pt-PT',expected:'Abra Casa in Ordine para consultar os detalhes.',other:/Abre Casa in Ordine/}
  ];
- for(const {language,expected,formal} of cases){
+ for(const {language,expected,other} of cases){
   const {text}=billReminderCopy({language,name:'Energia',dueDate:'2026-12-31'});
   assert.ok(text.endsWith(expected),language);
-  assert.doesNotMatch(text,formal,language);
+  assert.doesNotMatch(text,other,language);
   assert.match(text,/Energia/,language);
   assert.equal(text.split('\n').length,3,language);
  }

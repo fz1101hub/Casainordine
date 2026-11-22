@@ -8,9 +8,9 @@ const expected={
  it:{subject:'Promemoria scadenza bolletta',footer:'Apri Casa in Ordine per verificare i dettagli.'},
  en:{subject:'Bill due reminder',footer:'Open Casa in Ordine to review the details.'},
  es:{subject:'Recordatorio de vencimiento',footer:'Abre Casa in Ordine para consultar los detalles.'},
- fr:{subject:'Rappel d’échéance de facture',footer:'Ouvre Casa in Ordine pour vérifier les détails.'},
+ fr:{subject:'Rappel d’échéance de facture',footer:'Ouvrez Casa in Ordine pour vérifier les détails.'},
  de:{subject:'Erinnerung an Rechnungsfälligkeit',footer:'Öffne Casa in Ordine, um die Details zu prüfen.'},
- pt:{subject:'Lembrete de vencimento da fatura',footer:'Abre Casa in Ordine para consultar os detalhes.'}
+ pt:{subject:'Lembrete de vencimento da fatura',footer:'Abra Casa in Ordine para consultar os detalhes.'}
 };
 test('recipient email subjects and footers stay in the selected language',()=>{
  for(const [language,{subject,footer}] of Object.entries(expected)){

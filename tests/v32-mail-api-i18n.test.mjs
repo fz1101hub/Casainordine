@@ -7,7 +7,7 @@ const cases=[
  ['en-GB','Sign in to connect a mailbox.'],
  ['es-ES','Inicia sesión para conectar un buzón.'],
  ['fr-FR','Connectez-vous pour associer une boîte mail.'],
- ['de-DE','Melden Sie sich an, um ein Postfach zu verbinden.'],
+ ['de-DE','Melde dich an, um ein Postfach zu verbinden.'],
  ['pt-PT','Inicie sessão para ligar uma caixa de correio.']
 ];
 test('OAuth start messages use six request locales',()=>{
