@@ -33,3 +33,9 @@ Verificare CI e build del nuovo HEAD; poi continuare la localizzazione di V20/V2
 - Verificata la CI del commit precedente `d4c7bfc448f102c349dd01b9c727e584c4942f61`: [workflow #45008205576](https://github.com/fz1101hub/Casainordine/actions/runs/45008205576), **completed / success**. Questo esito non copre i nuovi commit.
 - Aggiunto `tests/v32-i18n-preferences-formats.test.mjs` (commit `009a4e30ee653cfcc6528d9aead8f4d0081c7b0e`): copertura per sei codici/locale, chiavi preferenze separate per account, fallback, date bisestili e impossibili, importi e conteggi. Sono test di libreria: non dimostrano persistenza reale delle preferenze né UX browser.
 - Gate ancora aperti: CI/build sul nuovo HEAD, copertura test dinamici/browser, testi V20/V21/API/email, privacy e isolamento RLS reale, accessibilità/mobile, anteprima Vercel. **Fase 1 ancora aperta; nessuna Fase 2 o Fase 3.**
+
+## Aggiornamento 22 novembre 2026 — negoziazione lingua pubblica
+
+- Verificato con GitHub Actions il workflow [#45013253061](https://github.com/fz1101hub/Casainordine/actions/runs/45013253061), relativo a `c6598894460e9a7bf6a1acda6872458ad2eb974c`: **completed/success**. Non estendere l'esito ai commit successivi.
+- Aggiunto `tests/v32-i18n-language-negotiation.test.mjs` (commit `6aff7783d6deccb79b231698a5a945c8ba8fe2d5`) per negoziazione `Accept-Language` delle pagine pubbliche: sei lingue, pesi e ordine, esclusioni `q=0`, pesi malformati, wildcard, fallback, preferenza browser e segnaposto mancanti. Si tratta di test unitari della libreria, non di test browser o delle email.
+- Nuovo HEAD documentale da sottoporre a CI e build. Rimangono aperti tutti i gate di copertura linguistica integrale, Supabase RLS reale, browser/mobile/accessibilità, privacy e anteprima Vercel. Fase 1 ancora attiva; fasi 2 e 3 bloccate. Nessun merge/deploy/migrazione o modifica dati.
