@@ -50,3 +50,9 @@ Verificare CI e build del nuovo HEAD; poi continuare la localizzazione di V20/V2
 
 - Aggiunto `tests/v32-v21-briefing-copy-locales.test.mjs` (commit `8f4ebbd4e7be3ff178b945f62928d25f6992759f`): controlli delle sei lingue per testi critici di privacy, errori, dialoghi e messaggi, parità delle chiavi, segnaposto di interpolazione e fallback regionali. Il test non prova l'interfaccia nel browser e non sostituisce la revisione linguistica.
 - Verificare esecuzione effettiva del nuovo test, CI e build sul nuovo HEAD; se fallisce, correggere il catalogo prima del merge. Restano i gate E2E, Supabase RLS con due account, email/API, accessibilità/mobile e anteprima Vercel. Nessun rilascio o avvio delle Fasi 2 e 3.
+
+## Aggiornamento 22 novembre 2026 — regressione segnaposto V21
+
+- Verificata la CI del commit `0b6d43b3b56172d09f7d11e6d2911d12f9f33531`: workflow [#45028744061](https://github.com/fz1101hub/Casainordine/actions/runs/45028744061), `completed/success`. Non è prova per commit successivi.
+- Corretto il rilevatore di segnaposto nel test `tests/v32-v21-briefing-copy-locales.test.mjs` (commit `f9726da52e8cf11d074101b8897d602cbff2d4f0`): la precedente regex cercava backslash non presenti nei template, rischiando un falso positivo sulla parità dei parametri. Aggiunta asserzione di autocontrollo su `{amount}` e `{date}`. La CI sul nuovo commit deve ancora essere verificata.
+- Questo intervento migliora il controllo regressione, non completa la traduzione. Restano aperti i gate di Fase 1: revisione di tutti i flussi e messaggi, E2E sei lingue, RLS reale multiaccount, privacy, mobile/accessibilità, anteprima Vercel e CI sullo SHA finale. Nessun merge/deploy/migrazione; Fasi 2 e 3 bloccate.
