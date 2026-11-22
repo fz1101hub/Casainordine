@@ -447,3 +447,20 @@
 .replacement-item.due .replacement-outcome{color:#9b2c1f}
 .replacement-item.missing_date .replacement-outcome,.replacement-item.missing_cost .replacement-outcome{color:#8a5a10}
 .replacement-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.6rem;width:100%}
+/* Affitti: locatore e inquilino (Fase 2) */
+.rental-invites .extra-item{align-items:center}
+.extra-pill.rental-invited{background:#fdf1dc;color:#8a5a10}
+.extra-pill.rental-ended{background:#f1efe9;color:#6b5f45}
+.extra-pill.rental-sign-draft{background:#f1efe9;color:#6b5f45}
+.extra-pill.rental-sign-landlord,.extra-pill.rental-sign-tenant{background:#fdf1dc;color:#8a5a10}
+.rental-report{border:1px solid var(--line);border-radius:12px;padding:.9rem 1rem;margin:1rem 0;display:flex;flex-direction:column;gap:.5rem}
+.rental-report h3{margin:0;display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.rental-report h4{margin:.5rem 0 0;font-size:.88rem}
+.rental-report.locked{background:#f6faf8}
+.rental-room{display:grid;grid-template-columns:minmax(110px,1fr) minmax(120px,.8fr) minmax(140px,1.4fr) auto;gap:.4rem;align-items:center}
+.rental-room input,.rental-room select{border:1px solid var(--line);border-radius:9px;padding:.45rem .55rem;font:inherit;font-size:.86rem;background:#fff;min-width:0}
+@media (max-width:640px){.rental-room{grid-template-columns:1fr 1fr}.rental-room input:nth-child(3){grid-column:1/-1}}
+.rental-actions{margin-top:.3rem}
+.rental-compare{background:#fbf7ee;border:1px solid #efe3c6;border-radius:12px;padding:.8rem 1rem}
+.rental-compare h3{margin:0 0 .4rem}
+.rental-compare p{margin:.2rem 0}
