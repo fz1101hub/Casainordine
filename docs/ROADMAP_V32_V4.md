@@ -15,12 +15,14 @@
 
 ## Fase 2 — Nuove funzioni, una alla volta
 
+Le voci spuntate hanno codice, test e prova nel browser in demo; la prova con un account vero si fa insieme a quella della Fase 1, quando la produzione torna attiva.
+
 Ogni funzione richiede flusso realmente utilizzabile, permessi per utente/casa condivisa, eventuale migrazione RLS, test automatici, mobile e anteprima Vercel. Evitare servizi AI a pagamento.
 
 ### 3.3 — Gestione rapida
 
-- [ ] **Ricerca universale**: ricerca trasversale di bollette, attività, contratti, documenti e oggetti; risultati per tipo e permessi rispettati; nessuna ricerca indiscriminata fra account.
-- [ ] **Acquisizione intelligente unica**: unica azione foto/PDF con classificazione locale e suggerimento di destinazione bolletta, ricevuta o garanzia, con conferma prima di scrivere.
+- [x] **Ricerca universale**: ricerca trasversale di bollette, attività, contratti, documenti e oggetti; risultati per tipo e permessi rispettati; nessuna ricerca indiscriminata fra account. — #59 (Ctrl/Cmd+K o «/»).
+- [x] **Acquisizione intelligente unica**: unica azione foto/PDF con classificazione locale e suggerimento di destinazione bolletta, ricevuta o garanzia, con conferma prima di scrivere. — #60.
 - [ ] **Automazioni personalizzate**: regole soglia importi, rinnovi, frequenze; simulazione, sospensione, cron e deduplica avvisi; autorizzazione di proprietario/editor.
 
 ### 3.4 — Cura quotidiana
