@@ -27,3 +27,9 @@
 ## Prossimo intervento tecnico
 
 Verificare CI e build del nuovo HEAD; poi continuare la localizzazione di V20/V21 e API/email con test dinamici pertinenti, prima dei collaudi E2E e RLS reali.
+
+## Aggiornamento 22 novembre 2026 — preferenze e formati
+
+- Verificata la CI del commit precedente `d4c7bfc448f102c349dd01b9c727e584c4942f61`: [workflow #45008205576](https://github.com/fz1101hub/Casainordine/actions/runs/45008205576), **completed / success**. Questo esito non copre i nuovi commit.
+- Aggiunto `tests/v32-i18n-preferences-formats.test.mjs` (commit `009a4e30ee653cfcc6528d9aead8f4d0081c7b0e`): copertura per sei codici/locale, chiavi preferenze separate per account, fallback, date bisestili e impossibili, importi e conteggi. Sono test di libreria: non dimostrano persistenza reale delle preferenze né UX browser.
+- Gate ancora aperti: CI/build sul nuovo HEAD, copertura test dinamici/browser, testi V20/V21/API/email, privacy e isolamento RLS reale, accessibilità/mobile, anteprima Vercel. **Fase 1 ancora aperta; nessuna Fase 2 o Fase 3.**
