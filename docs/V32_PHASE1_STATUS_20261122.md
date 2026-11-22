@@ -56,3 +56,10 @@ Verificare CI e build del nuovo HEAD; poi continuare la localizzazione di V20/V2
 - Verificata la CI del commit `0b6d43b3b56172d09f7d11e6d2911d12f9f33531`: workflow [#45028744061](https://github.com/fz1101hub/Casainordine/actions/runs/45028744061), `completed/success`. Non è prova per commit successivi.
 - Corretto il rilevatore di segnaposto nel test `tests/v32-v21-briefing-copy-locales.test.mjs` (commit `f9726da52e8cf11d074101b8897d602cbff2d4f0`): la precedente regex cercava backslash non presenti nei template, rischiando un falso positivo sulla parità dei parametri. Aggiunta asserzione di autocontrollo su `{amount}` e `{date}`. La CI sul nuovo commit deve ancora essere verificata.
 - Questo intervento migliora il controllo regressione, non completa la traduzione. Restano aperti i gate di Fase 1: revisione di tutti i flussi e messaggi, E2E sei lingue, RLS reale multiaccount, privacy, mobile/accessibilità, anteprima Vercel e CI sullo SHA finale. Nessun merge/deploy/migrazione; Fasi 2 e 3 bloccate.
+
+## Verifica CI 22 novembre 2026 — correzione segnaposto V21
+
+- Verificato GitHub Actions sul commit `0f229a4f18d944dcc8044ba6176ad286b494d30d`: workflow [#45033952169](https://github.com/fz1101hub/Casainordine/actions/runs/45033952169), stato `completed`, conclusione `success`.
+- La pipeline conferma il risultato automatizzato di questo SHA, non la correttezza linguistica di tutte le schermate né la sicurezza RLS su Supabase reale. Non è una certificazione esterna.
+- Priorità operativa invariata: correggere le traduzioni residue di V20/V21 e i messaggi API/email, poi collaudare E2E nelle sei lingue, preferenze, RLS multiaccount, privacy, mobile/accessibilità e anteprima Vercel sullo SHA candidato.
+- Nessun merge, deploy, migrazione o modifica ai dati; Fase 1 aperta, Fasi 2 e 3 bloccate.
