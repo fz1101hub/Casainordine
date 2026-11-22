@@ -436,3 +436,14 @@
 .project-photo-row figure .icon-button{position:absolute;top:4px;right:4px;background:#fff}
 .project-done-hint{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-top:1rem;color:#2f6b2c}
 .project-inline input,.project-inline select,.project-rows select,.project-head select{border:1px solid var(--line);border-radius:9px;padding:.5rem .6rem;font:inherit;font-size:.86rem;background:#fff;color:inherit;min-height:2.4rem}
+/* Fondo sostituzioni (Fase 2) */
+.replacement-disclaimer{background:#fbf7ee;border-color:#efe3c6}
+.replacement-tiles{margin:.2rem 0 1.1rem}
+.replacement-tiles small+small{font-size:.74rem}
+.replacement-list{display:flex;flex-direction:column}
+.replacement-item{padding:.9rem 0;border-bottom:1px solid #e8e9e8;display:flex;flex-direction:column;gap:.6rem;align-items:flex-start}
+.replacement-item header{display:flex;flex-direction:column;gap:.2rem}
+.replacement-outcome{color:#2e5d52;font-weight:600}
+.replacement-item.due .replacement-outcome{color:#9b2c1f}
+.replacement-item.missing_date .replacement-outcome,.replacement-item.missing_cost .replacement-outcome{color:#8a5a10}
+.replacement-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.6rem;width:100%}
