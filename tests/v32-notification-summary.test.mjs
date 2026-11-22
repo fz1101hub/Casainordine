@@ -25,3 +25,17 @@ test('amount validation rejects missing, empty, non-numeric and overflowing tota
 test('unsupported language falls back to Italian',()=>{
  assert.deepEqual(billSummaryCopy({language:'xx',today:'2026-11-04',bills}),billSummaryCopy({language:'it',today:'2026-11-04',bills}));
 });
+
+test('summary rejects monetary values that cannot be displayed faithfully',()=>{
+ const today='2026-11-04';
+ for(const amount of ['9007199254740992',9007199254740992,'9007199254740991.25']){
+  assert.throws(()=>billSummaryCopy({today,bills:[{...bills[0],amount}]}),TypeError);
+ }
+ assert.throws(()=>billSummaryCopy({today,bills:[
+  {...bills[0],amount:9007199254740991},
+  {...bills[0],amount:1}
+ ]}),TypeError);
+ const valid=billSummaryCopy({today,bills:[{...bills[0],amount:'1234.50'}]});
+ assert.notEqual(valid.description.includes('—'),true);
+ assert.notEqual(valid.rows[0].amount,'—');
+});
