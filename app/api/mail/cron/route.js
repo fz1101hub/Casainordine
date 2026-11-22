@@ -8,8 +8,8 @@ export async function GET(request){
   // Vercel Cron (una volta al giorno) e Supabase Cron (ogni 3 ore): ogni casella si legge al
   // massimo una volta ogni 20 ore, le chiamate in più servono a raggiungere tutte le caselle.
   let admin;
-  try{admin=getAdmin();}catch{return json({error:'Configurazione del database incompleta'},503);}
-  if(!(await scheduledCallAuthorized(request,admin)))return json({error:'Non autorizzato'},401);
+  try{admin=getAdmin();}catch{return json({error:'databaseConfig'},503);}
+  if(!(await scheduledCallAuthorized(request,admin)))return json({error:'unauthorized'},401);
   const started=Date.now();
   // Equità: si parte dalle caselle tentate meno di recente (last_attempt_at, migrazione v3.3).
   // Prima l'ordine era sull'ultima sincronizzazione RIUSCITA, quindi poche caselle sempre in
@@ -20,7 +20,7 @@ export async function GET(request){
     // Migrazione v3.3 non ancora eseguita: comportamento precedente.
     ({data,error}=await admin.from('mail_connections').select('*').neq('status','reconnect').order('last_sync_at',{ascending:true,nullsFirst:true}).limit(8));
   }
-  if(error)return json({error:'Impossibile leggere le caselle collegate.'},500);
+  if(error)return json({error:'connectionsLoad'},500);
   const results=[];
   for(const c of data||[]){
     // Il cron gira una volta al giorno: si elaborano più caselle possibile lasciando un minuto

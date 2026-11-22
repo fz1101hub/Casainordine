@@ -26,7 +26,7 @@ test('Bozze offline: la copia per la pagina offline è identica e la cache del s
   const pub=source('public/offline-standalone.js').split('\n').slice(1).join('\n');
   assert.equal(pub,lib);
   assert.match(source('lib/offline-queue.js'),/owner:deviceAccountId\(\)/);
-  assert.match(source('public/sw.js'),/const CACHE='casa-shell-v41';/);
+  assert.match(source('public/sw.js'),/const CACHE='casa-shell-v\d+';/);
   const hub=source('app/V20Hub.jsx');
   assert.match(hub,/const accountId=user\.id;\s*listDrafts\(accountId\)/,'il caricamento iniziale usa l’identità corrente');
   assert.match(hub,/listDrafts\(accountId\)/,'l’aggiornamento usa l’identità catturata');

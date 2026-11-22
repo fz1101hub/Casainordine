@@ -92,8 +92,8 @@ export async function GET(request) {
   // data (promemoria, notifiche, riepilogo), quindi una seconda chiamata nello stesso giorno non
   // manda nulla due volte.
   let admin;
-  try { admin = getAdmin(); } catch { return json({error:'Configurazione del database incompleta'},503); }
-  if (!(await scheduledCallAuthorized(request, admin))) return json({error:'Non autorizzato'},401);
+  try { admin = getAdmin(); } catch { return json({error:'databaseConfig'},503); }
+  if (!(await scheduledCallAuthorized(request, admin))) return json({error:'unauthorized'},401);
   const today = todayRome(), horizon = addDaysISO(today, 45), reminderRange = reminderWindow(today);
   // Il pulsante delle email porta all'app vera anche se APP_URL manca (prima: http://localhost:3000).
   const appUrl = publicAppUrl(request);
@@ -228,5 +228,5 @@ export async function GET(request) {
     await admin.from('home_recycle_bin').delete().lt('deleted_at',new Date(Date.now()-30*86400000).toISOString());
     await admin.from('home_audit_log').delete().lt('created_at',new Date(Date.now()-365*86400000).toISOString());
     return json({ok:!counts.errors.length,date:today,reminder_window:reminderRange,...counts},counts.errors.length?207:200);
-  } catch(e) {return json({error:'Elaborazione non riuscita',detail:String(e.message).slice(0,160),...counts},500);}
+  } catch(e) {return json({error:'processingFailed',detail:String(e.message).slice(0,160),...counts},500);}
 }

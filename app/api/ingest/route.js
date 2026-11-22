@@ -5,19 +5,19 @@ export const runtime = 'nodejs';
 export async function POST(request) {
   try {
     const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') || '';
-    if (!/^cio_[\w-]{40,}$/.test(token)) return json({error:'Chiave non valida'},401);
+    if (!/^cio_[\w-]{40,}$/.test(token)) return json({error:'ingestKey'},401);
     const admin = getAdmin();
     const {data:key,error:keyError} = await admin.from('integration_keys').select('user_id').eq('token_hash',hashToken(token)).maybeSingle();
-    if (keyError || !key) return json({error:'Chiave non valida'},401);
+    if (keyError || !key) return json({error:'ingestKey'},401);
     const raw = await request.text();
-    if (raw.length > 15000) return json({error:'Richiesta troppo grande'},413);
+    if (raw.length > 15000) return json({error:'requestTooLarge'},413);
     let body;
-    try { body = JSON.parse(raw); } catch { return json({error:'JSON non valido'},400); }
+    try { body = JSON.parse(raw); } catch { return json({error:'invalidJson'},400); }
     const amount = parseMoney(body.amount), due_date = normalizeDate(body.due_date);
     const external_id = String(body.external_id || '').trim();
     const title = String(body.title || '').trim(), supplier = String(body.supplier || '').trim();
     if (!Number.isFinite(amount) || !due_date || !title || title.length > 180 || supplier.length > 120 || !external_id || external_id.length > 180)
-      return json({error:'title, supplier, amount, due_date ed external_id sono obbligatori e devono essere validi'},400);
+      return json({error:'ingestFields'},400);
     const bill = {user_id:key.user_id,title,supplier,amount,due_date,
       category:String(body.category || 'Altro').slice(0,60), source:'webhook',external_id,
       is_estimate:false,paid_at: body.paid === true ? new Date().toISOString() : null};
@@ -30,5 +30,5 @@ export async function POST(request) {
     }
     if (error) throw error;
     return json({ok:true,id:data.id,duplicate:false});
-  } catch { return json({error:'Importazione non riuscita'},500); }
+  } catch { return json({error:'ingestFailed'},500); }
 }

@@ -3,7 +3,7 @@ import {useState} from 'react';
 import {Database,ShieldCheck,Plus,CheckCircle2} from 'lucide-react';
 import {createDemoFixtures} from '../lib/test-fixtures.mjs';
 import {useLanguage} from './LanguageProvider';
-import {publicError} from '../lib/public-error.mjs';
+import {appError} from '../lib/friendly-error.mjs';
 import { askConfirm, askText } from './ConfirmDialog';
 
 // Explicitly opt-in: creates fake records only for the signed-in user's brand-new account.
@@ -28,11 +28,11 @@ export default function SampleAccountSetup({client,user,homes=[],onCreated,onNot
    ]);
    const failure=checks.find(r=>r.error);
    if(failure)throw failure.error;
-   if(checks.some(r=>(r.count||0)>0))throw publicError(t('sample.notEmpty'));
+   if(checks.some(r=>(r.count||0)>0))throw appError('sample.notEmpty');
    const created=await client.rpc('create_home',{home_name:t('sample.homeName')});
    if(created.error)throw created.error;
    homeId=created.data;
-   if(!homeId)throw publicError(t('sample.creationFailed'));
+   if(!homeId)throw appError('sample.creationFailed');
    const samples=createDemoFixtures();
    const bills=samples.bills.map(b=>({user_id:user.id,home_id:homeId,title:b.title,supplier:b.supplier,category:b.category,amount:b.amount,due_date:b.due_date,paid_at:b.paid_at,source:'manual',is_estimate:false}));
    const tasks=samples.tasks.map(t=>({user_id:user.id,home_id:homeId,title:t.title,due_date:t.due_date,done_at:t.done_at}));
@@ -47,8 +47,8 @@ export default function SampleAccountSetup({client,user,homes=[],onCreated,onNot
   }catch(e){
    const extra=homeId?' '+t('sample.partial'):'';
    // Al browser solo i messaggi dell'app; gli errori del database vanno nella console.
-   if(!e?.public)console.error('[sample]',e?.message||e);
-   setMessage((e?.public?e.message:t('sample.failed'))+extra);
+   if(!e?.i18nKey)console.error('[sample]',e?.message||e);
+   setMessage((e?.i18nKey?t(e.i18nKey):t('sample.failed'))+extra);
   }finally{setBusy(false);}
  }
  return <section className="panel testdrive-seed">

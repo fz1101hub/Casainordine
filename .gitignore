@@ -1,6 +1,7 @@
 # Node / Next.js
 # Dizionari per lingua generati da scripts/build-i18n.mjs (fonte: lib/i18n.mjs)
 lib/i18n-dicts/
+public/offline-copy.js
 node_modules/
 .next/
 out/

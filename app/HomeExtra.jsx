@@ -5,10 +5,9 @@ import {readRatePlanDocument,documentFingerprint} from '../lib/document-reader.j
 import {extractConsumption,extractMeterCandidates,monthlyConsumption,consumptionAnomalies,expenseForecast,safeBackup,serializeCsv,UNITS} from '../lib/home-insights.mjs';
 import {todayRome} from '../lib/dates.mjs';
 import {useLanguage} from './LanguageProvider';
-import { friendlyError } from '../lib/friendly-error.mjs';
+import { friendlyError, shownError } from '../lib/friendly-error.mjs';
 import { askConfirm, askText } from './ConfirmDialog';
 
-const TAB_TITLES={insights:'Consumi e previsioni',archive:'Archivio documenti',properties:'I miei immobili',maintenance:'Manutenzioni',contracts:'Contratti e tariffe',payments:'Ricevute e pagamenti',alerts:'Centro notifiche e backup'};
 const tables={properties:'home_properties',documents:'home_documents',meters:'meter_readings',meterSchedules:'meter_reminders',assets:'maintenance_assets',events:'maintenance_events',receipts:'payment_receipts',contracts:'home_contracts'};
 const initial={properties:[],documents:[],meters:[],meterSchedules:[],assets:[],events:[],receipts:[],contracts:[],alerts:[],preferences:null};
 const emptyDate=()=>todayRome();
@@ -88,24 +87,24 @@ export default function HomeExtra({client,demo,user,homeId,canWrite,bills=[],uti
     const saved=await client.from('home_documents').insert({...common,property_id:doc.property_id||null,bill_id:doc.bill_id||null,doc_type:doc.type,notes:doc.notes,name:file.name.slice(0,200),mime_type:file.type,file_size:file.size,storage_path:path,sha256});
     if(saved.error){await client.storage.from('house-documents').remove([path]);throw saved.error;}
     onNotify(tr('extra.archive.saved'));await load();
-  }catch(e){onNotify(tr('extra.archive.uploadError',{error:e.message}))}finally{setDocumentBusy('');}
+  }catch(e){onNotify(tr('extra.archive.uploadError',{error:friendlyError(e,tr)}))}finally{setDocumentBusy('');}
  }
- async function openDocument(document){const popup=window.open('about:blank','_blank');if(popup)popup.opener=null;try{const {data,error}=await client.storage.from('house-documents').createSignedUrl(document.storage_path,60);if(error)throw error;if(popup)popup.location.replace(data.signedUrl);else window.location.assign(data.signedUrl);}catch(e){popup?.close();onNotify(tr('extra.archive.unavailable',{error:e.message}))}}
+ async function openDocument(document){const popup=window.open('about:blank','_blank');if(popup)popup.opener=null;try{const {data,error}=await client.storage.from('house-documents').createSignedUrl(document.storage_path,60);if(error)throw error;if(popup)popup.location.replace(data.signedUrl);else window.location.assign(data.signedUrl);}catch(e){popup?.close();onNotify(tr('extra.archive.unavailable',{error:friendlyError(e,tr)}))}}
  async function deleteDocument(document){if(!(await askConfirm(tr('extra.archive.deleteConfirm'),{danger:true})))return;
   const {error}=await client.storage.from('house-documents').remove([document.storage_path]);if(error){onNotify(friendlyError(error,tr));return;}
   await run(()=>client.from('home_documents').delete().eq('id',document.id),tr('extra.archive.deleted'));
  }
  async function analyseConsumption(file){if(!file)return;setReview(tr('extra.insights.ocrWorking'));try{
-  const result=await readRatePlanDocument(file,progress=>setReview(progress));const parsed=extractConsumption(result.text);
+  const result=await readRatePlanDocument(file,progress=>setReview(tr(progress.key,progress.params)));const parsed=extractConsumption(result.text);
   if(parsed.candidates.length===1){setConsumption(s=>({...s,value:String(parsed.value),unit:parsed.unit}));setReview(tr('extra.insights.ocrValue'));}
   else setReview(parsed.candidates.length?tr('extra.insights.ocrDifferent',{values:parsed.candidates.map(c=>c.value+' '+c.unit).join(', ')}):tr('extra.insights.ocrNoValue'));
   if(result.partial)setReview(v=>v+' '+tr('extra.insights.ocrPartial'));
- }catch(e){setReview(e.message)}}
+ }catch(e){setReview(friendlyError(e,tr))}}
  async function analyseMeter(file){if(!file)return;setMeterOcr(tr('extra.insights.ocrReading'));try{
-  const read=await readRatePlanDocument(file,progress=>setMeterOcr(progress));const candidates=extractMeterCandidates(read.text);setOcrCandidates(candidates);
+  const read=await readRatePlanDocument(file,progress=>setMeterOcr(tr(progress.key,progress.params)));const candidates=extractMeterCandidates(read.text);setOcrCandidates(candidates);
   if(candidates.length===1)setMeter(s=>({...s,read_value:String(candidates[0]),source:'ocr'}));
   setMeterOcr(tr(candidates.length===1?'extra.insights.ocrOne':candidates.length?'extra.insights.ocrMany':'extra.insights.ocrNone'));
- }catch(e){setMeterOcr(e.message)}}
+ }catch(e){setMeterOcr(friendlyError(e,tr))}}
  const monthly=monthlyConsumption(bills);
  const anomalies=consumptionAnomalies(monthly);
  const forecast=useMemo(()=>expenseForecast(bills,{months:years,anchor:todayRome().slice(0,7)+'-01'}),[bills,years]);
@@ -125,7 +124,7 @@ export default function HomeExtra({client,demo,user,homeId,canWrite,bills=[],uti
      for(let i=0;i<relevant.length;i+=80){
       const ids=relevant.slice(i,i+80);let offset=0;
       for(;;){const {data,error}=await client.from(name).select('*').in('expense_id',ids).order('expense_id').range(offset,offset+499);
-       if(error)throw error;const chunk=data||[];collected.push(...chunk);offset+=chunk.length;if(chunk.length<500)break;if(offset>10000)throw new Error(tr('extra.backup.tooManyShares'));}
+       if(error)throw error;const chunk=data||[];collected.push(...chunk);offset+=chunk.length;if(chunk.length<500)break;if(offset>10000)throw shownError(tr('extra.backup.tooManyShares'));}
      }
     }else{
      let offset=0;
@@ -134,20 +133,20 @@ export default function HomeExtra({client,demo,user,homeId,canWrite,bills=[],uti
       else q=homeId?q.eq('home_id',homeId):q.is('home_id',null);
       const {data,error}=await q.order('id').range(offset,offset+499);
       if(error)throw error;const chunk=data||[];collected.push(...chunk);offset+=chunk.length;
-      if(chunk.length<500)break;if(offset>10000)throw new Error(tr('extra.backup.tooManyRows',{table:name}));
+      if(chunk.length<500)break;if(offset>10000)throw shownError(tr('extra.backup.tooManyRows',{table:name}));
      }
     }
     more[name]=collected;
    }
-   const bundle=safeBackup({bills,utilities,properties:rows.properties,documents:rows.documents,meters:rows.meters,meterReminders:rows.meterSchedules,contracts:rows.contracts,assets:rows.assets,events:rows.events,receipts:rows.receipts});
+   const bundle=safeBackup({notice:tr('extra.backup.fileNotice'),bills,utilities,properties:rows.properties,documents:rows.documents,meters:rows.meters,meterReminders:rows.meterSchedules,contracts:rows.contracts,assets:rows.assets,events:rows.events,receipts:rows.receipts});
    bundle.household=more;bundle.scope={home_id:homeId||null};
    downloadBlob(`casa-in-ordine-${stamp}.json`,JSON.stringify(bundle,null,2),'application/json;charset=utf-8');
    onNotify(tr('extra.backup.done'));
-  }catch(e){onNotify(tr('extra.backup.failed',{error:e.message}))}finally{setWorking(false)}
+  }catch(e){onNotify(tr('extra.backup.failed',{error:friendlyError(e,tr)}))}finally{setWorking(false)}
  }
 
  if(demo)return <section className="panel extra-panel"><h1>{tr('extra.tab.'+tab)}</h1><p>{tr('extra.demoHelp')}</p></section>;
- return <div className="extra-main"><div className="extra-print-only"><h1>{tr('extra.printTitle')}</h1><p>{tr('extra.exported',{date:dateNice(todayRome()),scope:scopeName})}</p><table><thead><tr><th>{tr('extra.print.bill')}</th><th>{tr('extra.print.supplier')}</th><th>{tr('extra.print.due')}</th><th>{tr('extra.print.amount')}</th><th>{tr('extra.print.status')}</th></tr></thead><tbody>{bills.map(b=><tr key={b.id}><td>{b.title}</td><td>{b.supplier}</td><td>{dateNice(b.due_date)}</td><td>{price(b.amount)}</td><td>{tr(b.paid_at?'bill.paid':'bill.toPay')}</td></tr>)}</tbody></table></div><div className="page-heading"><div><div className="eyebrow">{tr('extra.eyebrow')}</div><h1>{TAB_TITLES[tab]}</h1><p>{tr('extra.headingDescription',{scope:scopeName})}</p></div></div>
+ return <div className="extra-main"><div className="extra-print-only"><h1>{tr('extra.printTitle')}</h1><p>{tr('extra.exported',{date:dateNice(todayRome()),scope:scopeName})}</p><table><thead><tr><th>{tr('extra.print.bill')}</th><th>{tr('extra.print.supplier')}</th><th>{tr('extra.print.due')}</th><th>{tr('extra.print.amount')}</th><th>{tr('extra.print.status')}</th></tr></thead><tbody>{bills.map(b=><tr key={b.id}><td>{b.title}</td><td>{b.supplier}</td><td>{dateNice(b.due_date)}</td><td>{price(b.amount)}</td><td>{tr(b.paid_at?'bill.paid':'bill.toPay')}</td></tr>)}</tbody></table></div><div className="page-heading"><div><div className="eyebrow">{tr('extra.eyebrow')}</div><h1>{tr('nav.'+tab)}</h1><p>{tr('extra.headingDescription',{scope:scopeName})}</p></div></div>
  {showRows()}
  {tab==='properties'&&<div className="extra-layout"><section className="panel extra-panel"><h2><House size={20}/> {tr('extra.properties.add')}</h2><p>{tr('extra.properties.help')}</p>{canWrite&&<form className="extra-form" onSubmit={async e=>{e.preventDefault();if(await add(tables.properties,property,tr('extra.properties.saved')))setProperty({label:'',kind:'principale',address:''});}}><Field label={tr('extra.properties.name')}><input required minLength={2} maxLength={120} value={property.label} onChange={e=>setProperty({...property,label:e.target.value})} placeholder={tr('extra.properties.placeholder')}/></Field><Field label={tr('extra.properties.kind')}><select value={property.kind} onChange={e=>setProperty({...property,kind:e.target.value})}>{['principale','seconda casa','affitto','altro'].map(k=><option key={k} value={k}>{propertyType(k)}</option>)}</select></Field><Field label={tr('extra.properties.address')}><input maxLength={350} value={property.address} onChange={e=>setProperty({...property,address:e.target.value})}/></Field><button className="btn btn-primary" disabled={working}><Plus size={16}/> {tr('extra.properties.save')}</button></form>}</section><section className="panel extra-panel"><h2>{tr('extra.properties.registered')}</h2>{properties.map(p=><div className="extra-item" key={p.id}><div><b>{p.label}</b><small>{propertyType(p.kind)} · {p.address||tr('extra.properties.noAddress')}</small></div>{canWrite&&<button className="icon-button danger" title={tr('ui.delete')} onClick={()=>remove(tables.properties,p.id,tr('extra.properties.deleted'))}><Trash2 size={17}/></button>}</div>)}{!properties.length&&<p className="muted">{tr('extra.properties.empty')}</p>}</section><section className="panel extra-panel"><h2>{tr('extra.properties.assign')}</h2><p>{tr('extra.properties.assignHelp')}</p>{bills.map(b=><div className="extra-item" key={b.id}><div><b>{b.title}</b><small>{b.supplier} · {price(b.amount)}</small></div>{canWrite&&propSelect(b.property_id,v=>run(()=>client.from('bills').update({property_id:v||null}).eq('id',b.id),tr('extra.properties.assigned'),{refreshParent:true}))}</div>)}{utilities.map(u=><div className="extra-item" key={u.id}><div><b>{tr('extra.properties.utility',{supplier:u.supplier})}</b><small>{u.category}</small></div>{canWrite&&propSelect(u.property_id,v=>run(()=>client.from('utilities').update({property_id:v||null}).eq('id',u.id),'Immobile assegnato.',{refreshParent:true}))}</div>)}</section></div>}
  {tab==='archive'&&<div className="extra-layout"><section className="panel extra-panel"><h2><Archive size={20}/> {tr('extra.archive.uploadTitle')}</h2><p>{tr('extra.archive.privacy')}</p>{canWrite&&<div className="extra-form"><Field label={tr('extra.archive.type')}><select value={doc.type} onChange={e=>setDoc({...doc,type:e.target.value})}>{['bolletta','contratto','ricevuta','garanzia','manuale','condominio','altro'].map(k=><option key={k} value={k}>{documentType(k)}</option>)}</select></Field><Field label={tr('extra.archive.property')}>{propSelect(doc.property_id,v=>setDoc({...doc,property_id:v}))}</Field><Field label={tr('extra.archive.linkedBill')}><select value={doc.bill_id} onChange={e=>setDoc({...doc,bill_id:e.target.value})}><option value="">{tr('extra.archive.none')}</option>{bills.map(b=><option value={b.id} key={b.id}>{b.title} · {b.due_date}</option>)}</select></Field><Field label={tr('extra.archive.notes')}><textarea rows={2} maxLength={1000} value={doc.notes} onChange={e=>setDoc({...doc,notes:e.target.value})}/></Field><label className="btn btn-primary extra-upload"><UploadCloud size={17}/>{documentBusy||tr('extra.archive.upload')}<input type="file" hidden disabled={Boolean(documentBusy)} accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,application/pdf,image/jpeg,image/png,image/webp,text/plain" onChange={e=>{const file=e.target.files?.[0];e.target.value='';loadDocument(file);}}/></label></div>}</section><section className="panel extra-panel"><h2>{tr('extra.archive.title')}</h2><Field label={tr('extra.archive.search')}><input value={docSearch} onChange={e=>setDocSearch(e.target.value)} placeholder={tr('extra.archive.searchPlaceholder')}/></Field><div className="extra-list">{docFiltered.map(d=><div className="extra-item" key={d.id}><div><b>{d.name}</b><small>{documentType(d.doc_type)} · {dateNice(d.created_at.slice(0,10))} · {(d.file_size/1024).toFixed(0)} KB</small></div><button className="btn btn-soft" onClick={()=>openDocument(d)}>{tr('extra.archive.open')}</button>{canWrite&&<button className="icon-button danger" title={tr('ui.delete')} onClick={()=>deleteDocument(d)}><Trash2 size={16}/></button>}</div>)}</div>{!docFiltered.length&&<p className="muted">{tr('extra.archive.empty')}</p>}</section></div>}

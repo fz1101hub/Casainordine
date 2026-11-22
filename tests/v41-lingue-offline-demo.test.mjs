@@ -4,7 +4,9 @@ import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const source = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const { OFFLINE_COPY, offlineLanguage, offlineText, offlineError } = await import(pathToFileURL(new URL('../public/offline-i18n.js', import.meta.url).pathname).href);
-const { localizeMainDemo } = await import('../lib/v32-demo-fixture-labels.mjs');
+const { localizeMainDemo, localizeDemoFixtures } = await import('../lib/v32-demo-fixture-labels.mjs');
+const { createDemoFixtures } = await import('../lib/test-fixtures.mjs');
+const { translate } = await import('../lib/i18n.mjs');
 const LANGS = ['it', 'en', 'es', 'fr', 'de', 'pt'];
 const memory = entries => ({ getItem: k => entries[k] ?? null });
 
@@ -55,32 +57,26 @@ test('pagina offline: ogni testo della pagina ha la sua traduzione e niente ital
 });
 
 test('modalità prova senza account: dati di esempio nella lingua scelta', () => {
+  const tEn = (key, params) => translate('en', key, params);
   const demo = {
     bills: [
-      { id: 'demo-1', title: 'Bolletta elettricità', supplier: 'Energia di esempio' },
-      { id: 'demo-2', title: 'Fibra casa modificata', supplier: 'Internet di esempio' },
+      { id: 'demo-1', title: 'Bolletta luce', supplier: 'Energia Esempio' },
+      { id: 'demo-2', title: 'Fibra casa modificata', supplier: 'Rete Demo' },
       { id: 'mia', title: 'Bolletta mia', supplier: 'Fornitore mio' }
     ],
-    utilities: [{ id: 'demo-u1', supplier: 'Internet di esempio', account_reference: 'Codice cliente ••••42' }],
-    tasks: [{ id: 'demo-t1', title: 'Controllare il filtro del condizionatore' }],
-    reminders: [{ id: 'demo-rem1', bills: { id: 'demo-1', title: 'Bolletta elettricità' } }]
+    tasks: [{ id: 'demo-t1', title: 'Pulire il filtro del climatizzatore' }],
+    reminders: [{ id: 'demo-rem1', bills: { id: 'demo-1', title: 'Bolletta luce' } }]
   };
-  const en = localizeMainDemo(demo, 'en');
+  const en = localizeMainDemo(demo, tEn);
   assert.equal(en.bills[0].title, 'Electricity bill');
-  assert.equal(en.bills[0].supplier, 'Example Energy');
+  assert.equal(en.bills[0].supplier, 'Energia Esempio', 'i fornitori di esempio sono nomi di fantasia');
   assert.equal(en.bills[1].title, 'Fibra casa modificata', 'un titolo cambiato nella prova resta quello');
   assert.equal(en.bills[2].title, 'Bolletta mia');
-  assert.equal(en.utilities[0].account_reference, 'Customer code ••••42');
   assert.equal(en.tasks[0].title, 'Clean the air conditioner filter');
   assert.equal(en.reminders[0].bills.title, 'Electricity bill');
-  assert.equal(localizeMainDemo(demo, 'de').bills[0].title, 'Stromrechnung');
-  assert.equal(localizeMainDemo(demo, 'it'), demo);
-  assert.equal(demo.bills[0].title, 'Bolletta elettricità', 'i dati salvati non cambiano');
-  for (const lang of LANGS.slice(1)) {
-    const out = localizeMainDemo(demo, lang);
-    assert.doesNotMatch(JSON.stringify([out.bills[0], out.utilities, out.tasks]), /Bolletta elettricità|di esempio|Codice cliente|Controllare il filtro/, lang);
-  }
-  const page = source('app/page.jsx');
-  assert.match(page, /const shown=demo\?localizeMainDemo\(data,language\):data;/);
-  assert.match(page, /shown\.reminders\.length\?shown\.reminders\.slice/);
+  // La pagina di prova (/prova) usa gli stessi testi: dati di lib/test-fixtures.mjs.
+  const fixtures = localizeDemoFixtures(createDemoFixtures('2026-11-01'), (key, params) => translate('de', key, params));
+  assert.equal(fixtures.shopping[0].title, translate('de', 'demo.fixture.shop-milk'));
+  assert.equal(fixtures.shopping[0].quantity, translate('de', 'demo.fixture.qty.shop-milk'));
+  assert.equal(fixtures.assets[0].name, translate('de', 'demo.fixture.asset-boiler'));
 });

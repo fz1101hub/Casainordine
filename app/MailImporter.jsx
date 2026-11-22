@@ -3,30 +3,31 @@ import { useEffect, useRef, useState } from 'react';
 import { Mail, RefreshCcw, Link2, Trash2, FileText, Eye, ShieldCheck, Info, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { IMAP_PROVIDERS, providerLabel } from '../lib/mail-providers.mjs';
 import {useLanguage} from './LanguageProvider';
-import {safeMailApiMessage} from '../lib/mail-api-errors.mjs';
+import {apiErrorText,apiText,friendlyError,shownError} from '../lib/friendly-error.mjs';
 import {formatMailDate} from '../lib/mail-date.mjs';
 import { askConfirm, askText } from './ConfirmDialog';
 
-async function mailRequest(client,path,method='GET',payload,tr,language){
+// Le API rispondono con un codice; il testo arriva dal dizionario nella lingua dell'app.
+async function mailRequest(client,path,method='GET',payload,tr){
   const {data:{session}}=await client.auth.getSession();
-  if(!session?.access_token)throw new Error(tr('mail.sessionExpired'));
+  if(!session?.access_token)throw shownError(tr('mail.sessionExpired'));
   const response=await fetch(`/api/mail/${path}`,{
-    method,headers:{Authorization:`Bearer ${session.access_token}`,'Accept-Language':language,...(payload?{'Content-Type':'application/json'}:{})},
+    method,headers:{Authorization:`Bearer ${session.access_token}`,...(payload?{'Content-Type':'application/json'}:{})},
     ...(payload?{body:JSON.stringify(payload)}:{})
   });
   const result=await response.json().catch(()=>({}));
-  if(!response.ok){
-    throw new Error(safeMailApiMessage(result.error,language)||tr('mail.operationFailed'));
-  }
+  if(!response.ok)throw shownError(apiErrorText(result,tr,'mail.operationFailed'));
   return result;
 }
 export default function MailImporter({client,onReview,notify,refresh=0,onPaymentsChanged,bills=[]}){
-  const {t:tr,money,locale,language}=useLanguage();
-  const request=(path,method,payload)=>mailRequest(client,path,method,payload,tr,language);
+  const {t:tr,money,locale}=useLanguage();
+  const request=(path,method,payload)=>mailRequest(client,path,method,payload,tr);
+  // Nome della casella nella lingua dell'app quando contiene parole («gratuita», «aziendale»…).
+  const providerName=id=>{const key='mail.imap.label.'+id,text=tr(key);return text!==key?text:providerLabel(id);};
   const date=value=>formatMailDate(value,locale,tr('mail.never'));
   const [connections,setConnections]=useState([]),[documents,setDocuments]=useState([]),[payments,setPayments]=useState([]),[trustedSenders,setTrustedSenders]=useState([]),[billSenders,setBillSenders]=useState([]),[choices,setChoices]=useState({}),[trusted,setTrusted]=useState({}),[busy,setBusy]=useState(''),[loading,setLoading]=useState(true);
   const [imapProvider,setImapProvider]=useState('icloud'),[imapEmail,setImapEmail]=useState(''),[imapLogin,setImapLogin]=useState(''),[imapPassword,setImapPassword]=useState(''),[imapOpen,setImapOpen]=useState(false);
-  // Invalidate older responses on refresh, language changes and unmount.
+  // Invalidate older responses on refresh and unmount.
   const loadGeneration = useRef(0);
   async function load(){
     const generation = ++loadGeneration.current;
@@ -36,14 +37,14 @@ export default function MailImporter({client,onReview,notify,refresh=0,onPayment
       const [c,d,p,s]=await Promise.all([request('connections'),request('documents'),request('payments'),request('senders')]);
       if(generation !== loadGeneration.current)return;
       setConnections(c.connections||[]);setDocuments(d.documents||[]);setPayments(p.payments||[]);setTrustedSenders(p.trusted_senders||[]);setBillSenders(s.senders||[]);
-    }catch(e){if(generation === loadGeneration.current)notify(e.message);}
+    }catch(e){if(generation === loadGeneration.current)notify(friendlyError(e,tr));}
     finally{if(generation === loadGeneration.current)setLoading(false);}
   }
   useEffect(()=>{
     load();
     return ()=>{loadGeneration.current++;};
-  },[client,refresh,language]);
-  async function act(name,fn){setBusy(name);try{await fn();}catch(e){notify(e.message);}finally{setBusy('');}}
+  },[client,refresh]);
+  async function act(name,fn){setBusy(name);try{await fn();}catch(e){notify(friendlyError(e,tr));}finally{setBusy('');}}
   const connect=provider=>act(`connect-${provider}`,async()=>{
     const {url}=await request('start','POST',{provider});
     window.location.assign(url);
@@ -61,7 +62,7 @@ export default function MailImporter({client,onReview,notify,refresh=0,onPayment
   });
   const disconnect=async c=>{
     if(!(await askConfirm(tr('mail.disconnectConfirm',{email:c.email_address}))))return;
-    act(c.id,async()=>{const result=await request('connections','DELETE',{id:c.id});await load();notify(tr('mail.disconnectDone'));});
+    act(c.id,async()=>{const result=await request('connections','DELETE',{id:c.id});await load();notify([tr('mail.disconnectDone'),apiText(result.notice,tr)].filter(Boolean).join(' '));});
   };
   const dismiss=async d=>{
     if(!(await askConfirm(tr('mail.dismissConfirm'))))return;
@@ -73,7 +74,7 @@ export default function MailImporter({client,onReview,notify,refresh=0,onPayment
     const result=await request('payments','PATCH',payload);
     await load();
     if(action==='confirm')await onPaymentsChanged?.();
-    notify(tr(action==='confirm'?'mail.confirmedPayment':'mail.rejectedPayment'));
+    notify([tr(action==='confirm'?'mail.confirmedPayment':'mail.rejectedPayment'),apiText(result.warning,tr)].filter(Boolean).join(' '));
   });
   const revokeSender=entry=>act(`revoke-${entry.id}`,async()=>{
     await request('payments','DELETE',{id:entry.id});
@@ -85,7 +86,7 @@ export default function MailImporter({client,onReview,notify,refresh=0,onPayment
   };
   const review=d=>act(d.id,async()=>{
     const {data,error}=await client.storage.from('mail-bills').download(d.storage_path);
-    if(error||!data)throw new Error(tr('mail.downloadError'));
+    if(error||!data)throw shownError(tr('mail.downloadError'));
     const file=new File([data],d.filename,{type:d.mime_type});
     await onReview(d,file);
   });
@@ -94,7 +95,7 @@ export default function MailImporter({client,onReview,notify,refresh=0,onPayment
     <div className="mail-privacy"><ShieldCheck size={18}/><span>{tr('mail.privacy')}</span></div>
     {loading?<p>{tr('mail.loading')}</p>:<>
       {connections.length>0&&<div className="mail-accounts">{connections.map(c=><div className="mail-account" key={c.id}>
-        <div><b><Mail size={16}/> {c.email_address} <span className="mail-provider-label">{providerLabel(c.provider)}</span></b><small>{tr('mail.lastCheck',{date:date(c.last_sync_at)})} · {tr(c.status==='active'?'mail.connected':c.status==='reconnect'?'mail.reconnect':'mail.tempError')}</small>{c.last_error&&<small className="danger-text">{tr('mail.operationFailed')}</small>}</div>
+        <div><b><Mail size={16}/> {c.email_address} <span className="mail-provider-label">{providerName(c.provider)}</span></b><small>{tr('mail.lastCheck',{date:date(c.last_sync_at)})} · {tr(c.status==='active'?'mail.connected':c.status==='reconnect'?'mail.reconnect':'mail.tempError')}</small>{c.last_error&&<small className="danger-text">{tr('mail.operationFailed')}</small>}</div>
         <div className="mail-account-actions"><button className="btn btn-soft" disabled={!!busy||c.status==='reconnect'} onClick={()=>sync(c)}><RefreshCcw size={15}/> {tr(busy===c.id?'mail.checking':'mail.check')}</button><button className="icon-button danger" disabled={!!busy} onClick={()=>disconnect(c)} title={tr('mail.disconnect')} aria-label={tr('mail.disconnect')}><Trash2 size={17}/></button></div>
       </div>)}</div>}
       <div className="mail-connect-options">
@@ -106,12 +107,12 @@ export default function MailImporter({client,onReview,notify,refresh=0,onPayment
         <h3>{tr('mail.imapTitle')}</h3>
         <p>{tr('mail.imapHelp')}</p>
         <label>{tr('mail.emailService')}
-          <select value={imapProvider} onChange={e=>setImapProvider(e.target.value)}>{Object.entries(IMAP_PROVIDERS).map(([id,p])=><option key={id} value={id}>{p.label}</option>)}</select>
+          <select value={imapProvider} onChange={e=>setImapProvider(e.target.value)}>{Object.entries(IMAP_PROVIDERS).map(([id])=><option key={id} value={id}>{providerName(id)}</option>)}</select>
         </label>
         <div className="mail-imap-fields"><label>{tr('mail.address')}<input type="email" autoComplete="email" required value={imapEmail} onChange={e=>setImapEmail(e.target.value)} placeholder="tuoindirizzo@esempio.it"/></label>
         <label>{tr('mail.login')}<input autoComplete="username" value={imapLogin} onChange={e=>setImapLogin(e.target.value)} placeholder={tr('mail.loginHint')}/></label></div>
         <label>{tr('mail.password')}<input type="password" minLength={4} autoComplete="new-password" required value={imapPassword} onChange={e=>setImapPassword(e.target.value)} placeholder={tr('mail.passwordHint')}/></label>
-        <p className="mail-imap-tip"><Info size={15}/> Server: {IMAP_PROVIDERS[imapProvider].host}:993 (TLS). {IMAP_PROVIDERS[imapProvider].tip}</p>
+        <p className="mail-imap-tip"><Info size={15}/> Server: {IMAP_PROVIDERS[imapProvider].host}:993 (TLS). {tr('mail.imap.tip.'+imapProvider)}</p>
         <button className="btn btn-primary" type="submit" disabled={!!busy}><Link2 size={16}/>{tr(busy==='imap'?'mail.verifying':'mail.verify')}</button>
       </form>}
       <div className="mail-documents-head"><h3>{tr('mail.paymentsTitle')} <span>{payments.length}</span></h3><p>{tr('mail.paymentsHelp')}</p></div>

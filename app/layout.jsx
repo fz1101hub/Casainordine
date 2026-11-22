@@ -12,7 +12,9 @@ import '@fontsource/plus-jakarta-sans/800.css';
 import './globals.css';
 import {LanguageProvider} from './LanguageProvider';
 import {ConfirmHost} from './ConfirmDialog';
-export const metadata = { title: 'Casa in Ordine | Bollette e scadenze', description:'Organizza le spese di casa e ricevi promemoria prima delle scadenze.', applicationName:'Casa in Ordine', appleWebApp:{capable:true,title:'Casa in Ordine',statusBarStyle:'default'}, icons:{apple:'/icon-192.png'} };
+import {translate} from '../lib/i18n.mjs';
+// La pagina statica parte in italiano; nel browser LocalizedTitle passa alla lingua scelta.
+export const metadata = { title: translate('it','meta.title'), description: translate('it','meta.description'), applicationName:'Casa in Ordine', appleWebApp:{capable:true,title:'Casa in Ordine',statusBarStyle:'default'}, icons:{apple:'/icon-192.png'} };
 export default function Layout({children}) {
   return <html lang="it"><body><LanguageProvider>{children}<ConfirmHost/></LanguageProvider></body></html>;
 }

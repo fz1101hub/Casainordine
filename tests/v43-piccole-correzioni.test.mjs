@@ -3,15 +3,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { detectBillingInconsistencies } from '../lib/v21-core.mjs';
+import {translate} from '../lib/i18n.mjs';
+import {textGroup} from '../lib/i18n-core.mjs';
+const copy=textGroup(key=>translate('it',key),'briefing.');
 const source = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
 test('L1: un rimborso atteso per oggi non è in ritardo; da domani sì', () => {
   const refunds = [{ status: 'expected', expected_on: '2026-11-11', label: 'Conguaglio', bill_id: 'b1' }];
-  const late = today => detectBillingInconsistencies({ refunds, today }).filter(x => x.code === 'refund_late').length;
+  const late = today => detectBillingInconsistencies({copy, refunds, today }).filter(x => x.code === 'refund_late').length;
   assert.equal(late('2026-11-11'), 0);
   assert.equal(late('2026-11-12'), 1);
   assert.equal(late('2026-11-10'), 0);
-  assert.equal(detectBillingInconsistencies({ refunds: [{ ...refunds[0], status: 'received' }], today: '2026-12-01' }).length, 0);
+  assert.equal(detectBillingInconsistencies({copy, refunds: [{ ...refunds[0], status: 'received' }], today: '2026-12-01' }).length, 0);
 });
 
 test('L1: senza data esplicita vale la data italiana, non quella UTC', () => {

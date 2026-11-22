@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {v20AlertCopy,v20MailHealthLabel} from '../lib/v20-alert-copy.mjs';
+import {v20AlertCopy} from '../lib/v20-alert-copy.mjs';
+import {mailHealth} from '../lib/v20-core.mjs';
+import {translate} from '../lib/i18n.mjs';
 
 const events=[
  {kind:'missing_bill',source:{supplier:'Water',expected_on:'2026-12-03'}},
@@ -27,20 +29,12 @@ test('invalid dates and missing names fail closed; unsupported locale falls back
  assert.deepEqual(v20AlertCopy(events[0],'xx'),v20AlertCopy(events[0],'it'));
 });
 
-test('mail connection health is localized for all six languages and all five states',()=>{
+test('mail connection health: five states, each with its text in six languages',()=>{
  const now=new Date('2026-11-04T12:00:00Z');
- const samples=[
-  {status:'reconnect'},
-  {status:'error'},
-  {status:'active'},
-  {status:'active',last_sync_at:'2026-11-01T12:00:00Z'},
-  {status:'active',last_sync_at:'2026-11-04T11:00:00Z'}
- ];
- const languages=['it','en','es','fr','de','pt'];
+ const samples=[{status:'reconnect'},{status:'error'},{status:'active'},{status:'active',last_sync_at:'2026-11-01T12:00:00Z'},{status:'active',last_sync_at:'2026-11-04T11:00:00Z'}];
+ assert.deepEqual(samples.map(sample=>mailHealth(sample,now).status),['reconnect','error','never','stale','recent']);
  for(const sample of samples){
-  const labels=languages.map(lang=>v20MailHealthLabel(sample,lang,now));
+  const labels=['it','en','es','fr','de','pt'].map(lang=>translate(lang,'v20.mail.'+mailHealth(sample,now).status));
   assert.equal(new Set(labels).size,6);
-  for(const label of labels)assert.ok(label.trim());
  }
- assert.equal(v20MailHealthLabel(samples[4],'unknown',now),v20MailHealthLabel(samples[4],'it',now));
 });

@@ -3,16 +3,12 @@ import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {AlertTriangle,Check,Download,History,House,MailWarning,Plus,ShieldAlert,Trash2,WifiOff,RefreshCw,Wallet,ScanLine,Car,FileText} from 'lucide-react';
 import {todayRome} from '../lib/dates.mjs';
 import {formatV20Date, formatTimestampForDevice} from '../lib/v20-timestamp.mjs';
-import {useLanguage} from './LanguageProvider';
-import {v20UiCopy} from '../lib/v20-ui-copy.mjs';
-import {localizedMoveChecklist} from '../lib/v20-move-i18n.mjs';
-import {v20MailHealthLabel} from '../lib/v20-alert-copy.mjs';
-import {localizedFraudFlag} from '../lib/v20-fraud-i18n.mjs';
-import {v20OcrProgress,v20OcrError} from '../lib/v20-ocr-i18n.mjs';
-import {v20SafeError} from '../lib/v20-safe-error.mjs';
+import {useLanguage,useSection} from './LanguageProvider';
+import {textGroup} from '../lib/i18n-core.mjs';
+import {friendlyError} from '../lib/friendly-error.mjs';
 import {v21LoadErrorKind} from '../lib/v21-load-errors.mjs';
 import {memberName} from '../lib/member-names.mjs';
-import {missingBillCandidates,billFraudSignals,parsePagoPA,moveChecklist,savingsProjection,mailHealth} from '../lib/v20-core.mjs';
+import {missingBillCandidates,billFraudSignals,parsePagoPA,moveChecklist,savingsProjection,mailHealth,fraudFlagText} from '../lib/v20-core.mjs';
 import {readRatePlanDocument} from '../lib/document-reader.js';
 import {listDrafts,removeDraft} from '../lib/offline-queue.js';
 import { askConfirm, askText } from './ConfirmDialog';
@@ -20,12 +16,18 @@ const today=todayRome;
 function Field({label,children}){return <label className="extra-field">{label}{children}</label>}
 function Item({children,action}){return <div className="extra-item"><div>{children}</div>{action}</div>}
 const key=()=>crypto.randomUUID();
-export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilities=[],tab,onNotify=()=>{},onRefresh=()=>{}}){
+// I testi della sezione arrivano quando la apri (lib/i18n-dicts/<lingua>.v20.json).
+export default function V20Section(props){
+ const ready=useSection('v20');
+ const {t}=useLanguage();
+ return ready?<V20Hub {...props}/>:<p className="import-progress" role="status">{t('general.loading')}</p>;
+}
+function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilities=[],tab,onNotify=()=>{},onRefresh=()=>{}}){
  const {money,date:formatDate,locale,language,t}=useLanguage();
  // Ora italiana, più quella del dispositivo quando è diversa (per esempio all'estero).
  const stamp=(value,fallback)=>formatTimestampForDevice(value,locale,{fallback,italyLabel:t('time.italy'),deviceLabel:t('time.device')});
  const formatCount=value=>new Intl.NumberFormat(locale,{maximumFractionDigits:0}).format(value);
- const ui=v20UiCopy(language);
+ const ui=textGroup(t,'v20.ui.');
  // Registro delle modifiche: chi l'ha fatta con il suo nome (o «Nome (ex membro)») e l'azione a parole.
  // Chi non è né membro né ex membro registrato (voci più vecchie della v4.1) resta «Utente 1a2b3c4d».
  const actorName=id=>{const members=[...rows.people,...(user?.id&&!homeId?[{user_id:user.id,email:user.email}]:[])];return members.some(m=>m.user_id===id)||rows.former.some(f=>f.user_id===id)?memberName(id,{members,former:rows.former,formerLabel:t('family.formerMember')}):ui.userLabel+' '+String(id).slice(0,8);};
@@ -66,7 +68,7 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   // Cambiando casa in fretta può arrivare per ultima la risposta della casa precedente: si scarta.
   if(seq!==loadSeq.current||activeAccount.current!==accountId||activeHome.current!==homeId)return;
   const errorKind=v21LoadErrorKind(res);
-  if(errorKind)onNotify((errorKind==='migrationRequired'?ui.migrationRequired:ui.operationFailed+': ')+v20SafeError(language,res.find(r=>r.error)?.error));
+  if(errorKind)onNotify((errorKind==='migrationRequired'?ui.migrationRequired:ui.operationFailed+': ')+friendlyError(res.find(r=>r.error)?.error,t));
   const next={};for(let i=0;i<specs.length;i++)next[specs[i][0]]=res[i].data||[];
   next.alerts=res[specs.length].data||[];next.connections=res[specs.length+1].data||[];next.preferences=res[specs.length+2].data||null;
   next.people=res[specs.length+3].data||[];next.former=res[specs.length+4].data||[];
@@ -79,7 +81,7 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   setDrafts([]);setOfflineError('');
   if(tab==='offline'&&user?.id){
    const accountId=user.id;
-   listDrafts(accountId).then(items=>{if(seq===draftSeq.current&&activeAccount.current===accountId)setDrafts(items)}).catch(()=>{if(seq===draftSeq.current&&activeAccount.current===accountId)setOfflineError(v20SafeError(language))});
+   listDrafts(accountId).then(items=>{if(seq===draftSeq.current&&activeAccount.current===accountId)setDrafts(items)}).catch(()=>{if(seq===draftSeq.current&&activeAccount.current===accountId)setOfflineError(t('errors.generic'))});
   }
   return ()=>{draftSeq.current++};
  },[tab,user?.id,language]);
@@ -95,7 +97,7 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
    onNotify(message);await load();
    if(!sameContext())return null;
    if(options.parent)onRefresh();return data;
-  }catch(e){if(sameContext())onNotify(v20SafeError(language,e));return null;}
+  }catch(e){if(sameContext())onNotify(friendlyError(e,t));return null;}
   finally{if(sameContext())setWorking(false)}
  }
  async function change(table,id,patch,message){
@@ -109,7 +111,7 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
    if(!sameContext())return;
    if(error)throw error;
    onNotify(message);await load();
-  }catch(e){if(sameContext())onNotify(v20SafeError(language,e))}
+  }catch(e){if(sameContext())onNotify(friendlyError(e,t))}
   finally{if(sameContext())setWorking(false)}
  }
  async function erase(table,id){
@@ -124,7 +126,7 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
    if(!sameContext())return;
    if(error)throw error;
    onNotify(ui.deleted);await load();
-  }catch(e){if(sameContext())onNotify(v20SafeError(language,e))}
+  }catch(e){if(sameContext())onNotify(friendlyError(e,t))}
   finally{if(sameContext())setWorking(false)}
  }
  const missing=useMemo(()=>missingBillCandidates(utilities,bills,today()),[utilities,bills]);
@@ -147,10 +149,10 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   const plan=await save('home_move_plans',move,ui.movePlanCreated);
   // A home/account switch while the plan is saving must not start a second write.
   if(!plan||!sameContext())return;
-  const steps=localizedMoveChecklist(moveChecklist(move.move_on),language).map(s=>({user_id:accountId,home_id:moveHomeId||null,plan_id:plan.id,title:s.title,due_on:s.due_on,done_at:null}));
+  const steps=moveChecklist(move.move_on).map(s=>({user_id:accountId,home_id:moveHomeId||null,plan_id:plan.id,title:t('v20.move.'+s.step),due_on:s.due_on,done_at:null}));
   const {error}=await client.from('home_move_steps').insert(steps);
   if(!sameContext())return;
-  if(error)onNotify(ui.moveStepsPartial+v20SafeError(language,error));else onNotify(ui.movePlanAndStepsCreated);
+  if(error)onNotify(ui.moveStepsPartial+friendlyError(error,t));else onNotify(ui.movePlanAndStepsCreated);
   await load();if(sameContext())setMove({title:'',move_on:today(),notes:''});}
  async function parseNoticeText(value){const guess=parsePagoPA(value);setNotice(o=>({...o,notice_code:guess.noticeCode||o.notice_code,creditor_code:guess.creditorCode||o.creditor_code}));
   setNoticeMessage(guess.ambiguous?ui.multipleNoticeCodes:guess.noticeCode?ui.suggestedNoticeCode:ui.unrecognizedNoticeCode);}
@@ -159,15 +161,15 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
    const barcodes=await detector.detect(bit);bit.close?.();const data=barcodes.map(b=>b.rawValue).filter(Boolean).join('\n');
    if(data){setRawNotice(data);await parseNoticeText(data);return;}}catch{/* Riprova con OCR se il lettore QR non è disponibile. */}
   }
-  const output=await readRatePlanDocument(file,progress=>setNoticeMessage(v20OcrProgress(progress,language)));setRawNotice(output.text.slice(0,4000));await parseNoticeText(output.text);
- }catch(e){setNoticeMessage(ui.noticeScanFailed+' '+v20OcrError(language))}}
+  const output=await readRatePlanDocument(file,progress=>setNoticeMessage(t(progress.key,progress.params)));setRawNotice(output.text.slice(0,4000));await parseNoticeText(output.text);
+ }catch(e){setNoticeMessage(ui.noticeScanFailed+' '+t('ocr.failed'))}}
  async function saveNotice(e){e.preventDefault();const code=notice.notice_code.replace(/\D/g,'');if(![15,18].includes(code.length))return onNotify(ui.noticeCodeInvalid);
   if(createBill&&(!notice.due_on||notice.amount===''))return onNotify(ui.noticeReminderRequiresDetails);
   if(createBill&&!(await askConfirm(ui.confirmNoticeOriginal)))return;
   setWorking(true);try{const {error}=await client.rpc('v20_register_pagopa',{p_home_id:homeId||null,p_notice_code:code,p_creditor_code:notice.creditor_code||null,p_creditor_name:notice.creditor_name,p_amount:notice.amount===''?null:Number(notice.amount),p_due_on:notice.due_on||null,p_create_bill:createBill});if(error)throw error;
    onNotify(createBill?ui.noticeAndReminderSaved:ui.noticeSaved);setNotice({notice_code:'',creditor_code:'',creditor_name:'',amount:'',due_on:''});setRawNotice('');await load();onRefresh();}
-   catch(e){onNotify(v20SafeError(language,e))}finally{setWorking(false)}}
-  async function refreshDrafts(){if(tab!=='offline'||!user?.id)return;const seq=++draftSeq.current;const accountId=user.id;try{const items=await listDrafts(accountId);if(seq!==draftSeq.current||activeAccount.current!==accountId)return;setDrafts(items);setOfflineError('')}catch(e){if(seq===draftSeq.current&&activeAccount.current===accountId)setOfflineError(v20SafeError(language))}}
+   catch(e){onNotify(friendlyError(e,t))}finally{setWorking(false)}}
+  async function refreshDrafts(){if(tab!=='offline'||!user?.id)return;const seq=++draftSeq.current;const accountId=user.id;try{const items=await listDrafts(accountId);if(seq!==draftSeq.current||activeAccount.current!==accountId)return;setDrafts(items);setOfflineError('')}catch(e){if(seq===draftSeq.current&&activeAccount.current===accountId)setOfflineError(t('errors.generic'))}}
  async function importDraft(d){if(!client||!user)return onNotify(ui.signInToImport);if(!['task','shopping'].includes(d.type))return onNotify(ui.syncFailed);
   const accountId=user.id;
   const importHomeId=homeId;
@@ -181,7 +183,7 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
    await removeDraft(d.id);if(!sameContext())return;
    await refreshDrafts();if(!sameContext())return;
    onRefresh();onNotify(d.type==='shopping'?ui.shoppingAdded:ui.taskSynced);
-  }catch(e){if(sameContext())onNotify(ui.syncFailed+v20SafeError(language,e))}finally{if(sameContext())setWorking(false)}}
+  }catch(e){if(sameContext())onNotify(ui.syncFailed+friendlyError(e,t))}finally{if(sameContext())setWorking(false)}}
  function downloadDraft(d){const url=URL.createObjectURL(d.file);const a=document.createElement('a');a.href=url;a.download=d.title||ui.documentLabel;a.click();setTimeout(()=>URL.revokeObjectURL(url),6000)}
  if(demo)return <section className="panel extra-panel"><h2>{ui.v20Name}</h2><p>{ui.demoSetupNotice}</p></section>;
  return <div className="extra-hub v20-hub">
@@ -190,10 +192,10 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
  {missing.map(m=><Item key={m.utility_id+'-'+m.expected_on}><b>{m.supplier}</b><small>{ui.expectedAround}{formatDate(m.expected_on)} · {formatCount(m.days_late)}{ui.daysOverdue}</small></Item>)}
  {!missing.length&&<p className="muted">{ui.noMissingBills}</p>}
  </section><section className="panel extra-panel"><h2><RefreshCw size={19}/> {ui.mailConnections}</h2><p>{ui.mailHealthDescription}</p>
- <label className="extra-toggle"><input type="checkbox" checked={rows.preferences?.push_monitor!==false} onChange={async e=>{const {error}=await client.from('user_alert_preferences').upsert({user_id:user.id,push_monitor:e.target.checked},{onConflict:'user_id'});if(error)onNotify(v20SafeError(language,error));else{onNotify(ui.pushMonitorSaved);await load()}}}/> {ui.pushMonitorLabel}</label>
- {rows.connections.map(c=>{const h=mailHealth(c);return <Item key={c.id}><b>{c.email_address}</b><small>{c.provider} · {ui.lastChecked}{stamp(c.last_sync_at,ui.never)}</small><small style={{color:h.level==='ok'?'#167d64':'#a34526'}}>{v20MailHealthLabel(c,language)}</small></Item>})}
+ <label className="extra-toggle"><input type="checkbox" checked={rows.preferences?.push_monitor!==false} onChange={async e=>{const {error}=await client.from('user_alert_preferences').upsert({user_id:user.id,push_monitor:e.target.checked},{onConflict:'user_id'});if(error)onNotify(friendlyError(error,t));else{onNotify(ui.pushMonitorSaved);await load()}}}/> {ui.pushMonitorLabel}</label>
+ {rows.connections.map(c=>{const h=mailHealth(c);return <Item key={c.id}><b>{c.email_address}</b><small>{c.provider} · {ui.lastChecked}{stamp(c.last_sync_at,ui.never)}</small><small style={{color:h.level==='ok'?'#167d64':'#a34526'}}>{t('v20.mail.'+h.status)}</small></Item>})}
  {!rows.connections.length&&<p className="muted">{ui.noMailConnections}</p>}
- </section><section className="panel extra-panel"><h2>{ui.automaticAlerts}</h2>{rows.alerts.filter(a=>['missing_bill','mail_sync','fraud'].includes(a.kind)).map(a=><Item key={a.id} action={a.read_at?null:<button className="btn btn-soft" onClick={async()=>{const {error}=await client.from('user_alerts').update({read_at:new Date().toISOString()}).eq('id',a.id).eq('user_id',user.id);if(error)onNotify(v20SafeError(language,error));else await load()}}>{ui.markRead}</button>}><b>{a.title}</b><small>{a.body}{a.read_at?' · '+ui.read:''}</small></Item>)}{!rows.alerts.some(a=>['missing_bill','mail_sync','fraud'].includes(a.kind))&&<p className="muted">{ui.noAlerts}</p>}</section></div></>}
+ </section><section className="panel extra-panel"><h2>{ui.automaticAlerts}</h2>{rows.alerts.filter(a=>['missing_bill','mail_sync','fraud'].includes(a.kind)).map(a=><Item key={a.id} action={a.read_at?null:<button className="btn btn-soft" onClick={async()=>{const {error}=await client.from('user_alerts').update({read_at:new Date().toISOString()}).eq('id',a.id).eq('user_id',user.id);if(error)onNotify(friendlyError(error,t));else await load()}}>{ui.markRead}</button>}><b>{a.title}</b><small>{a.body}{a.read_at?' · '+ui.read:''}</small></Item>)}{!rows.alerts.some(a=>['missing_bill','mail_sync','fraud'].includes(a.kind))&&<p className="muted">{ui.noAlerts}</p>}</section></div></>}
  {tab==='fraud'&&<><header className="page-heading"><div><div className="eyebrow">{ui.fraudCheck}</div><h1>{ui.fraudTitle}</h1><p>{ui.fraudDescription}</p></div></header>
  <div className="extra-layout"><section className="panel extra-panel"><h2><ShieldAlert size={19}/> {ui.analyzeBill}</h2><p>{ui.fraudPrivacyDescription}</p>
  <Field label={ui.billLabel}><select value={selectedBill} onChange={e=>{setSelectedBill(e.target.value);setRiskPreview(null)}}><option value="">{ui.select}</option>{bills.map(b=><option key={b.id} value={b.id}>{b.title} · {formatDate(b.due_date)}</option>)}</select></Field>
@@ -201,12 +203,12 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
  <Field label={ui.emailAuthLabel}><select value={auth} onChange={e=>setAuth(e.target.value)}><option value="unknown">{ui.authUnknown}</option><option value="pass">{ui.authPassed}</option><option value="fail">{ui.authFailed}</option></select></Field>
  <Field label={ui.ibanLabel}><input value={iban} onChange={e=>setIban(e.target.value)} autoComplete="off" placeholder={ui.ibanPlaceholder}/></Field>
  <div className="extra-buttons"><button className="btn btn-soft" disabled={!activeBill||working} onClick={previewFraud}>{ui.analyze}</button>{canWrite&&riskPreview&&!rows.risk.some(x=>x.bill_id===activeBill?.id)&&<button className="btn btn-primary" disabled={working} onClick={saveFraud}>{ui.saveReview}</button>}</div>
- {riskPreview&&<div role="status"><b>{riskPreview.requiresReview?ui.reviewRequired:ui.noWarningSigns}</b>{riskPreview.flags.map(f=><p key={f.id}>⚠ {localizedFraudFlag(f,language,riskPreview.baseline,locale)}</p>)}<small>{ui.fraudCheckDisclaimer}</small></div>}
- </section><section className="panel extra-panel"><h2>{ui.savedReviews}</h2>{rows.risk.map(r=><Item key={r.id} action={canWrite?<div className="extra-buttons"><button className="btn btn-soft" onClick={()=>change('bill_security_reviews',r.id,{review_status:'reviewed',reviewed_at:new Date().toISOString()},ui.manuallyReviewed)}>{ui.reviewedLabel}</button><button className="btn btn-soft" onClick={()=>change('bill_security_reviews',r.id,{review_status:'suspicious',reviewed_at:new Date().toISOString()},ui.markedSuspicious)}>{ui.suspiciousLabel}</button></div>:null}><b>{bills.find(b=>b.id===r.bill_id)?.title||ui.billLabel}</b><small>{r.risk_flags?.map(f=>localizedFraudFlag(f,language,null,locale)).join(' · ')||ui.noAnomalies} · {r.review_status==='reviewed'?ui.reviewedLabel:r.review_status==='suspicious'?ui.suspiciousLabel:r.review_status==='pending'?ui.reviewRequired:r.review_status}</small><small>{r.iban_suffix?'IBAN ····'+r.iban_suffix:''}</small></Item>)}{!rows.risk.length&&<p className="muted">{ui.noReviews}</p>}</section></div></>}
+ {riskPreview&&<div role="status"><b>{riskPreview.requiresReview?ui.reviewRequired:ui.noWarningSigns}</b>{riskPreview.flags.map(f=><p key={f.id}>⚠ {fraudFlagText(f,t,riskPreview.baseline,money)}</p>)}<small>{ui.fraudCheckDisclaimer}</small></div>}
+ </section><section className="panel extra-panel"><h2>{ui.savedReviews}</h2>{rows.risk.map(r=><Item key={r.id} action={canWrite?<div className="extra-buttons"><button className="btn btn-soft" onClick={()=>change('bill_security_reviews',r.id,{review_status:'reviewed',reviewed_at:new Date().toISOString()},ui.manuallyReviewed)}>{ui.reviewedLabel}</button><button className="btn btn-soft" onClick={()=>change('bill_security_reviews',r.id,{review_status:'suspicious',reviewed_at:new Date().toISOString()},ui.markedSuspicious)}>{ui.suspiciousLabel}</button></div>:null}><b>{bills.find(b=>b.id===r.bill_id)?.title||ui.billLabel}</b><small>{r.risk_flags?.map(f=>fraudFlagText(f,t,null,money)).join(' · ')||ui.noAnomalies} · {r.review_status==='reviewed'?ui.reviewedLabel:r.review_status==='suspicious'?ui.suspiciousLabel:r.review_status==='pending'?ui.reviewRequired:r.review_status}</small><small>{r.iban_suffix?'IBAN ····'+r.iban_suffix:''}</small></Item>)}{!rows.risk.length&&<p className="muted">{ui.noReviews}</p>}</section></div></>}
  {tab==='pagopa'&&<><header className="page-heading"><div><div className="eyebrow">{ui.publicNotices}</div><h1>{ui.pagopaTitle}</h1><p>{ui.pagopaDescription}</p></div></header><div className="extra-layout"><section className="panel extra-panel"><h2><ScanLine size={19}/> {ui.readNotice}</h2><label className="extra-field">{ui.fileOrScreenshot}<input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" onChange={e=>captureNotice(e.target.files?.[0])}/></label><Field label={ui.copiedText}><textarea rows={3} value={rawNotice} onChange={e=>setRawNotice(e.target.value)} placeholder={ui.pasteNotice}/></Field><button className="btn btn-soft" onClick={()=>parseNoticeText(rawNotice)}>{ui.findCodeInText}</button>{noticeMessage&&<p role="status">{noticeMessage}</p>}
  {canWrite&&<form className="extra-form" onSubmit={saveNotice}><Field label={ui.noticeCodeLabel}><input required inputMode="numeric" maxLength={22} value={notice.notice_code} onChange={e=>setNotice({...notice,notice_code:e.target.value})}/></Field><Field label={ui.creditorCodeLabel}><input inputMode="numeric" maxLength={11} value={notice.creditor_code} onChange={e=>setNotice({...notice,creditor_code:e.target.value})}/></Field><Field label={ui.authorityLabel}><input maxLength={160} value={notice.creditor_name} onChange={e=>setNotice({...notice,creditor_name:e.target.value})}/></Field><div className="extra-row"><Field label={ui.amountLabel}><input type="number" min="0" step="0.01" value={notice.amount} onChange={e=>setNotice({...notice,amount:e.target.value})}/></Field><Field label={ui.dueDateLabel}><input type="date" value={notice.due_on} onChange={e=>setNotice({...notice,due_on:e.target.value})}/></Field></div><label className="extra-toggle"><input type="checkbox" checked={createBill} onChange={e=>setCreateBill(e.target.checked)}/> {ui.createBillReminderLabel}</label><button className="btn btn-primary" disabled={working}>{ui.registerNotice}</button></form>}</section>
  <section className="panel extra-panel"><h2>{ui.registeredNotices}</h2>{rows.notices.map(n=><Item key={n.id} action={canWrite?<button className="icon-button danger" onClick={()=>erase('pagopa_notices',n.id)} aria-label={`${ui.deleteLabel}: ${n.creditor_name||ui.pagopaNotice}`}><Trash2 size={16}/></button>:null}><b>{n.creditor_name||ui.pagopaNotice}</b><small>{ui.codeLabel} {n.notice_code} · {n.amount==null?ui.amountNeedsReview:money(n.amount)} · {formatDate(n.due_on)}</small></Item>)}{!rows.notices.length&&<p className="muted">{ui.noNotices}</p>}<p className="muted">{ui.pagopaDebtWarning} <a href="https://www.pagopa.gov.it/" target="_blank" rel="noopener noreferrer">{ui.officialPagopa}</a>.</p></section></div></>}
- {tab==='history'&&<><header className="page-heading"><div><div className="eyebrow">{ui.transparencyRecovery}</div><h1>{ui.historyTitle}</h1><p>{ui.historyDescription}</p></div></header><div className="extra-layout"><section className="panel extra-panel"><h2><History size={19}/> {ui.recentActivity}</h2>{rows.audit.map(a=><Item key={a.id}><b>{auditAction(a.action)} · {a.summary}</b><small>{a.source_table} · {stamp(a.created_at)} · {a.actor_id?actorName(a.actor_id):ui.automaticProcess}</small></Item>)}{!rows.audit.length&&<p className="muted">{ui.noAuditEvents}</p>}</section><section className="panel extra-panel"><h2>{ui.recoverableTrash}</h2>{rows.recycle.filter(r=>!r.restored_at&&Date.parse(r.deleted_at)>Date.now()-30*86400000).map(r=><Item key={r.id} action={canWrite?<button className="btn btn-soft" disabled={working} onClick={async()=>{if(!(await askConfirm(ui.confirmRestore)))return;setWorking(true);const {error}=await client.rpc('v20_restore_deleted',{target_id:r.id});setWorking(false);if(error)onNotify(v20SafeError(language,error));else{onNotify(ui.restored);await load();onRefresh()}}}>{ui.restoreLabel}</button>:null}><b>{r.snapshot?.title||ui.itemLabel}</b><small>{r.source_table} · {ui.deletedOn} {formatV20Date(r.deleted_at,locale)}</small></Item>)}{!rows.recycle.some(r=>!r.restored_at&&Date.parse(r.deleted_at)>Date.now()-30*86400000)&&<p className="muted">{ui.trashEmpty}</p>}<small>{ui.trashRetentionNotice}</small></section></div></>}
+ {tab==='history'&&<><header className="page-heading"><div><div className="eyebrow">{ui.transparencyRecovery}</div><h1>{ui.historyTitle}</h1><p>{ui.historyDescription}</p></div></header><div className="extra-layout"><section className="panel extra-panel"><h2><History size={19}/> {ui.recentActivity}</h2>{rows.audit.map(a=><Item key={a.id}><b>{auditAction(a.action)} · {a.summary}</b><small>{a.source_table} · {stamp(a.created_at)} · {a.actor_id?actorName(a.actor_id):ui.automaticProcess}</small></Item>)}{!rows.audit.length&&<p className="muted">{ui.noAuditEvents}</p>}</section><section className="panel extra-panel"><h2>{ui.recoverableTrash}</h2>{rows.recycle.filter(r=>!r.restored_at&&Date.parse(r.deleted_at)>Date.now()-30*86400000).map(r=><Item key={r.id} action={canWrite?<button className="btn btn-soft" disabled={working} onClick={async()=>{if(!(await askConfirm(ui.confirmRestore)))return;setWorking(true);const {error}=await client.rpc('v20_restore_deleted',{target_id:r.id});setWorking(false);if(error)onNotify(friendlyError(error,t));else{onNotify(ui.restored);await load();onRefresh()}}}>{ui.restoreLabel}</button>:null}><b>{r.snapshot?.title||ui.itemLabel}</b><small>{r.source_table} · {ui.deletedOn} {formatV20Date(r.deleted_at,locale)}</small></Item>)}{!rows.recycle.some(r=>!r.restored_at&&Date.parse(r.deleted_at)>Date.now()-30*86400000)&&<p className="muted">{ui.trashEmpty}</p>}<small>{ui.trashRetentionNotice}</small></section></div></>}
  {tab==='moving'&&<><header className="page-heading"><div><div className="eyebrow">{ui.movingUtilities}</div><h1>{ui.movingTitle}</h1><p>{ui.movingDescription}</p></div></header><div className="extra-layout"><section className="panel extra-panel"><h2><House size={19}/> {ui.newMovePlan}</h2>{canWrite&&<form className="extra-form" onSubmit={createMove}><Field label={ui.moveName}><input required minLength={2} maxLength={140} value={move.title} onChange={e=>setMove({...move,title:e.target.value})} placeholder={ui.movePlaceholder}/></Field><Field label={ui.moveDate}><input required type="date" value={move.move_on} onChange={e=>setMove({...move,move_on:e.target.value})}/></Field><Field label={ui.notesLabel}><textarea rows={2} value={move.notes} onChange={e=>setMove({...move,notes:e.target.value})}/></Field><button className="btn btn-primary" disabled={working}>{ui.createMoveChecklist}</button></form>}<small>{ui.moveProviderDisclaimer}</small></section><section className="panel extra-panel"><h2>{ui.myChecklists}</h2>{rows.moves.map(m=><div key={m.id} className="v20-move"><b>{m.title} · {formatDate(m.move_on)}</b>{rows.steps.filter(s=>s.plan_id===m.id).map(s=><div className="extra-item" key={s.id}><label><input type="checkbox" disabled={!canWrite} checked={!!s.done_at} onChange={e=>change('home_move_steps',s.id,{done_at:e.target.checked?new Date().toISOString():null},ui.checklistUpdated)}/>{s.title}<small> · {formatDate(s.due_on)}</small></label></div>)}{canWrite&&<button className="btn btn-soft" onClick={()=>erase('home_move_plans',m.id)}>{ui.deleteMovePlan}</button>}</div>)}{!rows.moves.length&&<p className="muted">{ui.noScheduledMoves}</p>}</section></div></>}
  {tab==='savings'&&<><header className="page-heading"><div><div className="eyebrow">{ui.plannedSavings}</div><h1>{ui.savingsTitle}</h1><p>{ui.savingsDescription}</p></div></header><div className="extra-layout"><section className="panel extra-panel"><h2><Wallet size={19}/> {ui.createSavingsGoal}</h2>{canWrite&&<form className="extra-form" onSubmit={async e=>{e.preventDefault();const r=await save('home_savings_goals',{...goal,target_amount:Number(goal.target_amount),current_amount:Number(goal.current_amount)},ui.savingsGoalCreated);if(r)setGoal({label:'',target_amount:'',current_amount:'0',deadline:today()})}}><Field label={ui.savingFor}><input value={goal.label} onChange={e=>setGoal({...goal,label:e.target.value})} minLength={2} maxLength={150} required/></Field><div className="extra-row"><Field label={ui.targetAmountLabel}><input type="number" min="0.01" step="0.01" required value={goal.target_amount} onChange={e=>setGoal({...goal,target_amount:e.target.value})}/></Field><Field label={ui.savedAmountLabel}><input type="number" min="0" step="0.01" required value={goal.current_amount} onChange={e=>setGoal({...goal,current_amount:e.target.value})}/></Field></div><Field label={ui.byDate}><input type="date" required min={today()} value={goal.deadline} onChange={e=>setGoal({...goal,deadline:e.target.value})}/></Field><button className="btn btn-primary" disabled={working}>{ui.saveGoal}</button></form>}</section>
  <section className="panel extra-panel"><h2>{ui.progressMonthly}</h2>{rows.goals.map(g=>{const p=savingsProjection({targetAmount:g.target_amount,currentAmount:g.current_amount,deadline:g.deadline,today:today()});return <Item key={g.id} action={canWrite?<button className="icon-button danger" onClick={()=>erase('home_savings_goals',g.id)} aria-label={`${ui.deleteLabel}: ${g.label}`}><Trash2 size={16}/></button>:null}><b>{g.label} · {money(g.current_amount)} / {money(g.target_amount)}</b><small>{formatCount(p?.progress||0)}% {ui.reached} · {money(p?.monthly||0)} {ui.perMonthFor} {formatCount(p?.months||0)} {ui.monthsLabel} · {ui.deadlineLabel} {formatDate(g.deadline)}</small><progress max="100" value={p?.progress||0} aria-label={`${ui.progressMonthly}: ${g.label}`} style={{width:'100%'}} />{canWrite&&<div className="extra-buttons"><button className="btn btn-soft" disabled={working} onClick={async ()=>{const value=(await askText(ui.savingsPrompt,{defaultValue:'10'}));if(value===null)return;const n=Number(value.replace(',','.'));if(!Number.isFinite(n)||n<=0)return onNotify(ui.invalidAmount);change('home_savings_goals',g.id,{current_amount:Math.round((Number(g.current_amount)+n)*100)/100},ui.savingsUpdated)}}>{ui.addSavings}</button></div>}</Item>})}{!rows.goals.length&&<p className="muted">{ui.noSavingsGoals}</p>}<p className="muted">{ui.compareOffersIntro} <a href="https://www.ilportaleofferte.it/portaleOfferte/" target="_blank" rel="noopener noreferrer">{ui.offersPortal}</a>{ui.noLiveComparison}</p></section></div></>}

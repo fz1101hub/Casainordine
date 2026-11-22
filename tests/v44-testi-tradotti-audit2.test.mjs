@@ -4,8 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { LANGUAGES, translate, acceptedLanguage } from '../lib/i18n.mjs';
-import { friendlyError, friendlyErrorKey } from '../lib/friendly-error.mjs';
-import { publicError } from '../lib/public-error.mjs';
+import { friendlyError, friendlyErrorKey, shownError } from '../lib/friendly-error.mjs';
 const source = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const NEW_KEYS = ['mail.status.connected', 'mail.status.denied', 'mail.status.expired', 'mail.status.otherBrowser', 'mail.status.noRefresh', 'mail.status.failed',
   'import.pdfTruncated', 'import.readingRatePlan', 'import.preparing', 'import.readingEmailBill', 'import.senderHintExact', 'import.senderHintDomain', 'import.senderAuthFailed',
@@ -55,7 +54,7 @@ test('Errori del database: messaggio tradotto, dettaglio solo in console', () =>
     assert.equal(friendlyErrorKey(new TypeError('Failed to fetch')), 'errors.network');
     assert.equal(friendlyErrorKey({ code: 'XX000', message: 'boom' }), 'errors.generic');
     assert.equal(friendlyError({ code: '42501', message: 'permission denied for table bills' }, tr), 'You do not have permission for this action.');
-    assert.equal(friendlyError(publicError('Messaggio dell’app'), tr), 'Messaggio dell’app');
+    assert.equal(friendlyError(shownError('Messaggio dell’app'), tr), 'Messaggio dell’app');
     // I messaggi dei controlli del database sono in italiano: si vedono solo con l'app in italiano.
     const guard = { code: 'P0001', message: 'Impossibile cambiare la casa di un elemento' };
     assert.equal(friendlyError(guard, key => translate('it', key)), 'Impossibile cambiare la casa di un elemento');

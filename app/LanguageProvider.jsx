@@ -11,9 +11,19 @@ function loadDictionary(lang){
  if(dictionaries[lang])return Promise.resolve(dictionaries[lang]);
  return import(`../lib/i18n-dicts/${lang}.json`).then(module=>(dictionaries[lang]=module.default||module));
 }
+// I testi delle sezioni a parte (chiavi «v20.*») arrivano solo quando le apri (vedi useSection).
+const sections={};
+function loadSection(lang,section){
+ const id=lang+'.'+section;
+ if(sections[id])return Promise.resolve(sections[id]);
+ return import(`../lib/i18n-dicts/${lang}.${section}.json`).then(module=>(sections[id]=module.default||module));
+}
 // Finché la lingua scelta non è arrivata (pochi millisecondi, una volta sola) si usa l'italiano.
 function translate(lang,key,params){
- return interpolate((dictionaries[lang]||italian)[key]??italian[key]??key,params);
+ const section=key.startsWith('v20.')?'v20':'';
+ const text=section?sections[lang+'.'+section]?.[key]??sections['it.'+section]?.[key]
+  :(dictionaries[lang]||italian)[key]??italian[key];
+ return interpolate(text??key,params);
 }
 
 function accountLanguage(userId){
@@ -105,6 +115,19 @@ export function LanguageProvider({children}){
   setLanguage,saveError
  }),[language,setLanguage,saveError,ready]);
  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
+}
+// Scarica i testi di una sezione (oggi solo v20) nella lingua scelta; restituisce true quando ci sono.
+export function useSection(section){
+ const {language}=useLanguage();
+ const id=language+'.'+section;
+ const [,setLoaded]=useState(0);
+ useEffect(()=>{
+  if(sections[id])return;
+  let active=true;
+  loadSection(language,section).then(()=>{if(active)setLoaded(n=>n+1);}).catch(()=>{});
+  return()=>{active=false;};
+ },[id,language,section]);
+ return Boolean(sections[id]);
 }
 export function useLanguage(){
  const value=useContext(LanguageContext);

@@ -4,12 +4,13 @@ import { readFileSync } from 'node:fs';
 
 const source = readFileSync(new URL('../app/MailImporter.jsx', import.meta.url), 'utf8');
 
-test('mail list loads invalidate stale responses on language change and unmount', () => {
+test('mail list loads invalidate stale responses on refresh and unmount', () => {
   assert.match(source, /useRef\(0\)/);
   assert.match(source, /const generation = \+\+loadGeneration\.current/);
   assert.match(source, /if\(generation !== loadGeneration\.current\)return/);
-  assert.match(source, /if\(generation === loadGeneration\.current\)notify\(e\.message\)/);
+  assert.match(source, /if\(generation === loadGeneration\.current\)notify\(friendlyError\(e,tr\)\)/);
   assert.match(source, /if\(generation === loadGeneration\.current\)setLoading\(false\)/);
   assert.match(source, /return \(\)=>\{loadGeneration\.current\+\+;\}/);
-  assert.match(source, /\[client,refresh,language\]/);
+  // Le risposte non dipendono più dalla lingua: cambiare lingua non ricarica le caselle.
+  assert.match(source, /\[client,refresh\]\);/);
 });
