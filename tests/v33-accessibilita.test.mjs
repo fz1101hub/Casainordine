@@ -20,7 +20,9 @@ test('Finestre: ruolo dialog, titolo collegato, focus gestito e pulsante di chiu
   assert.match(page,/const onFocus=e=>\{if\(!e\.target\?\.closest\?\.\('\.modal'\)\)lastFocus\.current=e\.target;\};/);
 });
 test('Finestre: Esc chiude, ma non una bolletta letta da un documento (come il tocco sullo sfondo)',()=>{
-  assert.match(page,/if\(e\.key!=='Escape'\)return;if\(dialogState\.current\.ratePlan\)setRatePlan\(null\);else if\(!dialogState\.current\.documentBill\)setModal\(null\);/);
+  assert.match(page,/if\(e\.key!=='Escape'\)return;if\(dialogState\.current\.capture\)setCapture\(null\);else if\(dialogState\.current\.ratePlan\)setRatePlan\(null\);else if\(!dialogState\.current\.documentBill\)setModal\(null\);/);
+  // Passando dalla scelta del documento alla bolletta il fuoco va nella nuova finestra.
+  assert.match(page,/const dialogOpen=capture\?'capture':ratePlan\?'rates':modal\|\|'';/);
   assert.match(page,/if\(e\.target===e\.currentTarget&&form\.source!=='document'\)setModal\(null\);/);
   assert.match(page,/\},\[dialogOpen\]\);/,'il focus non salta quando cambia il contenuto della finestra');
 });
