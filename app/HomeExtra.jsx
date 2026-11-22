@@ -1,7 +1,8 @@
 'use client';
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Archive,BarChart3,Bell,Check,Download,House,Plus,ShieldCheck,Trash2,UploadCloud,Wrench} from 'lucide-react';
-import {readRatePlanDocument,documentFingerprint} from '../lib/document-reader.js';
+import {readRatePlanDocument} from '../lib/document-reader.js';
+import {uploadHouseDocument} from '../lib/document-upload.mjs';
 import {extractConsumption,extractMeterCandidates,monthlyConsumption,consumptionAnomalies,expenseForecast,safeBackup,serializeCsv,UNITS} from '../lib/home-insights.mjs';
 import {todayRome} from '../lib/dates.mjs';
 import {useLanguage} from './LanguageProvider';
@@ -11,7 +12,6 @@ import { askConfirm, askText } from './ConfirmDialog';
 const tables={properties:'home_properties',documents:'home_documents',meters:'meter_readings',meterSchedules:'meter_reminders',assets:'maintenance_assets',events:'maintenance_events',receipts:'payment_receipts',contracts:'home_contracts'};
 const initial={properties:[],documents:[],meters:[],meterSchedules:[],assets:[],events:[],receipts:[],contracts:[],alerts:[],preferences:null};
 const emptyDate=()=>todayRome();
-const uid=()=>crypto.randomUUID();
 function Field({label,children}){return <label className="extra-field">{label}{children}</label>}
 function DownloadLink({onClick,children}){return <button type="button" className="btn btn-soft" onClick={onClick}><Download size={15}/>{children}</button>}
 function Badge({children}){return <span className="extra-pill">{children}</span>}
@@ -92,23 +92,15 @@ export default function HomeExtra({client,demo,user,homeId,canWrite,bills=[],uti
  async function loadDocument(file){await uploadDocument(file,{docType:doc.type,propertyId:doc.property_id,billId:doc.bill_id,notes:doc.notes});}
  // Carica un file nell'archivio della casa (o dello spazio personale); restituisce l'id del documento.
  async function uploadDocument(file,{docType='altro',propertyId='',billId='',notes=''}={}){if(!file||!canWrite)return null;
-  const valid=['application/pdf','image/jpeg','image/png','image/webp','text/plain'];if(!valid.includes(file.type)||file.size>10485760||file.size===0){onNotify(tr('extra.archive.invalidFile'));return null;}
   setDocumentBusy(tr('extra.archive.hashing'));
-  let path='';try{
-    const sha256=await documentFingerprint(file);
-    const existing=rows.documents.find(d=>d.sha256===sha256);if(existing){onNotify(tr('extra.archive.duplicate'));return existing.id;}
-    path=`${user.id}/${uid()}.${file.type==='application/pdf'?'pdf':file.type==='image/jpeg'?'jpg':file.type==='image/png'?'png':file.type==='image/webp'?'webp':'txt'}`;
-    const uploaded=await client.storage.from('house-documents').upload(path,file,{contentType:file.type,upsert:false,cacheControl:'3600'});
-    // Spazio per utente (supabase/migrate_v36_quota.sql): la regola di accesso rifiuta il file.
-    if(uploaded.error&&/row-level security|violates|unauthorized|403/i.test(`${uploaded.error.message||''} ${uploaded.error.statusCode||''}`)){
-     const {data:used}=await client.rpc('v36_my_storage_used');
-     if(Number(used)>=200*1024*1024){onNotify(tr('extra.archive.quotaFull'));return null;}
-    }
-    if(uploaded.error)throw uploaded.error;
-    const saved=await client.from('home_documents').insert({...common,property_id:propertyId||null,bill_id:billId||null,doc_type:docType,notes,name:file.name.slice(0,200),mime_type:file.type,file_size:file.size,storage_path:path,sha256}).select('id').single();
-    if(saved.error){await client.storage.from('house-documents').remove([path]);throw saved.error;}
-    onNotify(tr('extra.archive.saved'));await load();return saved.data.id;
-  }catch(e){onNotify(tr('extra.archive.uploadError',{error:friendlyError(e,tr)}));return null;}finally{setDocumentBusy('');}
+  try{
+    const {id,duplicate}=await uploadHouseDocument(client,{file,userId:user.id,homeId:homeId||null,docType,notes,propertyId,billId,known:rows.documents});
+    onNotify(tr(duplicate?'extra.archive.duplicate':'extra.archive.saved'));if(!duplicate)await load();return id;
+  }catch(e){
+    if(e?.i18nKey==='extra.archive.invalidFile'||e?.i18nKey==='extra.archive.quotaFull')onNotify(tr(e.i18nKey));
+    else onNotify(tr('extra.archive.uploadError',{error:friendlyError(e,tr)}));
+    return null;
+  }finally{setDocumentBusy('');}
  }
  async function openDocument(document){const popup=window.open('about:blank','_blank');if(popup)popup.opener=null;try{const {data,error}=await client.storage.from('house-documents').createSignedUrl(document.storage_path,60);if(error)throw error;if(popup)popup.location.replace(data.signedUrl);else window.location.assign(data.signedUrl);}catch(e){popup?.close();onNotify(tr('extra.archive.unavailable',{error:friendlyError(e,tr)}))}}
  async function deleteDocument(document){if(!(await askConfirm(tr('extra.archive.deleteConfirm'),{danger:true})))return;

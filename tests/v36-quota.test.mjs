@@ -13,8 +13,11 @@ test('Quota documenti: 200 MB per utente, controllati nella regola di caricament
   assert.match(sql,/revoke all on function public\.v36_my_storage_used\(\) from public, anon;/);
 });
 test('Quota documenti: messaggio chiaro nelle sei lingue quando lo spazio è finito',()=>{
-  const hub=source('app/HomeExtra.jsx');
-  assert.match(hub,/client\.rpc\('v36_my_storage_used'\)/);
-  assert.match(hub,/onNotify\(tr\('extra\.archive\.quotaFull'\)\)/);
+  // Il caricamento è in lib/document-upload.mjs (archivio, acquisizione unica e progetti): lì si
+  // riconosce lo spazio pieno; chi carica mostra il messaggio.
+  const upload=source('lib/document-upload.mjs');
+  assert.match(upload,/client\.rpc\('v36_my_storage_used'\)/);
+  assert.match(upload,/throw appError\('extra\.archive\.quotaFull'\)/);
+  assert.match(source('app/HomeExtra.jsx'),/if\(e\?\.i18nKey==='extra\.archive\.invalidFile'\|\|e\?\.i18nKey==='extra\.archive\.quotaFull'\)onNotify\(tr\(e\.i18nKey\)\);/);
   for(const {code} of LANGUAGES){const text=translate(code,'extra.archive.quotaFull');assert.ok(text&&text!=='extra.archive.quotaFull'&&/200/.test(text),code);}
 });

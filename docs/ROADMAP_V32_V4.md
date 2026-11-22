@@ -33,7 +33,7 @@ Ogni funzione richiede flusso realmente utilizzabile, permessi per utente/casa c
 
 ### 4.0 — Evoluzione completa
 
-- [ ] **Progetti e lavori**: schede progetto, fasi, preventivi, spese, foto prima/dopo e fornitori.
+- [x] **Progetti e lavori**: schede progetto, fasi, preventivi, spese, foto prima/dopo e fornitori. — #65; serve `migrate_v47_progetti.sql` sul database.
 - [ ] **Fondo sostituzioni**: vita utile indicativa, costi stimati, risparmio mensile e disclaimer delle stime.
 - [ ] **Profilo locatore/inquilino**: immobili e contratti, verbali ingresso/uscita, foto e letture, accesso separato per ruolo senza esposizione dati privati.
 - [ ] **Casa Control**: pannello facoltativo, indicatori calcolati da eventi veri, formula trasparente, gestione mancanza dati e nessun punteggio arbitrario.
