@@ -39,3 +39,22 @@ test('summary rejects monetary values that cannot be displayed faithfully',()=>{
  assert.notEqual(valid.description.includes('—'),true);
  assert.notEqual(valid.rows[0].amount,'—');
 });
+
+test('monthly email summaries agree in number across all six recipient languages',()=>{
+ const expected={
+  it:['bolletta ancora','bollette ancora'],
+  en:['unpaid bill totalling','unpaid bills totalling'],
+  es:['factura pendiente','facturas pendientes'],
+  fr:['facture impayée','factures impayées'],
+  de:['offene Rechnung','offene Rechnungen'],
+  pt:['fatura por pagar','faturas por pagar']
+ };
+ for(const [language,[singular,plural]] of Object.entries(expected)){
+  const one=billSummaryCopy({language,today:'2026-11-04',bills});
+  const two=billSummaryCopy({language,today:'2026-11-04',bills:[...bills,{...bills[0],amount:10}]});
+  assert.ok(one.description.includes('1 '+singular),language+' singular: '+one.description);
+  assert.ok(two.description.includes('2 '+plural),language+' plural: '+two.description);
+  assert.equal(one.rows.length,1);
+  assert.equal(two.rows.length,2);
+ }
+});
