@@ -63,3 +63,10 @@ Verificare CI e build del nuovo HEAD; poi continuare la localizzazione di V20/V2
 - La pipeline conferma il risultato automatizzato di questo SHA, non la correttezza linguistica di tutte le schermate né la sicurezza RLS su Supabase reale. Non è una certificazione esterna.
 - Priorità operativa invariata: correggere le traduzioni residue di V20/V21 e i messaggi API/email, poi collaudare E2E nelle sei lingue, preferenze, RLS multiaccount, privacy, mobile/accessibilità e anteprima Vercel sullo SHA candidato.
 - Nessun merge, deploy, migrazione o modifica ai dati; Fase 1 aperta, Fasi 2 e 3 bloccate.
+
+## Aggiornamento 22 novembre 2026 — precisione importi nelle email mensili
+
+- Verificata la pipeline [#45039432554](https://github.com/fz1101hub/Casainordine/actions/runs/45039432554) per il precedente HEAD `d5ce27d`: **completed/success**. Non estendere il risultato ai commit successivi.
+- Corretto `lib/notification-summary.mjs`: importi di singole bollette e totali che `formatMoney` non può rappresentare con precisione affidabile vengono rifiutati, anziché produrre `—` in un'email di riepilogo o un totale apparentemente preciso. Nessun importo persistito viene modificato.
+- Aggiunti casi in `tests/v32-notification-summary.test.mjs` per importi fuori intervallo sicuro, stringhe decimali oltre la precisione rappresentabile, overflow del totale e importi normali. Commit funzionale `0900f4f`, test `79b9606`.
+- **CI/build sul nuovo HEAD ancora da verificare.** Nessuna email reale inviata; restano collaudi staging, RLS multiaccount, browser nelle sei lingue, accessibilità/mobile, traduzioni residue e anteprima Vercel. Fase 1 aperta; Fasi 2 e 3 non avviate. Nessun merge o deploy.
