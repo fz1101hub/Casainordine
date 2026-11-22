@@ -96,7 +96,20 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   }catch(e){if(sameContext())onNotify(v20SafeError(language,e));return null;}
   finally{if(sameContext())setWorking(false)}
  }
- async function change(table,id,patch,message){if(!client||!canWrite||!user?.id)return;setWorking(true);try{const {error}=await scopedMutation(client.from(table).update(patch).eq('id',id));if(error)throw error;onNotify(message);await load();}catch(e){onNotify(v20SafeError(language,e))}finally{setWorking(false)}}
+ async function change(table,id,patch,message){
+  if(!client||!canWrite||!user?.id)return;
+  const accountId=user.id,changeHomeId=homeId;
+  const sameContext=()=>activeAccount.current===accountId&&activeHome.current===changeHomeId;
+  setWorking(true);
+  try{
+   const query=client.from(table).update(patch).eq('id',id);
+   const {error}=await (changeHomeId?query.eq('home_id',changeHomeId):query.eq('user_id',accountId).is('home_id',null));
+   if(!sameContext())return;
+   if(error)throw error;
+   onNotify(message);await load();
+  }catch(e){if(sameContext())onNotify(v20SafeError(language,e))}
+  finally{if(sameContext())setWorking(false)}
+ }
  async function erase(table,id){
   if(!canWrite||!user?.id)return;
   const accountId=user.id, deletionHomeId=homeId;
