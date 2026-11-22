@@ -84,3 +84,10 @@ Verificare CI e build del nuovo HEAD; poi continuare la localizzazione di V20/V2
 - La CI del commit `1c1ad11896bb70cbf1856b8d31ead994f894d20e` è [#45050522772](https://github.com/fz1101hub/Casainordine/actions/runs/45050522772), **completed / success**. Questo non prova collaudi E2E, deploy anteprima, RLS multiaccount né copertura totale delle traduzioni.
 - Il merge della PR #54 **non equivale** al superamento dei gate della versione 3.2. Fase 1 resta attiva, Fasi 2 e 3 bloccate. Proseguire su una nuova PR draft di follow-up, senza ulteriori merge o release finché i gate non sono verificati.
 - Resta necessario verificare sul nuovo HEAD: tutti i flussi V20/V21 e API/email, preferenze e privacy su due account reali, accessibilità/mobile, test browser per sei lingue, build e preview Vercel. Nessuna migrazione o operazione sui dati in questo aggiornamento.
+
+## Aggiornamento 22 novembre 2026 — oggetto email mensile localizzato
+
+- Su PR draft #57, corretto `lib/notification-summary.mjs`: l'oggetto del riepilogo mensile mostra ora mese e anno nel locale del destinatario (it-IT, en-GB, es-ES, fr-FR, de-DE, pt-PT), con fuso UTC esplicito e senza modificare importi o dati persistiti. Prima mostrava sempre `YYYY-MM`.
+- Aggiunto test in `tests/v32-notification-summary.test.mjs` per i sei mesi localizzati e il cambio d'anno. Commit funzionale `0a2d9cb`, commit test `10a611e`.
+- **CI/build su questi commit non ancora verificate**, né invio email reale; se i formati `Intl` del runner differiscono, adeguare le asserzioni dopo verifica, senza indebolire il requisito di localizzazione.
+- Gate ancora aperti: traduzioni residue V20/V21/API, browser/E2E sei lingue, Supabase RLS con due account reali, privacy, accessibilità/mobile, preview Vercel e CI sullo SHA finale. Fase 1 aperta; Fasi 2 e 3 bloccate. Nessun merge, deploy o migrazione.
