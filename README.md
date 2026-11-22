@@ -27,6 +27,7 @@ Ordine completo di installazione su un database nuovo, in quest'ordine:
 13. `migrate_v44_professionisti.sql`: professionisti di fiducia con contatti e nota condivisa, nota privata di ciascuno e collegamento degli interventi di manutenzione. Finché non è eseguita, la sezione Professionisti dice che va attivata e il registro delle manutenzioni funziona come prima.
 14. `migrate_v45_stagionale.sql`: programma stagionale, con profilo della casa (clima, tipo, dotazioni) e voci fatte, una per stagione. Finché non è eseguita, la sezione mostra il programma con le scelte della pagina e si possono comunque aggiungere le voci alle attività.
 15. `migrate_v46_scorte.sql`: scorte domestiche con soglia di riordino e funzione `v46_adjust_stock` per «−» e «+» senza perdere i tocchi fatti insieme. Finché non è eseguita, la sezione Scorte dice che va attivata.
+16. `migrate_v47_progetti.sql`: progetti e lavori con fasi, preventivi (anche da professionisti di fiducia), spese e foto prima/durante/dopo; nell'archivio due tipi nuovi, «foto» e «preventivo». Finché non è eseguita, la sezione Progetti dice che va attivata.
 
 Ogni script è in una sola transazione e si può rieseguire.
 
