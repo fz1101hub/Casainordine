@@ -142,7 +142,7 @@ const MAIL_STATUS={connected:'mail.status.connected',denied:'mail.status.denied'
 function mailStatusMessage(status,tr){return tr(MAIL_STATUS[status]||'mail.status.failed');}
 
 export default function Page() {
-  const {t:tr,money,locale,language}=useLanguage();
+  const {t:tr,money,locale,language,date:formatDay}=useLanguage();
   useLocalizedTitle('meta.title','meta.description');
   const weekdayLabel=day=>new Intl.DateTimeFormat(locale,{weekday:'long',timeZone:'UTC'}).format(new Date(Date.UTC(2023,0,1+day)));
   const client = useMemo(()=>db(),[]), demo = !client;
@@ -161,6 +161,7 @@ export default function Page() {
   const [mailRefresh,setMailRefresh]=useState(0);
   const [supplierForm,setSupplierForm]=useState({name:'',category:'Luce',sender_email:''});
   const [recovery,setRecovery]=useState(false);
+  const [capture,setCapture]=useState(null),[captureIntent,setCaptureIntent]=useState(null);
   const [ratePlan,setRatePlan]=useState(null), [ratePaste,setRatePaste]=useState(''), [rateUnit,setRateUnit]=useState(''), [rateSupplier,setRateSupplier]=useState('Condominio'), [billPaste,setBillPaste]=useState('');
 
   const notify = txt=>{setToast(txt);};
@@ -247,8 +248,9 @@ export default function Page() {
   // Una bolletta letta da un documento non si chiude con Esc o col tocco sullo sfondo: si perderebbe
   // quanto estratto; resta il pulsante di chiusura.
   const dialogRef=useRef(null), dialogState=useRef({});
-  dialogState.current={ratePlan:Boolean(ratePlan),documentBill:form.source==='document'};
-  const dialogOpen=Boolean(modal||ratePlan);
+  dialogState.current={capture:Boolean(capture),ratePlan:Boolean(ratePlan),documentBill:form.source==='document'};
+  // Quale finestra è aperta: passando da una all'altra (scelta del documento → bolletta) il fuoco segue la nuova.
+  const dialogOpen=capture?'capture':ratePlan?'rates':modal||'';
   // L'ultimo elemento con il focus fuori dalle finestre: i campi con autoFocus prendono il focus
   // prima degli effetti, quindi activeElement all'apertura è già dentro la finestra.
   const lastFocus=useRef(null);
@@ -261,7 +263,7 @@ export default function Page() {
     if(!dialogOpen)return;
     const previous=lastFocus.current;
     if(dialogRef.current&&!dialogRef.current.contains(document.activeElement))dialogRef.current.focus();
-    const onKey=e=>{if(e.key!=='Escape')return;if(dialogState.current.ratePlan)setRatePlan(null);else if(!dialogState.current.documentBill)setModal(null);};
+    const onKey=e=>{if(e.key!=='Escape')return;if(dialogState.current.capture)setCapture(null);else if(dialogState.current.ratePlan)setRatePlan(null);else if(!dialogState.current.documentBill)setModal(null);};
     document.addEventListener('keydown',onKey);
     return ()=>{document.removeEventListener('keydown',onKey);if(previous?.isConnected&&typeof previous.focus==='function')previous.focus();};
   },[dialogOpen]);
@@ -458,13 +460,26 @@ export default function Page() {
         if(existing){notify(tr('v32.feedback.23'));return;}
       }
       const extracted=await readBillDocument(file,progress=>setDocumentState({busy:true,message:tr(progress.key,progress.params)}));
-      setForm({...billDefault,title:billTitle(tr,extracted),supplier:extracted.supplier,category:extracted.category,
-        amount:extracted.amount??'',due_date:extracted.due_date||'',paid:false,
-        source:'document',external_id:fingerprint,import_file:file.name,import_document_type:extracted.documentType,import_warnings:extracted.warnings.map(key=>tr(key)),ibanCandidate:extracted.ibanCandidate});
-      setModal('bill');
-      notify(tr('v32.feedback.24'));
+      // Acquisizione unica (Fase 2): si propone dove salvarlo; decide la persona (finestra «capture»).
+      const {captureProposal}=await import('../lib/capture.mjs');
+      const proposal=captureProposal(extracted.text,extracted,data.bills);
+      setCapture({file,fingerprint,extracted,choice:demo?'bill':proposal.suggested,...proposal});
     }catch(error){notify(tr('v32.import.documentReadError',{detail:friendlyError(error,tr)}));}
     finally{setDocumentState({busy:false,message:''});}
+  }
+  // Dopo la scelta nella finestra dell'acquisizione unica: bolletta → modulo della bolletta;
+  // ricevuta o prova d'acquisto → la sezione giusta, con i campi letti e il file da conservare.
+  function continueCapture(){
+    const c=capture;if(!c)return;setCapture(null);
+    if(c.choice==='bill'){
+      const extracted=c.extracted;
+      setForm({...billDefault,title:billTitle(tr,extracted),supplier:extracted.supplier,category:extracted.category,
+        amount:extracted.amount??'',due_date:extracted.due_date||'',paid:false,
+        source:'document',external_id:c.fingerprint,import_file:c.file.name,import_document_type:extracted.documentType,import_warnings:extracted.warnings.map(key=>tr(key)),ibanCandidate:extracted.ibanCandidate});
+      setModal('bill');notify(tr('v32.feedback.24'));return;
+    }
+    setCaptureIntent({kind:c.choice,fields:c.choice==='receipt'?c.receipt:c.purchase,file:c.file});
+    changePage(c.choice==='receipt'?'payments':'maintenance');
   }
   async function reviewEmailDocument(document, file){
     setDocumentState({busy:true,message:tr('import.readingEmailBill')});
@@ -578,7 +593,7 @@ export default function Page() {
       <div className="content">
         {activeHomeId&&!canWrite&&<div className="informative"><ShieldCheck size={17}/><p>{tr('v32.shell.readOnly')}</p></div>}
         {demo&&<div className="demo-banner"><Info size={17}/><div><b>{tr('v32.batch.demoTitle')}</b> {tr('v32.batch.demoHelp')}</div><button onClick={()=>{localStorage.removeItem('casainordine-demo-v1');setData(fakeData());notify(tr('v32.batch.demoResetDone'));}} >{tr('v32.batch.demoReset')}</button></div>}
-        {['insights','archive','properties','maintenance','contracts','payments','alerts'].includes(tab)&&<HomeExtra client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} bills={bills} utilities={utilities} tab={tab} onNotify={notify} onRefresh={reload}/>}
+        {['insights','archive','properties','maintenance','contracts','payments','alerts'].includes(tab)&&<HomeExtra client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} bills={bills} utilities={utilities} tab={tab} onNotify={notify} onRefresh={reload} intent={captureIntent} onIntentUsed={()=>setCaptureIntent(null)}/>}
         {['tags','sos','radar','simulator','passport','vacation','inventory','decisions','briefing'].includes(tab)&&<V21Hub client={client} user={user} homeId={activeHomeId} homeName={homeMembership?.homes?.name||''} canWrite={canWrite} demo={demo} bills={bills} tasks={tasks} tab={tab} onNotify={notify}/>}
         {['monitor','fraud','pagopa','history','moving','savings','offline'].includes(tab)&&<V20Hub client={client} user={user} homeId={activeHomeId} canWrite={canWrite} demo={demo} bills={bills} utilities={utilities} tab={tab} onNotify={notify} onRefresh={reload}/>}
         {tab==='dashboard'&&<PersonalizedHome client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} bills={bills} tasks={tasks} displayName={displayName} onNavigate={changePage} onNewBill={()=>openModal('bill')} onNewTask={()=>openModal('task')} onPay={pay} onToggleTask={toggleTask} onRefresh={reload} onNotify={notify}/>}
@@ -645,6 +660,17 @@ export default function Page() {
       </div>
     </main>
     {recovery&&<PasswordRecoveryDialog client={client} t={tr} onDone={message=>{setRecovery(false);notify(message);}}/>}
+    {capture&&<div className="modal-overlay"><div className="modal capture-modal" role="dialog" aria-modal="true" aria-labelledby="capture-title" tabIndex={-1} ref={dialogRef}>
+      <div className="modal-head"><div><div className="eyebrow">{tr('nav.connect')}</div><h2 id="capture-title">{tr('capture.title')}</h2></div><button className="icon-button" onClick={()=>setCapture(null)} aria-label={tr('ui.close')}><X size={20}/></button></div>
+      <div className="modal-form"><p className="muted">{tr('capture.intro',{file:capture.file.name})}</p>
+        {[['bill',tr('capture.billHelp'),[capture.extracted.supplier,capture.extracted.amount!=null&&money(capture.extracted.amount),capture.extracted.due_date&&formatDay(capture.extracted.due_date)]],
+          ['receipt',tr('capture.receiptHelp',{section:tr('nav.payments')}),[capture.receipt.amount!==''&&capture.receipt.amount!=null&&money(Number(capture.receipt.amount)),capture.receipt.paid_on&&formatDay(capture.receipt.paid_on),capture.receipt.reference]],
+          ['purchase',tr('capture.purchaseHelp',{section:tr('nav.maintenance')}),[capture.purchase.name,capture.purchase.purchased_on&&formatDay(capture.purchase.purchased_on),capture.purchase.warranty_until&&tr('capture.warrantyUntil',{date:formatDay(capture.purchase.warranty_until)})]]
+        ].map(([kind,help,facts])=><label key={kind} className={`capture-option${capture.choice===kind?' selected':''}`}><input type="radio" name="capture-kind" value={kind} checked={capture.choice===kind} disabled={demo&&kind!=='bill'} onChange={()=>setCapture({...capture,choice:kind})}/>
+          <span><b>{tr('capture.'+kind)}{capture.suggested===kind&&<em> · {tr('capture.suggested')}</em>}</b><small>{help}</small>{(kind==='bill'||capture.suggested===kind)&&facts.filter(Boolean).length>0&&<small className="capture-facts">{facts.filter(Boolean).join(' · ')}</small>}</span></label>)}
+        {demo&&<p className="helper-text">{tr('capture.demoOnly')}</p>}
+        <div className="modal-actions"><button type="button" className="btn btn-soft" onClick={()=>setCapture(null)}>{tr('general.cancel')}</button><button type="button" className="btn btn-primary" onClick={continueCapture}>{tr('capture.continue')}</button></div>
+      </div></div></div>}
     {ratePlan&&<div className="modal-overlay"><div className="modal rate-modal" role="dialog" aria-modal="true" aria-labelledby="rate-modal-title" tabIndex={-1} ref={dialogRef}><div className="modal-head"><div><div className="eyebrow">{tr('rates.eyebrow')}</div><h2 id="rate-modal-title">{tr('rates.count',{count:ratePlan.rows.length})}</h2></div><button className="icon-button" onClick={()=>setRatePlan(null)} aria-label={tr('ui.close')}><X size={20}/></button></div>
       <div className="rate-modal-body"><p>{tr('rates.source',{source:ratePlan.source})}</p>{ratePlan.warnings.map((w,i)=><p className="rate-warning" key={i}><AlertCircle size={15}/> {w}</p>)}
       <div className="table-scroll"><table className="bills-table"><thead><tr><th>{tr('rates.use')}</th><th>{tr('rates.description')}</th><th>{tr('rates.due')}</th><th>{tr('rates.amount')}</th></tr></thead><tbody>{ratePlan.rows.map((r,i)=><tr key={i}><td><input type="checkbox" checked={r.selected} onChange={e=>setRatePlan({...ratePlan,rows:ratePlan.rows.map((x,j)=>j===i?{...x,selected:e.target.checked}:x)})}/></td><td><input aria-label={tr('rates.itemDescription',{number:i+1})} value={r.title} onChange={e=>setRatePlan({...ratePlan,rows:ratePlan.rows.map((x,j)=>j===i?{...x,title:e.target.value}:x)})}/></td><td><input type="date" aria-label={tr('rates.itemDate',{number:i+1})} value={r.due_date} onChange={e=>setRatePlan({...ratePlan,rows:ratePlan.rows.map((x,j)=>j===i?{...x,due_date:e.target.value}:x)})}/></td><td><input type="number" min="0.01" step="0.01" aria-label={tr('rates.itemAmount',{number:i+1})} value={r.amount} onChange={e=>setRatePlan({...ratePlan,rows:ratePlan.rows.map((x,j)=>j===i?{...x,amount:e.target.value}:x)})}/></td></tr>)}</tbody></table></div>

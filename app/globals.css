@@ -335,3 +335,14 @@
 .search-result b{font-size:13px}
 .search-result small{font-size:11.5px;color:var(--muted)}
 @media(max-width:650px){.search-overlay{padding-top:0}.search-dialog{border-radius:0;max-width:none;min-height:100vh}.search-results{max-height:none}}
+/* Acquisizione unica (Fase 2) */
+.capture-option{display:flex!important;gap:11px;align-items:flex-start;border:1px solid var(--line);border-radius:11px;padding:12px 13px;margin-bottom:10px!important;cursor:pointer}
+.capture-option.selected{border-color:#8cc8b8;background:#f3faf7}
+.capture-option input[type=radio]{flex:0 0 18px;width:18px;height:18px;min-height:0;padding:0;margin:2px 0 0;box-shadow:none;accent-color:var(--green)}
+.capture-option span{flex:1;display:flex;flex-direction:column;gap:5px}
+.capture-option b{font-size:13px;color:var(--ink)}
+.capture-option em{font-style:normal;color:var(--green);font-weight:700}
+.capture-option small{font-size:12px;font-weight:400;color:var(--muted);line-height:1.45}
+.capture-option .capture-facts{color:#2e5d52}
+.capture-note{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:#f3faf7;border:1px solid #d6ebe3;border-radius:10px;padding:10px 12px;margin:10px 0}
+.capture-note p{margin:0;flex-basis:100%;font-size:12.5px}

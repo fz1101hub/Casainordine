@@ -3,6 +3,7 @@
 // Controlla che le pagine principali si aprano senza errori JavaScript, che le sezioni caricate a
 // richiesta arrivino, che la lingua cambi e che la pagina condivisa segua la lingua del browser.
 import { chromium } from 'playwright';
+import { textPdf } from './text-pdf.mjs';
 
 const BASE = (process.argv[2] || 'http://localhost:3000').replace(/\/$/, '');
 const failures = [];
@@ -24,6 +25,20 @@ try {
     await button.click();
     await page.waitForTimeout(700);
     check((await page.locator('main').innerText()).trim().length > 20, `la sezione «${name}» mostra contenuto`);
+  }
+
+  // Acquisizione unica: un PDF di bolletta letto nel browser propone la bolletta, poi apre il modulo compilato.
+  await page.getByRole('button', { name: 'Importa e collega', exact: true }).first().click();
+  await page.locator('input[type=file][accept*="pdf"]').first().setInputFiles({ name: 'bolletta.pdf', mimeType: 'application/pdf',
+    buffer: Buffer.from(textPdf(['Enel Energia', 'Bolletta luce', 'Totale da pagare 84,50 EUR', 'Scadenza 25/11/2026'])) });
+  const capture = page.locator('.capture-modal');
+  await capture.waitFor({ timeout: 30000 }).catch(() => {});
+  check(await capture.count() === 1, 'un PDF caricato apre la scelta di cosa salvare');
+  if (await capture.count()) {
+    check(/Bolletta/.test(await capture.locator('.capture-option.selected').innerText()), 'per una bolletta propone la bolletta');
+    await capture.locator('.btn-primary').click();
+    check(await page.locator('.modal input[type=number]').first().inputValue().then(value => Number(value) === 84.5, () => false), 'il modulo della bolletta arriva con l’importo letto');
+    await page.keyboard.press('Escape');
   }
 
   await page.goto(`${BASE}/prova`, { waitUntil: 'networkidle' });
