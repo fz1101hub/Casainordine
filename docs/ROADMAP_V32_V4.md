@@ -29,7 +29,7 @@ Ogni funzione richiede flusso realmente utilizzabile, permessi per utente/casa c
 
 - [x] **Professionisti di fiducia**: contatti, professione, note private/condivise, costi e interventi associati a manutenzioni. — #62; serve `migrate_v44_professionisti.sql` sul database.
 - [x] **Programma stagionale**: checklist adattabili per stagione, località e tipi d'immobile; azioni ricorrenti e completamento. — #63; serve `migrate_v45_stagionale.sql` sul database.
-- [ ] **Scorte domestiche**: scorte, soglie, decrementi, proposta prodotto in lista spesa senza aggiunte silenziose.
+- [x] **Scorte domestiche**: scorte, soglie, decrementi, proposta prodotto in lista spesa senza aggiunte silenziose. — #64; serve `migrate_v46_scorte.sql` sul database.
 
 ### 4.0 — Evoluzione completa
 

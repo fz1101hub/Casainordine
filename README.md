@@ -26,6 +26,7 @@ Ordine completo di installazione su un database nuovo, in quest'ordine:
 12. `migrate_v43_automazioni.sql`: automazioni personalizzate (soglie delle bollette, rinnovi dei contratti, promemoria periodici). Proprietario ed editor creano le regole della casa, tutti i membri le vedono; al massimo 30 per spazio. Finché non è eseguita, la sezione Automazioni dice che va attivata e il controllo programmato le salta.
 13. `migrate_v44_professionisti.sql`: professionisti di fiducia con contatti e nota condivisa, nota privata di ciascuno e collegamento degli interventi di manutenzione. Finché non è eseguita, la sezione Professionisti dice che va attivata e il registro delle manutenzioni funziona come prima.
 14. `migrate_v45_stagionale.sql`: programma stagionale, con profilo della casa (clima, tipo, dotazioni) e voci fatte, una per stagione. Finché non è eseguita, la sezione mostra il programma con le scelte della pagina e si possono comunque aggiungere le voci alle attività.
+15. `migrate_v46_scorte.sql`: scorte domestiche con soglia di riordino e funzione `v46_adjust_stock` per «−» e «+» senza perdere i tocchi fatti insieme. Finché non è eseguita, la sezione Scorte dice che va attivata.
 
 Ogni script è in una sola transazione e si può rieseguire.
 
