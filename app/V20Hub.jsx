@@ -82,9 +82,20 @@ export default function V20Hub({client,user,homeId,canWrite,demo,bills=[],utilit
   return ()=>{draftSeq.current++};
  },[tab,user?.id,language]);
  const common={user_id:user?.id,home_id:homeId||null};
- async function save(table,content,message,options={}){if(!client||!canWrite||!user?.id)return onNotify(ui.editPermissionRequired);setWorking(true);try{
-  const {data,error}=await client.from(table).insert({...common,...content}).select('*').single();if(error)throw error;onNotify(message);await load();if(options.parent)onRefresh();return data;
- }catch(e){onNotify(v20SafeError(language,e));return null;}finally{setWorking(false)}}
+ async function save(table,content,message,options={}){if(!client||!canWrite||!user?.id)return onNotify(ui.editPermissionRequired);
+  const accountId=user.id,saveHomeId=homeId;
+  const sameContext=()=>activeAccount.current===accountId&&activeHome.current===saveHomeId;
+  setWorking(true);
+  try{
+   const {data,error}=await client.from(table).insert({user_id:accountId,home_id:saveHomeId||null,...content}).select('*').single();
+   if(!sameContext())return null;
+   if(error)throw error;
+   onNotify(message);await load();
+   if(!sameContext())return null;
+   if(options.parent)onRefresh();return data;
+  }catch(e){if(sameContext())onNotify(v20SafeError(language,e));return null;}
+  finally{if(sameContext())setWorking(false)}
+ }
  async function change(table,id,patch,message){if(!client||!canWrite||!user?.id)return;setWorking(true);try{const {error}=await scopedMutation(client.from(table).update(patch).eq('id',id));if(error)throw error;onNotify(message);await load();}catch(e){onNotify(v20SafeError(language,e))}finally{setWorking(false)}}
  async function erase(table,id){
   if(!canWrite||!user?.id)return;
