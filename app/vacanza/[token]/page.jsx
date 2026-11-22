@@ -1,6 +1,8 @@
 import {headers} from 'next/headers';
 import {getAdmin,hashToken} from '../../../lib/server.mjs';
 import {acceptedLanguage,localeFor,translate} from '../../../lib/i18n.mjs';
+import {formatV20Timestamp} from '../../../lib/v20-timestamp.mjs';
+import DeviceTimestamp from './DeviceTimestamp';
 export const dynamic='force-dynamic';
 
 // Pagina aperta da chi non ha un account (vicini, parenti): la lingua viene dal browser.
@@ -18,6 +20,10 @@ export default async function SharedVacation({params}){
    if(!error&&data&&!data.revoked_at&&Date.parse(data.expires_at)>Date.now())shared=data;
   }catch{}
  }
- const until=shared?new Date(shared.expires_at).toLocaleString(localeFor(lang),{timeZone:'Europe/Rome'}):'';
- return <main lang={localeFor(lang)} style={{fontFamily:'system-ui',maxWidth:650,padding:30,margin:'auto',lineHeight:1.7}}><h1>{t('share.vacation.heading')}</h1>{shared?<><p>{t('share.vacation.intro')}</p><div style={{whiteSpace:'pre-wrap',padding:22,border:'1px solid #ccc',borderRadius:12}}>{shared.shared_text}</div><small>{translate(lang,'share.vacation.validUntil',{date:until})}</small></>:<p>{t('share.vacation.unavailable')}</p>}<p><small>{t('share.vacation.emergency')}</small></p></main>;
+ const locale=localeFor(lang);
+ const until=shared?formatV20Timestamp(String(shared.expires_at),locale):'';
+ // La frase resta tradotta per intero; al posto di {date} va la data, che nel browser
+ // può aggiungere l'ora del dispositivo.
+ const [validBefore,validAfter='']=translate(lang,'share.vacation.validUntil',{date:'\u0000'}).split('\u0000');
+ return <main lang={locale} style={{fontFamily:'system-ui',maxWidth:650,padding:30,margin:'auto',lineHeight:1.7}}><h1>{t('share.vacation.heading')}</h1>{shared?<><p>{t('share.vacation.intro')}</p><div style={{whiteSpace:'pre-wrap',padding:22,border:'1px solid #ccc',borderRadius:12}}>{shared.shared_text}</div><small>{validBefore}<DeviceTimestamp value={String(shared.expires_at)} locale={locale} italian={until} italyLabel={t('time.italy')} deviceLabel={t('time.device')}/>{validAfter}</small></>:<p>{t('share.vacation.unavailable')}</p>}<p><small>{t('share.vacation.emergency')}</small></p></main>;
 }

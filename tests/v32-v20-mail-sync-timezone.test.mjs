@@ -6,7 +6,7 @@ import {formatV20Timestamp} from '../lib/v20-timestamp.mjs';
 const source=readFileSync(new URL('../app/V20Hub.jsx',import.meta.url),'utf8');
 
 test('V20 mail synchronization timestamps use profile locale and Rome timezone',()=>{
- assert.match(source,/formatV20Timestamp\(c\.last_sync_at,locale,ui\.never\)/);
+ assert.match(source,/stamp\(c\.last_sync_at,ui\.never\)/);
  assert.equal(formatV20Timestamp('not-a-date','it-IT','Mai'),'Mai');
  assert.equal(formatV20Timestamp('2026-01-15T12:34:00Z','it-IT'),new Date('2026-01-15T12:34:00Z').toLocaleString('it-IT',{timeZone:'Europe/Rome'}));
  assert.doesNotMatch(source,/new Date\(c\.last_sync_at\)\.toLocaleString\('it-IT'/);
