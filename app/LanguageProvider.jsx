@@ -1,7 +1,7 @@
 'use client';
 import {createContext,useCallback,useContext,useEffect,useMemo,useRef,useState} from 'react';
 import {db} from '../lib/supabase-browser';
-import {browserLanguage,DEFAULT_LANGUAGE,SECTIONS,formatDate,formatMoney,interpolate,LANGUAGES,localeFor,normalizeLanguage,languageStorageKey} from '../lib/i18n-core.mjs';
+import {browserLanguage,DEFAULT_LANGUAGE,SECTIONS,formatDate,formatMoney,interpolate,LANGUAGES,localeFor,normalizeLanguage,languageStorageKey,pluralKey} from '../lib/i18n-core.mjs';
 // Solo l'italiano arriva con l'app (serve per la prima pagina, che è in italiano); le altre lingue
 // si scaricano quando servono, una alla volta (lib/i18n-dicts/, generati da scripts/build-i18n.mjs).
 import italian from '../lib/i18n-dicts/it.json';
@@ -19,10 +19,14 @@ function loadSection(lang,section){
  return import(`../lib/i18n-dicts/${lang}.${section}.json`).then(module=>(sections[id]=module.default||module));
 }
 // Finché la lingua scelta non è arrivata (pochi millisecondi, una volta sola) si usa l'italiano.
-function translate(lang,key,params){
+function lookup(lang,key){
  const prefix=key.slice(0,key.indexOf('.')),section=SECTIONS.includes(prefix)?prefix:'';
- const text=section?sections[lang+'.'+section]?.[key]??sections['it.'+section]?.[key]
+ return section?sections[lang+'.'+section]?.[key]??sections['it.'+section]?.[key]
   :(dictionaries[lang]||italian)[key]??italian[key];
+}
+function translate(lang,key,params){
+ // «1 bolletta», non «1 bollette»: la variante singolare se c'è (pluralKey).
+ const text=lookup(lang,pluralKey(lang,key,params,k=>lookup(lang,k)!==undefined));
  return interpolate(text??key,params);
 }
 

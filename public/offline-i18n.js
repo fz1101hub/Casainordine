@@ -21,7 +21,13 @@ export function offlineLanguage(storage = globalThis.localStorage, nav = globalT
 }
 export const offlineLocale = lang => LOCALES[lang] || 'it-IT';
 export function offlineText(lang, key, params = {}) {
-  const text = (OFFLINE_COPY[lang] || OFFLINE_COPY.it)[key] ?? OFFLINE_COPY.it[key] ?? key;
+  const copy = OFFLINE_COPY[lang] || OFFLINE_COPY.it;
+  // «1 scheda», non «1 schede»: variante singolare secondo le regole della lingua.
+  const n = params?.n ?? params?.count;
+  if (n !== undefined && (copy[key + '.one'] ?? OFFLINE_COPY.it[key + '.one']) !== undefined) {
+    try { if (new Intl.PluralRules(offlineLocale(lang)).select(Number(n)) === 'one') key += '.one'; } catch {}
+  }
+  const text = copy[key] ?? OFFLINE_COPY.it[key] ?? key;
   return text.replace(/\{(\w+)\}/g, (match, name) => params[name] ?? match);
 }
 // Gli errori di offline-standalone.js e sos-private.js sono in italiano: si mostrano tradotti.
