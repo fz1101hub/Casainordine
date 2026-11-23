@@ -15,6 +15,7 @@ import { parseRatePlanText, rateItemsWithKeys } from '../lib/rate-plan.mjs';
 import { extractBillFields, billTitle } from '../lib/document-import.mjs';
 import { ForgotPasswordButton, PasswordRecoveryDialog, DeleteAccountPanel } from './AccountSecurity';
 import { MIN_PASSWORD_LENGTH, passwordTooShort, markPasswordUpgrade, clearPasswordUpgrade, needsPasswordUpgrade } from '../lib/password-policy.mjs';
+import { MENU_TOP, MENU_GROUPS, MENU_BOTTOM, toggleGroup, withPageGroup, readOpenGroups, saveOpenGroups } from '../lib/menu-groups.mjs';
 import PersonalizedHome from './PersonalizedHome';
 import {useLanguage,LanguageSelector} from './LanguageProvider';
 import {useLocalizedTitle} from './LocalizedTitle';
@@ -93,6 +94,7 @@ const menu = [
   {id:'connect',icon:Link2},
   {id:'settings',icon:Settings},
 ];
+const menuIcons = Object.fromEntries(menu.map(({id,icon})=>[id,icon]));
 const billDefault = {title:'',supplier:'',category:'Luce',amount:'',due_date:addDaysISO(todayRome(),7),paid:false};
 const utilityDefault = {supplier:'',category:'Luce',account_reference:'',estimated_amount:'',frequency:'monthly',next_due_date:addDaysISO(todayRome(),14)};
 const taskDefault = {title:'',due_date:addDaysISO(todayRome(),7),assigned_to:''};
@@ -587,6 +589,12 @@ export default function Page() {
   const displayName=(data.profile?.full_name||user?.email?.split('@')[0]||'').split(' ')[0];
   function openModal(type){if(!canWrite){notify(tr('v32.feedback.30'));return;}setForm({...({bill:billDefault,utility:utilityDefault,task:taskDefault}[type])});setModal(type);}
   function changePage(id){setTab(id);setMobile(false);setBellOpen(false);}
+  // Menu in gruppi: quelli aperti si ricordano su questo dispositivo; il gruppo della pagina aperta
+  // si apre da solo, anche quando ci si arriva da un pulsante della pagina.
+  const [openGroups,setOpenGroups]=useState([]);
+  function changeGroups(next){setOpenGroups(next);saveOpenGroups(localStorage,next);}
+  useEffect(()=>{setOpenGroups(old=>withPageGroup(old.length?old:readOpenGroups(localStorage),tab));},[tab]);
+  function navButton(id){const Icon=menuIcons[id]||House;return <button key={id} className={`nav-item ${tab===id?'active':''}`} aria-current={tab===id?'page':undefined} onClick={()=>changePage(id)}><Icon size={19}/><span>{tr('nav.'+id)}</span>{tab===id&&<span className="nav-active-indicator"/>}</button>;}
   function switchHome(id){setActiveHomeId(id||null);setTab(id?'dashboard':'household');setData(old=>({...old,bills:[],utilities:[],tasks:[],reminders:[]}));}
   // QR codes contain only the asset UUID. Resolve its home via RLS after login.
   // Never bypass the user's membership permissions or infer an inaccessible home.
@@ -617,7 +625,7 @@ export default function Page() {
     {mobile&&<button className="mobile-backdrop" onClick={()=>setMobile(false)} aria-label={tr('ui.closeMenu')}/>}
     <aside className={`sidebar ${mobile?'sidebar-show':''}`}>
       <div className="brand"><span className="brand-icon"><House size={22}/></span><b>Casa<span>inOrdine</span></b></div>
-      <div className="sidebar-label">{activeHomeId?homeMembership?.homes?.name||tr('v32.overview.sharedHome').toUpperCase():tr('v32.overview.personalSpace').toUpperCase()}</div><nav className="nav">{menu.map(({id,icon:Icon})=><button key={id} className={`nav-item ${tab===id?'active':''}`} onClick={()=>changePage(id)}><Icon size={19}/><span>{tr('nav.'+id)}</span>{tab===id&&<span className="nav-active-indicator"/>}</button>)}</nav>
+      <div className="sidebar-label">{activeHomeId?homeMembership?.homes?.name||tr('v32.overview.sharedHome').toUpperCase():tr('v32.overview.personalSpace').toUpperCase()}</div><nav className="nav">{MENU_TOP.map(navButton)}{MENU_GROUPS.map(group=>{const open=openGroups.includes(group.id);return <div key={group.id} className="nav-group"><button type="button" className="nav-group-head" aria-expanded={open} aria-controls={`nav-group-${group.id}`} onClick={()=>changeGroups(toggleGroup(openGroups,group.id))}><span>{tr('nav.group.'+group.id)}</span><ChevronRight size={15} aria-hidden="true"/></button><div id={`nav-group-${group.id}`} className="nav-group-items" hidden={!open}>{group.items.map(navButton)}</div></div>;})}{MENU_BOTTOM.map(navButton)}</nav>
       <div className="sidebar-spacer"/><div className="sidebar-info"><div className="sidebar-info-icon"><Bell size={18}/></div><b>{tr('v32.shell.reminderTitle')}</b><p>{tr('v32.shell.reminderHelp')}</p></div>
       <div className="sidebar-profile"><span className="avatar"><UserRound size={18}/></span><div className="profile-copy"><b>{demo?tr('v32.overview.demoMode'):user?.email?.split('@')[0]}</b><small>{demo?tr('v32.overview.localData'):tr('v32.overview.privateSpace')}</small></div>{!demo&&<button title={tr('ui.signOut')} className="icon-button" onClick={signOut}><LogOut size={17}/></button>}</div>
     </aside>
