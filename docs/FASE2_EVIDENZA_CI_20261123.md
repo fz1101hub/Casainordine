@@ -33,3 +33,10 @@ Verifica tramite GitHub Actions API per la PR #88:
 - Sullo SHA `b7ee6e1` il workflow letto dal branch invoca `npm run test:languages -- http://localhost:3000`: il passo relativo alle lingue risulta `success`. Non è stata verificata l'invocazione **senza** argomento URL.
 
 **Aggiornamento gate:** G01 = PASS **solo per la CI automatica sullo SHA `b7ee6e1` e per i comandi effettivamente presenti nel workflow**, senza estensione ai test reali. G02–G04, F01–F10 e X01–X04 restano BLOCKED fino a evidenze di account reali, Supabase effettivo, deploy pubblico, notifiche/email e prove manuali. La PR rimane draft; nessun via libera alla Fase 3. Questa annotazione non equivale a certificazione esterna.
+
+## Riscontro sul commit successivo — 23 novembre 2026, ore 13:33 CET
+
+- Commit `93dd74cb25b022fe377db43d2d1d8f2f6c326b89`: [run 45166705442](https://github.com/fz1101hub/Casainordine/actions/runs/45166705442), stato `completed`, conclusione `success`, verificati tramite connettore GitHub.
+- Job `test` e `database`: entrambi `completed / success`. Nel job `test` risultano `success` i passi di installazione, controllo dipendenze, test logici, build Next.js, browser demo senza database, lingue, accessibilità e prove delle sezioni. Nel job `database` risulta `success` il passo delle prove su migrazioni/regole/funzioni in ambiente CI.
+- **G01:** evidenza CI positiva per il commit `93dd74c` e i passi previsti dal workflow; non equivale all'esecuzione locale indipendente, né a prove con account o DB di produzione. Il comando linguistico nel workflow mantiene l'URL esplicito: non è attestata l'esecuzione senza argomenti.
+- **G02–G04, F01–F10, X01–X04:** ancora `BLOCKED` nel registro di collaudo reale. La Fase 3 resta non autorizzata. Nessun deploy o intervento sui dati effettuato con questa verifica.
