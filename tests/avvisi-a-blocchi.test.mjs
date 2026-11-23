@@ -150,7 +150,8 @@ test('riepiloghi: bollette personali e delle case, uno per persona e giorno, let
 });
 
 test('il cron usa i lavori a blocchi', () => {
-  const cron = readFileSync(new URL('../app/api/cron/route.js', import.meta.url), 'utf8');
+  // Il corpo del cron è in lib/daily-jobs.mjs (provato dall'inizio alla fine in promemoria-completi).
+  const cron = readFileSync(new URL('../lib/daily-jobs.mjs', import.meta.url), 'utf8');
   assert.match(cron, /await processSummaries\(admin,profiles\|\|\[\],\{today,appUrl,counts,/);
   assert.doesNotMatch(cron, /for\(const profile of profiles\|\|\[\]\)/);
 });

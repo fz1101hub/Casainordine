@@ -34,14 +34,15 @@ test('ognuno sceglie: promemoria spenti o email spente bloccano l’email', () =
 test('il cron manda una email per bolletta e persona, registrata prima dell’invio', () => {
   // Dal 23 novembre i promemoria sono a blocchi (lib/reminder-run.mjs); il comportamento è
   // provato in tests/promemoria-a-blocchi.test.mjs, qui resta il controllo dell'ordine.
-  const run = read('../lib/reminder-run.mjs'), cron = read('../app/api/cron/route.js');
+  const run = read('../lib/reminder-run.mjs'), cron = read('../lib/daily-jobs.mjs');
   assert.match(run, /reminderEmailRecipients\(bill, membersOf\(bill\)\)/);
   assert.match(run, /wantsReminderEmail\(profile\)/);
   assert.match(run, /upsertMany\(admin, 'reminder_email_log', [^;]*\{ onConflict: 'bill_id,user_id', ignoreDuplicates: true \}/);
   const slot = run.indexOf("upsertMany(admin, 'reminder_email_log'"), send = run.indexOf('email.send(w.address');
   assert.ok(slot > 0 && send > slot, 'la riga del registro si scrive prima dell’invio');
   assert.match(run, /email\.send\(w\.address, w\.bill, languageOf\(w\.userId\), appUrl\)/);
-  assert.match(cron, /email:process\.env\.RESEND_API_KEY&&process\.env\.RESEND_FROM\?\{send:emailReminder\}:null/);
+  assert.match(cron, /email:emailOn\?\{send:email\.reminder\}:null/);
+  assert.match(cron, /const emailConfigured = \(\) => Boolean\(process\.env\.RESEND_API_KEY && process\.env\.RESEND_FROM\);/);
 });
 
 test('migrazione v50: scelta personale e registro solo per il server', () => {

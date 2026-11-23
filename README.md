@@ -34,6 +34,7 @@ Ordine completo di installazione su un database nuovo, in quest'ordine:
 20. `migrate_v51_sicurezza_funzioni.sql`: le 11 funzioni che servono solo alle regole di accesso escono dall'API (schema `private`); restano chiamabili le 20 azioni dell'app, ognuna con i propri controlli. Gli inviti d'affitto si vedono e si accettano solo con l'email verificata, come gli inviti alle case.
 
 21. `migrate_v52_ripristino_scadenze.sql`: il ripristino da backup riporta anche le scadenze dell'auto, collegate alla bolletta e all'utenza già ripristinate (funzione `v52_restore_vehicle_deadline`, con gli stessi controlli di `add_home_vehicle_deadline`). Finché non è eseguita, il ripristino salta le scadenze e lo dice.
+22. `migrate_v53_push_rinviate.sql`: le notifiche push che cadono nell'orario silenzioso si mettono da parte (tabella `push_deferred`, solo per il server) e partono dopo la sua fine, nello stesso giorno. Il giro orario si attiva con `migrate_v53_cron_push.sql` (vedi «Controlli programmati con Supabase Cron»).
 
 Ogni script è in una sola transazione e si può rieseguire. Dopo la v51 le migrazioni precedenti non vanno più rieseguite: cercherebbero le funzioni di controllo nello schema `public` e si fermerebbero senza cambiare niente.
 
@@ -47,6 +48,7 @@ I promemoria (`/api/cron`) e la lettura delle caselle email (`/api/mail/cron`) p
    - promemoria ogni giorno alle 07:07 UTC;
    - caselle email ogni 3 ore (ogni casella si legge comunque al massimo una volta ogni 20 ore);
    - pulizia della cronologia.
+   Dopo la v53 esegui anche `supabase/migrate_v53_cron_push.sql`: ogni ora, al minuto 37, `/api/cron/push` manda le notifiche rinviate dall'orario silenzioso (Vercel non serve: il piano Hobby permette solo lavori giornalieri).
 3. Controlla le esecuzioni con `select * from cron.job_run_details order by start_time desc limit 20;`.
 
 I cron di `vercel.json` restano come riserva: una seconda chiamata nello stesso giorno non manda nulla due volte. Se l'indirizzo dell'app non è `https://casainordine.vercel.app`, aggiorna il segreto `casa_app_url` (istruzioni in testa al file SQL).
@@ -135,7 +137,7 @@ Conserva fornitore, servizio, costo, PDF del contratto e data di rinnovo/scadenz
 
 ### 9. Centro notifiche
 
-In **Notifiche e backup** puoi abilitare/disabilitare le categorie push (bollette, contratti, manutenzioni/autoletture, riepiloghi), impostare un orario silenzioso in **Europa/Roma** e consultare/segnare come letti gli avvisi interni. Il cron registra gli avvisi interni a prescindere dal permesso push. Durante l'orario silenzioso, le push sono omesse, non accodate per una consegna successiva: gli avvisi interni restano accessibili. Il comportamento delle email esistenti è configurato separatamente.
+In **Notifiche e backup** puoi abilitare/disabilitare le categorie push (bollette, contratti, manutenzioni/autoletture, riepiloghi), impostare un orario silenzioso in **Europa/Roma** e consultare/segnare come letti gli avvisi interni. Il cron registra gli avvisi interni a prescindere dal permesso push. Durante l'orario silenzioso le push si mettono da parte e partono appena finisce, nello stesso giorno (giro orario `/api/cron/push`); prima della v53 andavano perse, e chi aveva un orario come 22:00–08:30 non riceveva mai notifiche, perché il controllo giornaliero parte alle 08:00–09:07. Gli avvisi interni restano accessibili. Il comportamento delle email esistenti è configurato separatamente.
 
 ### 10. Backup, CSV e PDF
 

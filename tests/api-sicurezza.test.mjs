@@ -64,7 +64,7 @@ test('senza accesso o con un accesso falso: 401 e nessuna lettura dei dati', asy
 
 test('lavori programmati: solo con il segreto del cron o la chiave di Supabase Cron', async () => {
   fake.state.rpc.v35_cron_token_valid = ({ token }) => token === 'a'.repeat(64);
-  for (const path of ['cron', 'mail/cron']) {
+  for (const path of ['cron', 'cron/push', 'mail/cron']) {
     for (const headers of [{}, { authorization: 'Bearer sbagliato' }, { authorization: 'Bearer segreto-del-cron-abbastanza-lung' }, { 'x-casa-cron-token': 'corto' }, { 'x-casa-cron-token': 'b'.repeat(64) }]) {
       fake.state.requests.length = 0;
       const res = await call(path, 'GET', { headers });
