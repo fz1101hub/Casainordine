@@ -10,7 +10,9 @@ export async function GET(request){
 export async function PATCH(request){
   const user=await authenticatedUser(request);if(!user)return json({error:'unauthorized'},401);
   const {id,action,bill_id}=await request.json().catch(()=>({}));
-  const isUuid=x=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(x));
+  // 8-4-4-4-12: fino al 23 novembre 2026 qui c'era un gruppo da 4 in più e nessun identificativo
+  // vero passava, quindi i documenti trovati nelle email non si potevano né importare né scartare.
+  const isUuid=x=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(x));
   if(!isUuid(id)||!['imported','dismissed'].includes(action)||
      (action==='imported'&&!isUuid(bill_id)))return json({error:'invalidRequest'},400);
   const admin=getAdmin();
