@@ -512,3 +512,10 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):
 .restore-preview h3{font-size:14px;margin:0 0 8px}
 .restore-preview p{font-size:12px;line-height:1.5;margin:6px 0;color:var(--muted)}
 .restore-preview ul{margin:8px 0;padding-left:18px;font-size:12px;line-height:1.7}
+/* Stato della configurazione (Impostazioni) */
+.config-status{margin-top:19px}.config-summary{margin:16px 0 6px;font-size:12.5px}.config-summary.ok{color:#1f7a5a}.config-summary.todo{color:#86621a}
+.config-list{list-style:none;margin:0;padding:0}.config-item{display:flex;gap:11px;align-items:flex-start;padding:13px 0;border-top:1px solid var(--line)}
+.config-item>svg{flex-shrink:0;margin-top:1px}.config-item.state-ok>svg{color:#2f8f6c}.config-item.state-missing>svg{color:#5f716a}.config-item.state-partial>svg{color:#a87a1f}.config-item.state-invalid>svg{color:#b5524a}
+.config-item>div{display:flex;flex-direction:column;gap:5px;min-width:0}.config-item b{font-size:12px;display:flex;flex-wrap:wrap;gap:7px;align-items:center}.config-item small{font-size:12px;color:var(--muted);line-height:1.45}
+.config-item code{font-size:11.5px;background:#f3f6f3;padding:1px 5px;border-radius:5px;overflow-wrap:anywhere}.config-note{margin:12px 0 0;font-size:12px}
+.config-item .config-level{font-weight:600;color:var(--muted);font-size:11.5px}

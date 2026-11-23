@@ -108,8 +108,20 @@ try {
 
   // 7. Accessibilità con accesso.
   await page.addScriptTag({ path: 'node_modules/axe-core/axe.min.js' });
-  const violations = await page.evaluate(async () => (await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] } })).violations.map(v => `${v.id}:${v.nodes.length}`));
+  const axe = () => page.evaluate(async () => (await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] } })).violations.map(v => `${v.id}:${v.nodes.length}`));
+  const violations = await axe();
   check(violations.length === 0, `nessuna violazione WCAG in «Notifiche e backup» con accesso ${violations.join(' ')}`);
+
+  // 7b. Stato della configurazione in Impostazioni (nella CI c'è la chiave del database, non il resto).
+  await go('Impostazioni');
+  await page.getByRole('button', { name: 'Controlla', exact: true }).click();
+  await page.locator('.config-list').waitFor({ timeout: 10000 }).catch(() => {});
+  const config = (await page.locator('.config-status').innerText().catch(() => '')).replace(/\s+/g, ' ');
+  check(/Chiave del database Pronto/.test(config), 'lo stato della configurazione vede la chiave del database');
+  check(/Da aggiungere su Vercel: APP_URL/.test(config) && /Manca qualcosa tra le impostazioni necessarie/.test(config), 'e dice quale variabile necessaria manca');
+  check(!config.includes(process.env.SUPABASE_SECRET_KEY || 'chiave-di-servizio-finta'), 'senza mostrare il valore della chiave');
+  const settingsViolations = await axe();
+  check(settingsViolations.length === 0, `nessuna violazione WCAG in «Impostazioni» con accesso ${settingsViolations.join(' ')}`);
 
   // 8. Uscita.
   await page.getByRole('button', { name: 'Esci', exact: true }).first().click();
@@ -120,4 +132,4 @@ try {
   await fake.close();
 }
 if (failures.length) { console.error(`\nProve con accesso: ${failures.length} non superate.`); process.exit(1); }
-console.log('\nProve con accesso: tutte superate (accesso, dati, backup JSON e .zip, ripristino, file sbagliati, accessibilità, uscita).');
+console.log('\nProve con accesso: tutte superate (accesso, dati, backup JSON e .zip, ripristino, file sbagliati, stato della configurazione, accessibilità, uscita).');
