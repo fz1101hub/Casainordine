@@ -12,7 +12,7 @@
 | Job test | `success`: `npm ci`, `npm audit --omit=dev --audit-level=high`, `npm test`, `npm run build`, smoke Chromium senza database, `scripts/check-languages.mjs`, `scripts/check-accessibility.mjs`, `scripts/prove-sezioni.mjs` |
 | Job database | `success`: `scripts/db-tests.sh` su PostgreSQL 17 locale con sostituto minimo Supabase |
 
-**Precisazione:** il workflow non esegue letteralmente `npm run test:languages`: esegue `node scripts/check-languages.mjs http://localhost:3000`. La corrispondenza con un eventuale script npm omonimo non è stata verificata. Non attribuire a questa run quel comando specifico.
+**Verifica aggiuntiva del 23 novembre 2026 (lettura diretta di `package.json` su `main`):** lo script `test:languages` esiste ed è definito come `node scripts/check-languages.mjs`. Il workflow ha eseguito lo stesso file con l'argomento esplicito `http://localhost:3000`; quindi è verificata la corrispondenza del programma, **non** l'esecuzione letterale di `npm run test:languages` senza argomenti, né l'equivalenza del comportamento con e senza URL. Per il gate G01 resta da eseguire e registrare il comando richiesto sullo SHA candidato.
 
 **Limiti verificati:** il browser della CI usa un'app compilata **senza database reale**; PostgreSQL è un servizio temporaneo con un sostituto minimo Supabase. Nessuna evidenza in questa run dimostra login reale, isolamento multiaccount nel progetto Supabase effettivo, invio email/cron, applicazione migrazioni in produzione, disponibilità del deployment pubblico o prove manuali con lettore di schermo.
 
