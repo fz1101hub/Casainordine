@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { processBillReminders, readIn } from '../lib/reminder-run.mjs';
 
 // Database finto in memoria, con le chiavi uniche delle tabelle vere: basta per select … in …,
