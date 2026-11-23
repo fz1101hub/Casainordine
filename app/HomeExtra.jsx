@@ -6,7 +6,8 @@ import {uploadHouseDocument} from '../lib/document-upload.mjs';
 import {extractConsumption,extractMeterCandidates,monthlyConsumption,consumptionAnomalies,expenseForecast,safeBackup,serializeCsv,UNITS} from '../lib/home-insights.mjs';
 import {todayRome} from '../lib/dates.mjs';
 import {useLanguage} from './LanguageProvider';
-import { friendlyError, shownError } from '../lib/friendly-error.mjs';
+import { friendlyError } from '../lib/friendly-error.mjs';
+import { collectBackupTables } from '../lib/backup-tables.mjs';
 import { askConfirm, askText } from './ConfirmDialog';
 
 const tables={properties:'home_properties',documents:'home_documents',meters:'meter_readings',meterSchedules:'meter_reminders',assets:'maintenance_assets',events:'maintenance_events',receipts:'payment_receipts',contracts:'home_contracts'};
@@ -126,33 +127,13 @@ export default function HomeExtra({client,demo,user,homeId,canWrite,bills=[],uti
   const stamp=todayRome();
   if(format==='csv'){downloadBlob(`casa-in-ordine-bollette-${stamp}.csv`,'\ufeff'+serializeCsv(bills,[{key:'title',label:tr('form.description')},{key:'supplier',label:tr('form.supplier')},{key:'category',label:tr('form.category')},{key:'amount',label:tr('extra.print.amount')+' EUR'},{key:'due_date',label:tr('extra.print.due')},{key:'paid_at',label:tr('extra.backup.csv.paidAt')},{key:'consumption_value',label:tr('extra.backup.csv.consumption')},{key:'consumption_unit',label:tr('extra.backup.csv.unit')}]),'text/csv;charset=utf-8');return;}
   if(format!=='json')return;
-  const more={};
-  const extraTables=['house_tasks','home_budgets','home_expenses','home_shopping','home_vehicles','home_vehicle_deadlines','home_expense_shares','user_suppliers'];
   try{
    setWorking(true);
-   for(const name of extraTables){
-    let collected=[];
-    if(name==='home_expense_shares'){
-     const relevant=homeId?(more.home_expenses||[]).map(e=>e.id):[];
-     for(let i=0;i<relevant.length;i+=80){
-      const ids=relevant.slice(i,i+80);let offset=0;
-      for(;;){const {data,error}=await client.from(name).select('*').in('expense_id',ids).order('expense_id').range(offset,offset+499);
-       if(error)throw error;const chunk=data||[];collected.push(...chunk);offset+=chunk.length;if(chunk.length<500)break;if(offset>10000)throw shownError(tr('extra.backup.tooManyShares'));}
-     }
-    }else{
-     let offset=0;
-     for(;;){let q=client.from(name).select('*');
-      if(name==='user_suppliers')q=q.eq('user_id',user.id);
-      else q=homeId?q.eq('home_id',homeId):q.is('home_id',null);
-      const {data,error}=await q.order('id').range(offset,offset+499);
-      if(error)throw error;const chunk=data||[];collected.push(...chunk);offset+=chunk.length;
-      if(chunk.length<500)break;if(offset>10000)throw shownError(tr('extra.backup.tooManyRows',{table:name}));
-     }
-    }
-    more[name]=collected;
-   }
+   // Tutte le sezioni dello spazio (lib/backup-tables.mjs); le regole di accesso restano il filtro.
+   const {tables,missing}=await collectBackupTables(client,{homeId:homeId||null,userId:user?.id,known:{maintenance_assets:rows.assets}});
+   const {data:profile}=await client.from('profiles').select('*').eq('id',user?.id).maybeSingle();
    const bundle=safeBackup({notice:tr('extra.backup.fileNotice'),bills,utilities,properties:rows.properties,documents:rows.documents,meters:rows.meters,meterReminders:rows.meterSchedules,contracts:rows.contracts,assets:rows.assets,events:rows.events,receipts:rows.receipts});
-   bundle.household=more;bundle.scope={home_id:homeId||null};
+   bundle.household=tables;bundle.profile=profile||null;bundle.scope={home_id:homeId||null};bundle.not_included=tr('extra.backup.notIncluded');if(missing.length)bundle.missing_sections=missing;
    downloadBlob(`casa-in-ordine-${stamp}.json`,JSON.stringify(bundle,null,2),'application/json;charset=utf-8');
    onNotify(tr('extra.backup.done'));
   }catch(e){onNotify(tr('extra.backup.failed',{error:friendlyError(e,tr)}))}finally{setWorking(false)}
