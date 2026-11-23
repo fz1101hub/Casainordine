@@ -33,6 +33,8 @@ Ordine completo di installazione su un database nuovo, in quest'ordine:
 19. `migrate_v50_email_promemoria.sql`: email di promemoria anche a editor e lettori, con la scelta personale di non riceverle.
 20. `migrate_v51_sicurezza_funzioni.sql`: le 11 funzioni che servono solo alle regole di accesso escono dall'API (schema `private`); restano chiamabili le 20 azioni dell'app, ognuna con i propri controlli. Gli inviti d'affitto si vedono e si accettano solo con l'email verificata, come gli inviti alle case.
 
+21. `migrate_v52_ripristino_scadenze.sql`: il ripristino da backup riporta anche le scadenze dell'auto, collegate alla bolletta e all'utenza già ripristinate (funzione `v52_restore_vehicle_deadline`, con gli stessi controlli di `add_home_vehicle_deadline`). Finché non è eseguita, il ripristino salta le scadenze e lo dice.
+
 Ogni script è in una sola transazione e si può rieseguire. Dopo la v51 le migrazioni precedenti non vanno più rieseguite: cercherebbero le funzioni di controllo nello schema `public` e si fermerebbero senza cambiare niente.
 
 

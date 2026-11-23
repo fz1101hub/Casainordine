@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { RESTORE_ORDER, RESTORE_SKIPPED, RESTORE_SECTIONS, LINKS, readBackup, prepareRows, restorePlan, existingCounts, runRestore, previewBySection, restoreTotals, RestoreFileError } from '../lib/backup-restore.mjs';
+import { RESTORE_ORDER, RESTORE_SKIPPED, RESTORE_WITH, SKIP_REASONS, RESTORE_SECTIONS, LINKS, readBackup, prepareRows, restorePlan, existingCounts, runRestore, previewBySection, restoreTotals, RestoreFileError } from '../lib/backup-restore.mjs';
 import { BACKUP_MAIN, BACKUP_TABLES } from '../lib/backup-tables.mjs';
 import { TRANSLATIONS } from '../lib/i18n.mjs';
 
@@ -24,9 +24,10 @@ const backup = (extra = {}) => ({ format: 'casa-in-ordine-backup', version: 2, e
 
 test('ogni tabella del backup si ripristina o ha il motivo per cui no', () => {
   const all = [...BACKUP_MAIN, ...BACKUP_TABLES.map(t => t.name)];
-  for (const table of all) assert.ok(RESTORE_ORDER.includes(table) || RESTORE_SKIPPED[table], table);
+  for (const table of all) assert.ok(RESTORE_ORDER.includes(table) || RESTORE_WITH[table] || RESTORE_SKIPPED[table], table);
   for (const table of RESTORE_ORDER) { assert.ok(all.includes(table), `${table} è nel backup`); assert.ok(RESTORE_SECTIONS[table], `${table} ha una sezione`); }
-  for (const reason of new Set(Object.values(RESTORE_SKIPPED))) for (const [lang, d] of Object.entries(TRANSLATIONS)) assert.ok(d['extra.restore.reason.' + reason], `${reason} in ${lang}`);
+  for (const reason of new Set(Object.values(RESTORE_SKIPPED))) assert.ok(SKIP_REASONS.includes(reason), reason);
+  for (const reason of SKIP_REASONS) for (const [lang, d] of Object.entries(TRANSLATIONS)) assert.ok(d['extra.restore.reason.' + reason], `${reason} in ${lang}`);
 });
 
 test('ordine: ogni voce dopo quelle a cui è collegata', () => {
@@ -75,7 +76,7 @@ test('stesso spazio: stessi identificativi; spazio diverso: identificativi nuovi
   assert.equal(rows.payment_receipts[0].bill_id, bill.id);
   assert.equal(rows.home_project_expenses[0].quote_id, rows.home_project_quotes[0].id);
   assert.equal(rows.home_project_expenses[0].project_id, rows.home_projects[0].id);
-  assert.deepEqual(copy.skipped, { files: 1, appOnly: 1, twoParties: 1, otherPeople: 1 });
+  assert.deepEqual(copy.skipped, { files: 1, unknown: 1, twoParties: 1, otherPeople: 1 }, 'la spesa del file non ha quote: incompleta');
   assert.deepEqual(copy.steps.map(s => s.table), RESTORE_ORDER.filter(t => rows[t]));
 });
 
