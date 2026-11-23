@@ -56,7 +56,9 @@ export default function BackupRestore({ client, user, homeId, canWrite, onNotify
         needsUpdate: Object.values(result).some(c => c.needsUpdate) }));
       onRefresh();
     } catch (e) {
-      setState(s => ({ ...s, stage: 'preview' }));
+      // Alcuni passi (o persino alcune righe del passo corrente) possono essere già persistiti.
+      // Non cancellare il piano: riprovando vengono riusati gli stessi identificativi.
+      setState(s => ({ ...s, stage: 'preview', interrupted: true }));
       onNotify(tr('extra.restore.failed', { error: friendlyError(e, tr) }));
     }
   }
@@ -74,6 +76,7 @@ export default function BackupRestore({ client, user, homeId, canWrite, onNotify
       {state.backup?.exportedAt && <p>{tr('extra.restore.from', { date: localDate(state.backup.exportedAt.slice(0, 10)) })}</p>}
       <p><b>{tr('extra.restore.target', { space })}</b> {tr('extra.restore.intro')}</p>
       {state.otherSpace && <p className="extra-alert">{tr('extra.restore.otherSpace')}</p>}
+      {state.interrupted && <p className="extra-alert" role="alert">{tr('extra.restore.interrupted')}</p>}
       <ul>{state.rows.map(r => <li key={r.section}><b>{tr('nav.' + r.section)}</b>: {tr('extra.restore.row', { total: r.total, present: r.present })}</li>)}</ul>
       {skipped.length > 0 && <p><small>{tr('extra.restore.skipped', { list: skipped.join(' · ') })}</small></p>}
       {state.stage === 'preview' && <div className="extra-buttons">

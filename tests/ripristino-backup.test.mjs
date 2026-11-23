@@ -129,10 +129,13 @@ test('pannello nella sezione backup, testi nelle 6 lingue', () => {
   assert.match(panel, /disabled=\{!canWrite \|\| busy\}/);
   assert.match(panel, /MAX_BYTES = 20 \* 1024 \* 1024/);
   for (const [lang, d] of Object.entries(TRANSLATIONS)) {
-    for (const key of ['button', 'title', 'intro', 'otherSpace', 'row', 'confirm', 'done', 'nothing', 'error.notJson', 'error.notBackup', 'error.tooBig', 'failed', 'readOnly'])
+    for (const key of ['button', 'title', 'intro', 'otherSpace', 'interrupted', 'row', 'confirm', 'done', 'nothing', 'error.notJson', 'error.notBackup', 'error.tooBig', 'failed', 'readOnly'])
       assert.ok(d['extra.restore.' + key], `extra.restore.${key} in ${lang}`);
   }
   assert.doesNotMatch(TRANSLATIONS.it['extra.backup.caution'], /non sono ancora disponibili/);
+  assert.match(panel, /interrupted: true/);
+  assert.match(panel, /tr\('extra\.restore\.interrupted'\)/);
+  assert.doesNotMatch(TRANSLATIONS.it['extra.restore.otherSpace'], /si copierebbero di nuovo/);
 });
 
 
