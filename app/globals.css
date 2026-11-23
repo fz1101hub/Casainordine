@@ -505,3 +505,10 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):
 }
 /* Bersaglio del pulsante «Ripristina» della demo: almeno 24 px. */
 .demo-banner button{min-height:24px;padding:4px 6px}
+/* Ripristino dal backup */
+.restore-box{margin:14px 0 10px;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.restore-box .upload-label.disabled{opacity:.55;pointer-events:none}
+.restore-preview{width:100%;border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:#fbfcfa}
+.restore-preview h3{font-size:14px;margin:0 0 8px}
+.restore-preview p{font-size:12px;line-height:1.5;margin:6px 0;color:var(--muted)}
+.restore-preview ul{margin:8px 0;padding-left:18px;font-size:12px;line-height:1.7}
