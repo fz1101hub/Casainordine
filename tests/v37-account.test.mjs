@@ -31,10 +31,10 @@ test('Eliminazione account: revoca dell’accesso Gmail senza bloccare se fallis
   const {admin}=adminMock({connections:[{refresh_token_enc:'non-valido'}]});
   assert.equal(await revokeGoogleAccess(admin,'u1',async()=>({ok:true})),0,'token illeggibile: si prosegue');
 });
-test('Eliminazione account: conferma con l’email, controllo delle case, poi file e utente',()=>{
+test('Eliminazione account: conferma con email, coda prima di Auth e Storage solo dopo',()=>{
   const route=source('app/api/account/delete/route.js');
   assert.match(route,/String\(confirm_email \|\| ''\)\.trim\(\)\.toLowerCase\(\) !== String\(user\.email \|\| ''\)\.trim\(\)\.toLowerCase\(\)/);
-  const order=['sharedOwnedHomes(admin, user.id)','revokeGoogleAccess(admin, user.id)','removeUserFiles(admin, user.id, keep)','admin.auth.admin.deleteUser(user.id)'].map(x=>route.indexOf(x));
+  const order=['sharedOwnedHomes(admin, user.id)','queueAccountCleanup(admin, user.id, keep)','admin.auth.admin.deleteUser(user.id)','finishAccountCleanup(admin, user.id)'].map(x=>route.indexOf(x));
   assert.ok(order.every((v,i)=>v>0&&(i===0||v>order[i-1])),order.join(','));
   const sql=source('supabase/migrate_v37_account.sql');
   assert.match(sql,/on delete set null/);
