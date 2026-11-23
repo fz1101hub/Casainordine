@@ -1,5 +1,5 @@
 import { authenticatedUser, getAdmin, json } from '../../../../lib/server.mjs';
-import { sharedOwnedHomes, sharedDocumentPaths, ownedLeasePhotoPaths, queueAccountCleanup, discardAccountCleanup, finishAccountCleanup, revokeGoogleAccess } from '../../../../lib/account-deletion.mjs';
+import { sharedOwnedHomes, sharedTenantLeases, sharedDocumentPaths, ownedLeasePhotoPaths, queueAccountCleanup, discardAccountCleanup, finishAccountCleanup, revokeGoogleAccess } from '../../../../lib/account-deletion.mjs';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
@@ -18,6 +18,9 @@ export async function POST(request) {
   try {
     const shared = await sharedOwnedHomes(admin, user.id);
     if (shared.length) return json({ error: 'accountOwner', homes: shared.map(h => h.name) }, 409);
+    // Un contratto con inquilino accettato non può sparire per un semplice delete account.
+    const leases = await sharedTenantLeases(admin, user.id);
+    if (leases.length) return json({ error: 'accountLease', leases: leases.map(l => l.property_label) }, 409);
     const keep = await sharedDocumentPaths(admin, user.id);
     const leasePaths = await ownedLeasePhotoPaths(admin, user.id);
     // Se questa scrittura fallisce, l'account resta intatto e nessun file viene cancellato.
