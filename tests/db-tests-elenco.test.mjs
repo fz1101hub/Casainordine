@@ -48,3 +48,11 @@ test('la CI prova anche l\'app con accesso, contro il Supabase finto', () => {
   assert.match(script, /startFakeSupabase\(\{ port: PORT/);
   assert.match(script, /process\.exit\(1\)/, 'una prova non superata ferma la CI');
 });
+
+test('Dependabot: npm e GitHub Actions ogni settimana, minori raggruppati', () => {
+  const yml = readFileSync(new URL('../.github/dependabot.yml', import.meta.url), 'utf8');
+  assert.match(yml, /^version: 2$/m);
+  for (const eco of ['npm', 'github-actions']) assert.match(yml, new RegExp(`package-ecosystem: ${eco}\\n    directory: /\\n    schedule:\\n      interval: weekly`), eco);
+  assert.match(yml, /update-types: \[minor, patch\]/);
+  assert.doesNotMatch(yml, /\t/, 'niente tabulazioni nello YAML');
+});
