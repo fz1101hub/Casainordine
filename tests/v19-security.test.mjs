@@ -18,7 +18,7 @@ test('receipts cannot mark paid from client directly',()=>{
  assert.match(extra,/client\.rpc\('confirm_payment_receipt'/);
 });
 test('cron includes home alerts as separate job within existing schedule',()=>{
- assert.match(cron,/processExtraAlerts\(admin,today,counts/);assert.match(cron,/pushAllowed\(pushPreferences\|\|\{\},'bill'\)/);
+ assert.match(cron,/processExtraAlerts\(admin,today,counts/);assert.match(cron,/pushAllowed\(pref,'bill'\)/);
 });
 test('new archive does not export passwords or storage locations',()=>{
  const backup=readFileSync(new URL('../lib/home-insights.mjs',import.meta.url),'utf8');assert.match(backup,/documents:documents\.map\(\(\{storage_path,\.\.\.d\}\)=>d\)/);
