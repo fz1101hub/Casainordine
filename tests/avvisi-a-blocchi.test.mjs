@@ -41,7 +41,7 @@ function fakeAdmin(db) {
         const res = { data: out, error: null };
         return { select: async () => res, then: (ok, ko) => Promise.resolve(res).then(ok, ko) };
       },
-      update(patch) { count('write', t); const conds = []; const u = { eq(c, v) { conds.push(r => r[c] === v); return u; }, then(ok) { for (const r of db[t]) if (conds.every(f => f(r))) Object.assign(r, patch); return Promise.resolve({ error: null }).then(ok); } }; return u; },
+      update(patch) { count('write', t); const conds = []; const u = { eq(c, v) { conds.push(r => r[c] === v); return u; }, in(c, vs) { conds.push(r => vs.includes(r[c])); return u; }, then(ok) { for (const r of db[t]) if (conds.every(f => f(r))) Object.assign(r, patch); return Promise.resolve({ error: null }).then(ok); } }; return u; },
       delete() { count('write', t); const conds = []; const d = { eq(c, v) { conds.push(r => r[c] === v); return d; }, then(ok) { db[t] = db[t].filter(r => !conds.every(f => f(r))); return Promise.resolve({ error: null }).then(ok); } }; return d; },
     };
   } };

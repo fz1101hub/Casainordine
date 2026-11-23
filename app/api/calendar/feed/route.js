@@ -10,7 +10,8 @@ export async function GET(request){
 export async function POST(request){
  try{const user=await authenticatedUser(request);if(!user)return json({error:'unauthorized'},401);
  const token=randomBytes(32).toString('base64url');
- const {error}=await getAdmin().from('calendar_feeds').upsert({user_id:user.id,token_hash:hashToken(token),created_at:new Date().toISOString()});
+ // Un collegamento per persona: il nuovo sostituisce il vecchio, che smette di funzionare.
+ const {error}=await getAdmin().from('calendar_feeds').upsert({user_id:user.id,token_hash:hashToken(token),created_at:new Date().toISOString()},{onConflict:'user_id'});
  if(error)throw error;
  const origin=new URL(request.url).origin;
  return json({url:`${origin}/api/calendar/${token}`});
