@@ -193,7 +193,12 @@ export default function Page() {
   const reloadHomes=useCallback(async()=>{
     if(!client)return;
     const seq=++homesSeq.current;
-    const {data:membership,error}=await client.from('home_members').select('home_id,role,homes(id,name,owner_id)').order('joined_at');
+    // Solo le proprie appartenenze: le regole di accesso mostrano anche gli altri membri delle
+    // proprie case, e senza questo filtro chi legge o modifica risultava con il ruolo del
+    // proprietario (la sua riga viene prima) e vedeva la stessa casa più volte.
+    const {data:{session}}=await client.auth.getSession();
+    const uid=session?.user?.id;if(!uid)return;
+    const {data:membership,error}=await client.from('home_members').select('home_id,role,homes(id,name,owner_id)').eq('user_id',uid).order('joined_at');
     if(seq!==homesSeq.current)return;
     if(error){if(error.code!=='42P01')notify(tr('v32.flow.homesError',{error:friendlyError(error,tr)}));return;}
     const allowed=membership||[];

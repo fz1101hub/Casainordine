@@ -22,10 +22,12 @@ const BILL_LUCE = '20000000-0000-4000-8000-000000000001', BILL_GAS = '20000000-0
 const DOC = '40000000-0000-4000-8000-000000000001';
 const PDF = '%PDF-1.4 bolletta della luce di prova';
 
-const fake = await startFakeSupabase({ port: PORT, lenientRpc: true });
+const fake = await startFakeSupabase({ port: PORT, lenientRpc: true, rls: true });
+const LUCA = '22222222-2222-4222-8222-222222222222';
 fake.addUser(ANNA, 'anna@example.org', { password: 'password-lunga-di-prova' });
+fake.addUser(LUCA, 'luca@example.org', { password: 'password-di-luca-lunga' });
 fake.state.rpc.v36_my_storage_used = () => 0;
-fake.seed('profiles', [{ id: ANNA, email: 'anna@example.org', reminders_enabled: true, reminder_emails: true }]);
+fake.seed('profiles', [{ id: ANNA, email: 'anna@example.org', reminders_enabled: true, reminder_emails: true }, { id: LUCA, email: 'luca@example.org', reminders_enabled: true }]);
 fake.seed('bills', [
   { id: BILL_LUCE, user_id: ANNA, home_id: null, title: 'Luce di casa', supplier: 'Enel', category: 'Luce', amount: 84.5, due_date: '2026-12-15', paid_at: null, is_estimate: false, created_at: '2026-11-01T10:00:00Z' },
   { id: BILL_GAS, user_id: ANNA, home_id: null, title: 'Gas di casa', supplier: 'Eni', category: 'Gas', amount: 61.2, due_date: '2026-12-20', paid_at: null, is_estimate: false, created_at: '2026-11-02T10:00:00Z' },
@@ -107,8 +109,11 @@ try {
   check(/backup di Casa in Ordine/i.test(await toast()), 'uno .zip che non è un backup viene segnalato');
 
   // 7. Accessibilità con accesso.
-  await page.addScriptTag({ path: 'node_modules/axe-core/axe.min.js' });
-  const axe = () => page.evaluate(async () => (await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] } })).violations.map(v => `${v.id}:${v.nodes.length}`));
+  // axe si carica di nuovo se la pagina è stata ricaricata (uscita e nuovo accesso).
+  const axe = async () => {
+    if (!(await page.evaluate(() => Boolean(window.axe)))) await page.addScriptTag({ path: 'node_modules/axe-core/axe.min.js' });
+    return page.evaluate(async () => (await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] } })).violations.map(v => `${v.id}:${v.nodes.length}`));
+  };
   const violations = await axe();
   check(violations.length === 0, `nessuna violazione WCAG in «Notifiche e backup» con accesso ${violations.join(' ')}`);
 
@@ -124,12 +129,62 @@ try {
   check(settingsViolations.length === 0, `nessuna violazione WCAG in «Impostazioni» con accesso ${settingsViolations.join(' ')}`);
 
   // 8. Uscita.
-  await page.getByRole('button', { name: 'Esci', exact: true }).first().click();
-  check(await page.locator('input[type=password]').waitFor({ timeout: 10000 }).then(() => true, () => false), 'dopo l\'uscita torna la schermata di accesso');
+  const login = async (email, password) => {
+    await page.locator('input[type=email]').fill(email);
+    await page.locator('input[type=password]').fill(password);
+    await page.locator('.auth-card form button.btn-primary').click();
+    return page.locator('nav .nav-group-head').first().waitFor({ timeout: 20000 }).then(() => true, () => false);
+  };
+  const logout = async () => { await page.getByRole('button', { name: 'Esci', exact: true }).first().click(); return page.locator('input[type=password]').waitFor({ timeout: 10000 }).then(() => true, () => false); };
+  check(await logout(), 'dopo l\'uscita torna la schermata di accesso');
+
+  // 9. Case condivise: Anna crea una casa e invita Luca in sola lettura; Luca accetta dal collegamento.
+  check(await login('anna@example.org', 'password-lunga-di-prova'), 'Anna rientra');
+  await go('Famiglia e inviti');
+  await page.getByLabel('Nome nuova casa').fill('Casa al lago');
+  await page.getByRole('button', { name: 'Crea casa' }).click();
+  await page.waitForTimeout(1500);
+  const lake = fake.rows('homes').find(h => h.name === 'Casa al lago');
+  check(lake?.owner_id === ANNA && fake.rows('home_members').some(m => m.home_id === lake?.id && m.user_id === ANNA && m.role === 'owner'), 'la casa è creata e Anna ne è proprietaria');
+  fake.seed('bills', [{ id: '20000000-0000-4000-8000-000000000009', user_id: ANNA, home_id: lake?.id, title: 'Acqua della casa al lago', supplier: 'Acquedotto', category: 'Acqua', amount: 40, due_date: '2026-12-28', paid_at: null, created_at: '2026-11-05T10:00:00Z' }]);
+  await go('Famiglia e inviti');
+  await page.getByLabel('Email della persona invitata').fill('luca@example.org');
+  await page.getByLabel('Permesso').selectOption('viewer');
+  await page.getByRole('button', { name: 'Genera invito' }).click();
+  const inviteUrl = await page.locator('.hub-invite-url code').innerText({ timeout: 10000 }).catch(() => '');
+  check(/\/\?invite=[a-f0-9]{64}$/.test(inviteUrl), 'l\'invito produce un collegamento con il codice');
+  check(fake.rows('home_invites').some(i => i.email === 'luca@example.org' && i.role === 'viewer' && !('token' in i)), 'nel database c\'è l\'invito, solo con l\'impronta del codice');
+  check(await logout(), 'Anna esce');
+
+  await page.goto(`${BASE}/?invite=${inviteUrl.split('invite=')[1] || ''}`, { waitUntil: 'networkidle' });
+  check(await login('luca@example.org', 'password-di-luca-lunga'), 'Luca entra dal collegamento dell\'invito');
+  await go('Famiglia e inviti');
+  check((await page.getByLabel('Codice invito (dal collegamento ricevuto)').inputValue()) === (inviteUrl.split('invite=')[1] || 'x'), 'il codice dell\'invito è già compilato');
+  await page.getByRole('button', { name: 'Accetta invito' }).click();
+  await page.waitForTimeout(1500);
+  check(fake.rows('home_members').some(m => m.home_id === lake?.id && m.user_id === LUCA && m.role === 'viewer'), 'Luca è membro della casa, in sola lettura');
+  check(/sola lettura a questa casa/.test(await page.locator('main').innerText()), 'l\'app dice a Luca che la casa è in sola lettura');
+  await go('Bollette');
+  const lucaBills = await page.locator('main').innerText();
+  check(/Acqua della casa al lago/.test(lucaBills), 'Luca vede le bollette della casa');
+  check(!/Luce di casa|Gas di casa/.test(lucaBills), 'e non quelle personali di Anna');
+  await page.getByRole('button', { name: 'Aggiungi bolletta' }).first().click();
+  await page.waitForTimeout(500);
+  check(/sola lettura/.test(await toast()) && await page.locator('.modal').count() === 0, 'chi legge non può aggiungere bollette');
+  await go('Famiglia e inviti');
+  await page.getByRole('button', { name: 'Spazio personale', exact: true }).click();
+  await page.waitForTimeout(800);
+  await go('Bollette');
+  const personal = await page.locator('main').innerText();
+  check(!/Acqua della casa al lago|Luce di casa/.test(personal), 'nello spazio personale di Luca non c\'è niente della casa né di Anna');
+  await go('Famiglia e inviti');
+  const hubViolations = await axe();
+  check(hubViolations.length === 0, `nessuna violazione WCAG in «Famiglia e inviti» ${hubViolations.join(' ')}`);
+  check(await logout(), 'Luca esce');
   check(errors.length === 0, `nessun errore JavaScript${errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''}`);
 } finally {
   await browser.close();
   await fake.close();
 }
 if (failures.length) { console.error(`\nProve con accesso: ${failures.length} non superate.`); process.exit(1); }
-console.log('\nProve con accesso: tutte superate (accesso, dati, backup JSON e .zip, ripristino, file sbagliati, stato della configurazione, accessibilità, uscita).');
+console.log('\nProve con accesso: tutte superate (accesso, dati, backup JSON e .zip, ripristino, file sbagliati, stato della configurazione, case condivise e inviti, accessibilità, uscita).');
