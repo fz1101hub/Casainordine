@@ -9,10 +9,9 @@ import {
 } from 'lucide-react';
 import { db } from '../lib/supabase-browser';
 import { addDaysISO, nextRecurringDue, todayRome, normalizeDate, euro } from '../lib/dates.mjs';
-import { parseBillsCsv } from '../lib/csv.mjs';
 import { BILL_CATEGORIES } from '../lib/bill-categories.mjs';
-import { parseRatePlanText, rateItemsWithKeys } from '../lib/rate-plan.mjs';
-import { extractBillFields, billTitle } from '../lib/document-import.mjs';
+// Lettura di CSV, piani rate e documenti: moduli scaricati solo quando servono (import()).
+import { billTitle } from '../lib/bill-title.mjs';
 import { ForgotPasswordButton, PasswordRecoveryDialog, DeleteAccountPanel } from './AccountSecurity';
 import { MIN_PASSWORD_LENGTH, passwordTooShort, markPasswordUpgrade, clearPasswordUpgrade, needsPasswordUpgrade } from '../lib/password-policy.mjs';
 import { MENU_TOP, MENU_GROUPS, MENU_BOTTOM, toggleGroup, withPageGroup, readOpenGroups, saveOpenGroups } from '../lib/menu-groups.mjs';
@@ -20,7 +19,6 @@ import PersonalizedHome from './PersonalizedHome';
 import {useLanguage,LanguageSelector} from './LanguageProvider';
 import {useLocalizedTitle} from './LocalizedTitle';
 import UniversalSearch from './UniversalSearch';
-import { billFraudSignals } from '../lib/v20-core.mjs';
 import {localizeMainDemo} from '../lib/v32-demo-fixture-labels.mjs';
 import { friendlyError, apiErrorText, apiText, authErrorKey, shownError } from '../lib/friendly-error.mjs';
 import { memberName } from '../lib/member-names.mjs';
@@ -350,6 +348,7 @@ export default function Page() {
         const {data:past,error:pastErr}=await client.from('bill_security_reviews').select('bill_id,iban_fingerprint,review_status').eq('review_status','reviewed');
         if(pastErr)throw pastErr;
         const trusted=(past||[]).filter(x=>data.bills.some(b=>b.id===x.bill_id&&b.supplier===item.supplier)).map(x=>x.iban_fingerprint).filter(Boolean);
+        const {billFraudSignals}=await import('../lib/v20-core.mjs');
         const flags=billFraudSignals({...item,id:savedBillId},data.bills,{sender:form.mailSender||'',senderAuth:form.mailSenderAuth||'unknown',ibanFingerprint:ibanHash,historicalIbanFingerprints:trusted}).flags;
         const {error:riskError}=await client.from('bill_security_reviews').insert({user_id:user.id,home_id:activeHomeId,bill_id:savedBillId,iban_fingerprint:ibanHash,iban_suffix:form.ibanCandidate.slice(-4),sender:form.mailSender||'',sender_auth:form.mailSenderAuth||'unknown',risk_flags:flags,review_status:'pending'});
         if(riskError)throw riskError;
@@ -408,7 +407,8 @@ export default function Page() {
     else {const {error}=await client.from('user_suppliers').insert({...item,user_id:user.id});if(error){notify(friendlyError(error,tr));return;}await reload();}
     setSupplierForm({...supplierForm,name:'',sender_email:''});notify(tr('v32.feedback.12'));
   }
-  function prepareRatePlan(text,source,partial=false){
+  async function prepareRatePlan(text,source,partial=false){
+    const {parseRatePlanText}=await import('../lib/rate-plan.mjs');
     const result=parseRatePlanText(text,{unitFilter:rateUnit,t:tr});
     if(!result.rows.length){notify(tr('v32.flow.noRates'));return;}
     setRatePlan({rows:result.rows,warnings:[...result.warnings,...(partial?[tr('import.pdfTruncated')]:[])],source});
@@ -417,6 +417,7 @@ export default function Page() {
   async function importBillFromText(){
     if(billPaste.trim().length<25){notify(tr('v32.feedback.13'));return;}
     if(billPaste.length>60000){notify(tr('v32.feedback.14'));return;}
+    const {extractBillFields}=await import('../lib/document-import.mjs');
     const details=extractBillFields(billPaste);
     const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(billPaste));
     const fingerprint=Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
@@ -444,6 +445,7 @@ export default function Page() {
     // A rate is identified by supplier + date + amount, plus its position among rates with the same
     // date and amount (e.g. 'Rata 1 ordinaria' and 'Rata 1 straordinaria'): both are saved, and
     // importing the same plan again stays idempotent.
+    const {rateItemsWithKeys}=await import('../lib/rate-plan.mjs');
     const items=rateItemsWithKeys(selected,supplier);
     setBusy(true);
     try{
@@ -468,6 +470,7 @@ export default function Page() {
     if(!canWrite)return notify(tr('v32.feedback.3'));
     const file=event.target.files?.[0];if(!file)return;
     try {
+      const {parseBillsCsv}=await import('../lib/csv.mjs');
       const text=await file.text(),parsed=parseBillsCsv(text),errors=parsed.errors.map(e=>tr(e.key,e.params));
       // Categorie scritte nella lingua dell'app («Electricity», «Strom»…) → codice; il titolo mancante si propone.
       const bills=parsed.bills.map(b=>{const category=categoryCode(b.category);return {...b,category,title:b.title||billTitle(tr,{category,supplier:b.supplier})};});
