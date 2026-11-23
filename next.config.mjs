@@ -41,8 +41,17 @@ const securityHeaders = [
   { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },
 ];
 
+// Nel browser niente Realtime, Edge Functions e bucket analytics di Supabase: l'app non li usa e
+// supabase-js li porterebbe comunque nella prima pagina (lib/browser-stubs/, test app-leggera).
+const browserStubs = {
+  '@supabase/realtime-js': { browser: './lib/browser-stubs/realtime.mjs' },
+  '@supabase/functions-js': { browser: './lib/browser-stubs/functions.mjs' },
+  'iceberg-js': { browser: './lib/browser-stubs/iceberg.mjs' },
+};
+
 export default {
   reactStrictMode: true,
+  turbopack: { resolveAlias: browserStubs },
   poweredByHeader: false,
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
