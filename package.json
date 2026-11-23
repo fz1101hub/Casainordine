@@ -22,7 +22,7 @@
     "@tesseract.js-data/eng": "1.0.0",
     "@tesseract.js-data/ita": "1.0.0",
     "imapflow": "^1.7.8",
-    "lucide-react": "^0.468.0",
+    "lucide-react": "^1.77.0",
     "mailparser": "^3.9.12",
     "next": "^15.5.0",
     "pdfjs-dist": "^6.4.299",
