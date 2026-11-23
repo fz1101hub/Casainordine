@@ -487,3 +487,21 @@
 .sidebar .nav>.nav-item,.sidebar .nav>.nav-group,.nav-group-items>.nav-item{flex-shrink:0}
 /* Sul telefono e sugli schermi bassi il riquadro informativo lascia lo spazio al menu. */
 @media(max-width:900px),(max-height:960px){.sidebar-info{display:none}}
+/* Accessibilità (controllo del 23 novembre).
+   WCAG 1.4.11, contrasto dei componenti: bordo dei campi e interruttori spenti almeno 3:1 sullo
+   sfondo (prima 1,2–1,4:1, quasi invisibili). Vale per tutti i campi dell'app. */
+:root{--field-border:#7a9088}
+input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=color]),select,textarea,.searchbox{border-color:var(--field-border)!important}
+.toggle{box-shadow:inset 0 0 0 1px var(--field-border)}
+.toggle.on{box-shadow:none}
+/* WCAG 1.4.10, riflusso: a 320 px niente scorrimento in orizzontale. Nella barra in alto resta
+   solo il nome della pagina, accorciato se serve. */
+@media(max-width:420px){
+ .crumb{min-width:0;overflow:hidden}
+ .crumb>span,.crumb>svg{display:none}
+ .crumb b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .topbar-right{gap:6px}
+ .house-switch{max-width:84px}
+}
+/* Bersaglio del pulsante «Ripristina» della demo: almeno 24 px. */
+.demo-banner button{min-height:24px;padding:4px 6px}

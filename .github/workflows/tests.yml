@@ -42,3 +42,6 @@ jobs:
       - name: Lingue (nessun testo rimasto in italiano nella versione inglese)
         timeout-minutes: 6
         run: node scripts/check-languages.mjs http://localhost:3000
+      - name: Accessibilità (WCAG 2.1 A/AA, riflusso a 320 px, contrasto dei campi)
+        timeout-minutes: 6
+        run: node scripts/check-accessibility.mjs http://localhost:3000

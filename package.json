@@ -13,7 +13,8 @@
     "postinstall": "node scripts/copy-pdf-worker.mjs && node scripts/build-i18n.mjs",
     "test:browser": "node scripts/smoke-browser.mjs",
     "i18n:build": "node scripts/build-i18n.mjs",
-    "test:languages": "node scripts/check-languages.mjs"
+    "test:languages": "node scripts/check-languages.mjs",
+    "test:accessibility": "node scripts/check-accessibility.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "5.3.0",
@@ -33,6 +34,7 @@
     "web-push": "^4.0.0"
   },
   "devDependencies": {
+    "axe-core": "^4.14.1",
     "playwright": "1.63.0"
   },
   "overrides": {
