@@ -520,19 +520,21 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):
 .config-item code{font-size:11.5px;background:#f3f6f3;padding:1px 5px;border-radius:5px;overflow-wrap:anywhere}.config-note{margin:12px 0 0;font-size:12px}
 .config-item .config-level{font-weight:600;color:var(--muted);font-size:11.5px}
 
-/* Schermi (scripts/prove-schermi-accesso.mjs): testo di almeno 12 px su ogni schermo; sul telefono
-   anche comandi di almeno 24 px. Le regole elencate qui sotto avevano testo da 9 a 11,9 px. */
+/* Schermi (scripts/prove-schermi-accesso.mjs): testo di almeno 12 px e comandi di almeno 24 px
+   su ogni schermo. Le regole elencate qui sotto avevano testo da 9 a 11,9 px. */
 .profile-copy b,.profile-copy small,.overdue-notice button,.text-link,.quick-panel .btn,.bills-table td,.table-identity b,.utility-detail,.utility-detail strong,.token-box label,.demo-banner,.modal-form label,.auth-card label,.auth-decoration>p:first-of-type,.page-heading p,.stat-top,.stat-card small,.mini-bill-info b,.bell-entry p strong,.document-review-head small,.document-review ul,.document-card .document-privacy,.mail-provider-label,.hub-item small,.hub-invite-url code,.hub-fieldset legend,.extra-field,.extra-item small,.extra-pill,.home3-card-link,.testdrive-brand small,.testdrive-footer,.testdrive-navigation button,.testdrive-seed-content small,.language-picker small,.search-scope,.search-results h3,.search-result small,.automation-sim,.automation-notify legend,.seasonal-features legend,.project-tiles small,.project-photos>div>small,.replacement-tiles small+small,.control-card>p,.nav-group-head,.config-item code,.config-item .config-level{font-size:12px}
 small{font-size:max(12px,.8333em)}
 .searchbox:focus-within{outline:2px solid var(--green);outline-offset:1px}
 .searchbox input{align-self:stretch;min-height:38px}
 .searchbox input::placeholder{color:var(--muted)}
-@media(max-width:650px){
-/* !important: alcune sezioni fissano caselle più piccole con regole più specifiche. */
+/* Comandi di almeno 24 × 24 px su ogni schermo (WCAG 2.5.8); prima solo sul telefono.
+   !important: alcune sezioni fissano caselle più piccole con regole più specifiche. */
 input[type=checkbox],input[type=radio]{width:24px!important;height:24px!important;flex:0 0 24px!important}
 summary{min-height:24px;padding-block:3px}
 .text-link,.auth-switch button{min-height:24px}
 .task-check{width:24px;height:24px}
+select{min-height:24px}
+@media(max-width:650px){
 .house-switch{max-width:100px;padding:8px 5px}
 .mail-heading>div:nth-child(2){flex:1 1 200px}
 }

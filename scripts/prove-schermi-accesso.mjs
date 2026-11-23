@@ -1,10 +1,10 @@
 // Telefono e computer con accesso (scelte dell'utente, 23 novembre 2026), contro il Supabase finto
 // (vedi scripts/prove-con-accesso.mjs). Due schermi: telefono da 360 px con il tocco e computer da
 // 1360 px. Per l'accesso e per ogni voce del menu, nello spazio personale e nella casa condivisa,
-// controlla che la pagina non scorra di lato, che il testo sia di almeno 12 px e non sia
-// schiacciato in una colonna sottile, e che le finestre stiano nello schermo. Sul telefono anche:
-// pulsanti, campi e caselle di almeno 24 × 24 px (WCAG 2.5.8), testo dei campi di almeno 16 px
-// (sotto, l'iPhone ingrandisce la pagina) e menu che si apre e si chiude.
+// controlla che la pagina non scorra di lato, che pulsanti, campi e caselle misurino almeno
+// 24 × 24 px (WCAG 2.5.8), che il testo sia di almeno 12 px e non sia schiacciato in una colonna
+// sottile, e che le finestre stiano nello schermo. Sul telefono anche: testo dei campi di almeno
+// 16 px (sotto, l'iPhone ingrandisce la pagina) e menu che si apre e si chiude.
 // Uso: node scripts/prove-schermi-accesso.mjs [indirizzo dell'app]
 import { BASE, checker, startScenario, openPage, launch } from './accesso-comune.mjs';
 
@@ -124,8 +124,7 @@ async function screen(browser, { label, width, height, device = {}, phone }) {
   await page.keyboard.press('Escape');
 
   report('wide', 'nessuna pagina scorre di lato e niente esce dallo schermo');
-  // Sul computer si usano mouse e tastiera: la misura dei comandi si controlla solo sul telefono.
-  if (phone) report('small', 'pulsanti, campi e caselle di almeno 24 × 24 px');
+  report('small', 'pulsanti, campi e caselle di almeno 24 × 24 px');
   report('tiny', 'testo di almeno 12 px');
   report('narrow', 'nessun testo lungo schiacciato in una colonna sotto i 110 px');
   if (phone) report('fields', 'testo dei campi di almeno 16 px (niente ingrandimento automatico sull\'iPhone)');
