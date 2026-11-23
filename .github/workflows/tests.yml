@@ -52,9 +52,10 @@ jobs:
   accesso:
     # L'app con accesso: compilata per un Supabase finto (tests/helpers/fake-supabase.mjs) e provata
     # nel browser con il client Supabase vero: accesso, dati, backup JSON e .zip, ripristino,
-    # file sbagliati, accessibilità e uscita. La prova del lavoro «test» gira invece in demo.
+    # file sbagliati, accessibilità e uscita; poi ruoli, lingue, bozze offline e telefono.
+    # La prova del lavoro «test» gira invece in demo.
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     env:
       NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
       NEXT_PUBLIC_SUPABASE_ANON_KEY: chiave-pubblica-finta
@@ -75,12 +76,25 @@ jobs:
         run: |
           npx playwright install chromium
           node -e "require('playwright').chromium.launch().then(b=>b.close())" || npx playwright install-deps chromium
-      - name: Prova con accesso (accesso, dati, backup, ripristino, uscita)
-        timeout-minutes: 6
+      - name: Avvia l'app
         run: |
           npm start -- -p 3000 > next.log 2>&1 &
           for i in $(seq 1 60); do curl -sf -o /dev/null http://localhost:3000/ && break; sleep 1; done
-          node scripts/prove-con-accesso.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
+      - name: Prova con accesso (accesso, dati, backup, ripristino, uscita)
+        timeout-minutes: 6
+        run: node scripts/prove-con-accesso.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
+      - name: Ruoli nelle case condivise (proprietario, modifica, sola lettura)
+        timeout-minutes: 5
+        run: node scripts/prove-ruoli.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
+      - name: Lingue con accesso (italiano e inglese)
+        timeout-minutes: 8
+        run: node scripts/prove-lingue-accesso.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
+      - name: Bozze offline con accesso
+        timeout-minutes: 4
+        run: node scripts/prove-offline-accesso.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
+      - name: Telefono con accesso (360 px)
+        timeout-minutes: 6
+        run: node scripts/prove-telefono-accesso.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
 
   database:
     # Migrazioni e prove del database su PostgreSQL 17 (la versione di Supabase), con un
