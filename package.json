@@ -14,7 +14,8 @@
     "test:browser": "node scripts/smoke-browser.mjs",
     "i18n:build": "node scripts/build-i18n.mjs",
     "test:languages": "node scripts/check-languages.mjs",
-    "test:accessibility": "node scripts/check-accessibility.mjs"
+    "test:accessibility": "node scripts/check-accessibility.mjs",
+    "test:sections": "node scripts/prove-sezioni.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "5.3.0",
