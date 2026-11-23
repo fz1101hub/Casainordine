@@ -1,5 +1,6 @@
 import { getAdmin, json, scheduledCallAuthorized, publicAppUrl } from '../../../lib/server.mjs';
 import { isHomeMember } from '../../../lib/home-access.mjs';
+import { reminderEmailRecipients, wantsReminderEmail } from '../../../lib/reminder-recipients.mjs';
 import { addDaysISO, nextRecurringDue, todayRome, euro } from '../../../lib/dates.mjs';
 import { reminderWindow, daysUntil, firstRecurringFrom } from '../../../lib/reminder-window.mjs';
 import { shouldSendSummary, monthEndISO, upcomingSummaryBills } from '../../../lib/summary-schedule.mjs';
@@ -42,6 +43,40 @@ async function emailSummary(recipient,bills,today,language='it',appUrl=publicApp
   const body=await response.json().catch(()=>({}));
   if(!response.ok)throw new Error(String(body.message||`Email HTTP ${response.status}`).slice(0,160));
   return {sent:true};
+}
+
+// Email del promemoria a ogni destinatario (lib/reminder-recipients.mjs), una sola volta per
+// bolletta e persona: la riga di reminder_email_log si scrive prima dell'invio.
+async function emailReminderForBill(admin,bill,today,appUrl,counts){
+  if(!process.env.RESEND_API_KEY||!process.env.RESEND_FROM)return;
+  let members=[];
+  if(bill.home_id){
+    const {data,error}=await admin.from('home_members').select('user_id,role').eq('home_id',bill.home_id).limit(40);
+    if(error){counts.errors.push(`Membri casa ${bill.home_id}: ${error.message}`);return;}
+    members=data||[];
+  }
+  for(const userId of reminderEmailRecipients(bill,members)){
+    const {data:profile,error:pError}=await admin.from('profiles').select('email,reminders_enabled,reminder_emails').eq('id',userId).maybeSingle();
+    if(pError){counts.errors.push(`Profilo ${userId}: ${pError.message}`);continue;}
+    if(!wantsReminderEmail(profile))continue;
+    const {data:slot,error:logErr}=await admin.from('reminder_email_log').upsert({bill_id:bill.id,user_id:userId,reminder_date:today},
+      {onConflict:'bill_id,user_id',ignoreDuplicates:true}).select('bill_id').maybeSingle();
+    if(logErr){counts.errors.push(`Log email ${bill.id}: ${logErr.message}`);continue;}
+    if(!slot)continue; // già inviata (o in invio) per questa persona
+    try{
+      // La lingua è personale: quella di una casa condivisa non la sostituisce mai.
+      const {data:languagePreference,error:languageError}=await admin.from('user_language_preferences').select('language').eq('user_id',userId).maybeSingle();
+      if(languageError)throw languageError; // meglio nessuna email che una nella lingua sbagliata
+      const res=await emailReminder(profile.email,bill,languagePreference?.language||'it',appUrl);
+      if(res.sent){
+        await admin.from('reminder_email_log').update({sent_at:new Date().toISOString(),error:null}).eq('bill_id',bill.id).eq('user_id',userId);
+        counts.emails_sent++;
+      }
+    }catch(e){
+      await admin.from('reminder_email_log').update({error:String(e.message).slice(0,150)}).eq('bill_id',bill.id).eq('user_id',userId);
+      counts.errors.push(`Invio email ${bill.id} non riuscito`);
+    }
+  }
 }
 
 async function notifyPushForBill(admin,bill,today,counts){
@@ -138,34 +173,22 @@ export async function GET(request) {
     for (const bill of bills || []) {
       if (alreadyReminded.has(bill.id)) continue;
       await notifyPushForBill(admin,bill,today,counts);
-      const {data:profile,error:pError} = await admin.from('profiles').select('email,reminders_enabled').eq('id',bill.user_id).maybeSingle();
-      if (pError || !profile?.reminders_enabled) continue;
-      // Chi ha creato la bolletta di una casa e poi ne è uscito non riceve più l'email.
-      if (bill.home_id) {
+      // Promemoria nell'app, per chi ha inserito la bolletta (se l'ha lasciato acceso ed è ancora
+      // nella casa). Una riga per bolletta e giorno: il secondo giro del cron non la ripete.
+      const {data:profile,error:pError} = await admin.from('profiles').select('reminders_enabled').eq('id',bill.user_id).maybeSingle();
+      let creatorActive = !pError && !!profile?.reminders_enabled;
+      if (creatorActive && bill.home_id) {
         const member = await isHomeMember(admin,bill.home_id,bill.user_id).catch(e=>{counts.errors.push(`Membri casa ${bill.home_id}: ${String(e.message).slice(0,80)}`);return null;});
-        if (!member) continue;
+        creatorActive = !!member;
       }
-      const {data:reminder,error:remErr} = await admin.from('reminders').upsert({
-        user_id:bill.user_id,bill_id:bill.id,reminder_date:today
-      },{onConflict:'bill_id,reminder_date',ignoreDuplicates:true}).select('id,email_sent_at').maybeSingle();
-      if (remErr) {counts.errors.push(`Promemoria ${bill.id}: ${remErr.message}`);continue;}
-      if (!reminder) continue; // already exists: no duplicate notification
-      counts.notifications_created++;
-      if (profile.email) {
-        try {
-          // Language is personal; a shared home's language must never override it.
-          const {data:languagePreference,error:languageError}=await admin.from('user_language_preferences').select('language').eq('user_id',bill.user_id).maybeSingle();
-          if(languageError)throw languageError; // fail closed rather than silently send the wrong language
-          const res = await emailReminder(profile.email,bill,languagePreference?.language||'it',appUrl);
-          if (res.sent) {
-            await admin.from('reminders').update({email_sent_at:new Date().toISOString(),email_error:null}).eq('id',reminder.id);
-            counts.emails_sent++;
-          }
-        } catch(e) {
-          await admin.from('reminders').update({email_error:String(e.message).slice(0,150)}).eq('id',reminder.id);
-          counts.errors.push(`Invio email ${bill.id} non riuscito`);
-        }
+      if (creatorActive) {
+        const {data:reminder,error:remErr} = await admin.from('reminders').upsert({
+          user_id:bill.user_id,bill_id:bill.id,reminder_date:today
+        },{onConflict:'bill_id,reminder_date',ignoreDuplicates:true}).select('id').maybeSingle();
+        if (remErr) counts.errors.push(`Promemoria ${bill.id}: ${remErr.message}`);
+        else if (reminder) counts.notifications_created++;
       }
+      await emailReminderForBill(admin,bill,today,appUrl,counts);
     }
     // A monthly list is independent of daily mailbox scans and the fixed T-3 reminder.
     const {data:profiles,error:summaryProfileError}=await admin.from('profiles').select('id,email,summary_frequency,summary_weekday,summary_month_day').neq('summary_frequency','off').limit(1000);
