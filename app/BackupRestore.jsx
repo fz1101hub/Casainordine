@@ -3,13 +3,17 @@ import { useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { useLanguage } from './LanguageProvider';
 import { friendlyError } from '../lib/friendly-error.mjs';
-import { readBackup, restorePlan, existingCounts, previewBySection, runRestore, restoreTotals, RestoreFileError } from '../lib/backup-restore.mjs';
+import { readBackup, restorePlan, existingCounts, existingDocumentIds, previewBySection, runRestore, restoreTotals, RestoreFileError } from '../lib/backup-restore.mjs';
 
 const MAX_BYTES = 20 * 1024 * 1024;
+// Backup .zip con i file (lib/backup-files.mjs, caricato solo quando serve): si legge tutto in memoria.
+const MAX_ZIP_BYTES = 400 * 1024 * 1024;
+const looksLikeZip = file => /\.zip$/i.test(file.name || '') || /zip/.test(file.type || '');
 const REASONS = ['files', 'twoParties', 'otherPeople', 'appOnly', 'settings', 'unknown'];
 
-// «Ripristina da backup» in Notifiche e backup: legge il file, mostra cosa contiene e quante voci
-// ci sono già, poi aggiunge solo ciò che manca nello spazio attivo (lib/backup-restore.mjs).
+// «Ripristina da backup» in Notifiche e backup: legge il file (.json, o .zip con i documenti), mostra
+// cosa contiene e quante voci ci sono già, poi aggiunge solo ciò che manca nello spazio attivo
+// (lib/backup-restore.mjs).
 export default function BackupRestore({ client, user, homeId, canWrite, onNotify = () => {}, onRefresh = () => {} }) {
   const { t: tr, date: localDate } = useLanguage();
   const [state, setState] = useState({ stage: 'idle' });
@@ -19,11 +23,18 @@ export default function BackupRestore({ client, user, homeId, canWrite, onNotify
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file || busy) return;
-    if (file.size > MAX_BYTES) { onNotify(tr('extra.restore.error.tooBig')); return; }
+    const zip = looksLikeZip(file);
+    if (file.size > (zip ? MAX_ZIP_BYTES : MAX_BYTES)) { onNotify(tr(zip ? 'extra.restore.error.tooBigZip' : 'extra.restore.error.tooBig')); return; }
     setState({ stage: 'reading' });
     try {
-      const backup = readBackup(await file.text());
-      const plan = restorePlan(backup, { homeId: homeId || null, userId: user?.id });
+      let backup;
+      if (zip) {
+        const { readBackupBytes } = await import('../lib/backup-files.mjs');
+        const { text, files } = readBackupBytes(new Uint8Array(await file.arrayBuffer()));
+        backup = { ...readBackup(text), files };
+      } else backup = readBackup(await file.text());
+      const target = { homeId: homeId || null, userId: user?.id };
+      const plan = restorePlan(backup, target, { existingDocuments: await existingDocumentIds(client, backup, target) });
       if (!plan.steps.length) { setState({ stage: 'idle' }); onNotify(tr('extra.restore.nothing')); return; }
       const existing = await existingCounts(client, plan);
       setState({ stage: 'preview', backup, plan, rows: previewBySection(plan, existing), otherSpace: plan.copy });
@@ -38,7 +49,7 @@ export default function BackupRestore({ client, user, homeId, canWrite, onNotify
     setState(s => ({ ...s, stage: 'running', done: 0, total: plan.steps.length }));
     try {
       const result = await runRestore(client, plan, { onProgress: p => setState(s => ({ ...s, done: p.done })) });
-      setState(s => ({ ...s, stage: 'done', totals: restoreTotals(result) }));
+      setState(s => ({ ...s, stage: 'done', totals: restoreTotals(result), quotaFull: Boolean(result.home_documents?.quotaFull) }));
       onRefresh();
     } catch (e) {
       setState(s => ({ ...s, stage: 'preview' }));
@@ -51,7 +62,7 @@ export default function BackupRestore({ client, user, homeId, canWrite, onNotify
   return <div className="restore-box">
     <label className={`btn btn-soft upload-label${!canWrite || busy ? ' disabled' : ''}`}>
       <RotateCcw size={15} aria-hidden="true" /> {tr(state.stage === 'reading' ? 'extra.restore.reading' : 'extra.restore.button')}
-      <input type="file" accept="application/json,.json" hidden disabled={!canWrite || busy} onChange={choose} />
+      <input type="file" accept="application/json,.json,application/zip,.zip" hidden disabled={!canWrite || busy} onChange={choose} />
     </label>
     {!canWrite && <small>{tr('extra.restore.readOnly')}</small>}
     {(state.stage === 'preview' || state.stage === 'running' || state.stage === 'done') && <section className="restore-preview" aria-labelledby="restore-title">
@@ -67,6 +78,7 @@ export default function BackupRestore({ client, user, homeId, canWrite, onNotify
       </div>}
       {state.stage === 'running' && <p role="status">{tr('extra.restore.running', { done: state.done, total: state.total })}</p>}
       {state.stage === 'done' && <><p role="status"><b>{tr('extra.restore.done', state.totals)}</b></p>
+        {state.quotaFull && <p className="extra-alert">{tr('extra.restore.quotaFull')}</p>}
         <button type="button" className="btn btn-soft" onClick={() => setState({ stage: 'idle' })}>{tr('extra.restore.close')}</button></>}
     </section>}
   </div>;
