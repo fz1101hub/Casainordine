@@ -1,7 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
 const sql=readFileSync(new URL('../supabase/migrate_v19.sql',import.meta.url),'utf8');
 const extra=readFileSync(new URL('../app/HomeExtra.jsx',import.meta.url),'utf8');
-const cron=readFileSync(new URL('../app/api/cron/route.js',import.meta.url),'utf8');
+// Il corpo del cron è in lib/daily-jobs.mjs (app/api/cron/route.js controlla solo chi chiama).
+const cron=readFileSync(new URL('../lib/daily-jobs.mjs',import.meta.url),'utf8');
 test('all new private/shared modules use row-level security and same permissions',()=>{
  for(const name of ['home_properties','home_documents','meter_readings','meter_reminders','maintenance_assets','maintenance_events','payment_receipts','home_contracts'])assert.ok(sql.includes(`'${name}'`),name);
  assert.match(sql,/public\.v19_can_read\(user_id,home_id\)/);assert.match(sql,/public\.v19_can_edit\(user_id,home_id\)/);
@@ -18,7 +19,7 @@ test('receipts cannot mark paid from client directly',()=>{
  assert.match(extra,/client\.rpc\('confirm_payment_receipt'/);
 });
 test('cron includes home alerts as separate job within existing schedule',()=>{
- assert.match(cron,/processExtraAlerts\(admin,today,counts/);assert.match(cron,/pushAllowed\(pref,'bill'\)/);
+ assert.match(cron,/processExtraAlerts\(admin,today,counts/);assert.match(cron,/pushAllowed\(pref,'bill',now\)/);
 });
 test('new archive does not export passwords or storage locations',()=>{
  const backup=readFileSync(new URL('../lib/home-insights.mjs',import.meta.url),'utf8');assert.match(backup,/documents:documents\.map\(\(\{storage_path,\.\.\.d\}\)=>d\)/);

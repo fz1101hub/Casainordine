@@ -58,8 +58,8 @@ test('publicAppUrl: APP_URL https, poi l’indirizzo della richiesta, mai localh
 test('Nessun link di ripiego verso http://localhost:3000 nel codice dell’app', () => {
   const found = files('app').filter(file => readFileSync(join(root, file), 'utf8').includes("'http://localhost:3000'"));
   assert.deepEqual(found, []);
-  const cron = readFileSync(join(root, 'app/api/cron/route.js'), 'utf8');
-  assert.match(cron, /const appUrl = publicAppUrl\(request\);/);
+  assert.match(readFileSync(join(root, 'app/api/cron/route.js'), 'utf8'), /runDailyJobs\(admin, \{ appUrl: publicAppUrl\(request\) \}\)/);
+  const cron = readFileSync(join(root, 'lib/daily-jobs.mjs'), 'utf8');
   assert.match(cron, /processBillReminders\(admin,[^;]*\{today,appUrl,counts,/);
   assert.match(readFileSync(join(root, 'lib/reminder-run.mjs'), 'utf8'), /email\.send\(w\.address, w\.bill, languageOf\(w\.userId\), appUrl\)/);
   assert.match(cron, /processSummaries\(admin,[^;]*\{today,appUrl,counts,/);

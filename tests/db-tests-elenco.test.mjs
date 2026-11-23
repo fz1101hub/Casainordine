@@ -8,8 +8,8 @@ const script = readFileSync(new URL('../scripts/db-tests.sh', import.meta.url), 
 const list = script.match(/MIGRATIONS=\(([\s\S]*?)\)/)[1].split(/\s+/).filter(Boolean);
 const files = readdirSync(new URL('../supabase/', import.meta.url));
 
-test('ogni migrazione dalla v19 in poi è nelle prove del database (tranne la v35, che richiede pg_cron)', () => {
-  const versioned = files.filter(f => /^migrate_v(\d+)/.test(f) && Number(f.match(/^migrate_v(\d+)/)[1]) >= 19 && !f.startsWith('migrate_v35_'));
+test('ogni migrazione dalla v19 in poi è nelle prove del database (tranne i job di Supabase Cron, che richiedono pg_cron)', () => {
+  const versioned = files.filter(f => /^migrate_v(\d+)/.test(f) && Number(f.match(/^migrate_v(\d+)/)[1]) >= 19 && !/^migrate_v\d+_cron/.test(f));
   for (const f of versioned) assert.ok(list.includes(f), `${f} manca in scripts/db-tests.sh`);
   for (const f of list) assert.ok(files.includes(f), `${f} non esiste in supabase/`);
 });

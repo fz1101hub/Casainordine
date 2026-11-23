@@ -35,7 +35,7 @@ test('Notifica push: oggi, domani, tra N giorni nelle sei lingue',()=>{
   assert.throws(()=>billDuePushCopy({name:'Luce',days:1.5}),/days/);
 });
 test('Cron: finestra, un solo promemoria per bolletta e persona, niente stime passate',()=>{
-  const s=source('app/api/cron/route.js');
+  const s=source('lib/daily-jobs.mjs');
   assert.match(s,/\.gte\('due_date',reminderRange\.from\)\.lte\('due_date',reminderRange\.to\)\.is\('paid_at',null\)/);
   assert.doesNotMatch(s,/\.eq\('due_date',target\)/);
   assert.match(s,/readIn\(admin,'reminders','bill_id','bill_id',\(bills\|\|\[\]\)\.map\(b=>b\.id\),q=>q\.neq\('reminder_date',today\)\)/);

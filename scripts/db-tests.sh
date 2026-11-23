@@ -11,7 +11,8 @@
 #   - una prova finisce con «NO» (colonna «falliti» diversa da 0).
 #
 # Uso: PGHOST=... PGPORT=... PGUSER=postgres [PGPASSWORD=...] scripts/db-tests.sh
-# migrate_v35_cron.sql resta fuori: richiede pg_cron e pg_net, che ci sono solo su Supabase.
+# migrate_v35_cron.sql e migrate_v53_cron_push.sql restano fuori: richiedono pg_cron e pg_net,
+# che ci sono solo su Supabase.
 set -u
 export PGOPTIONS="${PGOPTIONS:-} -c client_min_messages=warning"
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -25,7 +26,7 @@ MIGRATIONS=(
   migrate_v41_ex_membri.sql migrate_v42_permessi.sql migrate_v43_automazioni.sql migrate_v44_professionisti.sql
   migrate_v45_stagionale.sql migrate_v46_scorte.sql migrate_v47_progetti.sql migrate_v48_fondo.sql
   migrate_v49_affitti.sql migrate_v50_email_promemoria.sql migrate_v51_sicurezza_funzioni.sql
-  migrate_v52_ripristino_scadenze.sql
+  migrate_v52_ripristino_scadenze.sql migrate_v53_push_rinviate.sql
 )
 PSQL=(psql -X -q -v ON_ERROR_STOP=0)
 failed=0

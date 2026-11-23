@@ -221,7 +221,7 @@ test('Collegamenti: menu, sezione caricata a richiesta, controllo programmato, p
   const page = read('app/page.jsx');
   assert.match(page, /\{id:'automations',icon:Zap\}/);
   assert.match(page, /const Automations=lazy\(\(\)=>import\('\.\/Automations'\)\);/);
-  assert.match(read('app/api/cron/route.js'), /await processAutomations\(admin,today,counts,\{sendPush,configuredPush\}\);/);
+  assert.match(read('lib/daily-jobs.mjs'), /await processAutomations\(admin,today,counts,\{sendPush,configuredPush:\(\)=>pushOn,now\}\);/);
   assert.match(read('app/HomeExtra.jsx'), /\['push_automations','extra\.alerts\.automations'\]/);
   const ui = read('app/Automations.jsx');
   assert.match(ui, /simulateAutomation\(rule, data, today\)/, 'la prova usa lo stesso calcolo del controllo programmato');
