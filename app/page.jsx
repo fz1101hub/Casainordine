@@ -14,6 +14,7 @@ import { BILL_CATEGORIES } from '../lib/bill-categories.mjs';
 import { parseRatePlanText, rateItemsWithKeys } from '../lib/rate-plan.mjs';
 import { extractBillFields, billTitle } from '../lib/document-import.mjs';
 import { ForgotPasswordButton, PasswordRecoveryDialog, DeleteAccountPanel } from './AccountSecurity';
+import { MIN_PASSWORD_LENGTH, passwordTooShort, markPasswordUpgrade, clearPasswordUpgrade, needsPasswordUpgrade } from '../lib/password-policy.mjs';
 import PersonalizedHome from './PersonalizedHome';
 import {useLanguage,LanguageSelector} from './LanguageProvider';
 import {useLocalizedTitle} from './LocalizedTitle';
@@ -134,10 +135,15 @@ function Auth({client}) {
   const [email,setEmail] = useState(''); const [password,setPassword] = useState('');
   const [error,setError] = useState(''); const [pending,setPending] = useState(false); const [info,setInfo] = useState('');
   async function submit(e) {
-    e.preventDefault(); setError(''); setPending(true);
+    e.preventDefault(); setError('');
+    // Password nuove: almeno 8 caratteri. Chi ne ha già una più corta entra e poi la cambia.
+    if (signup && passwordTooShort(password)) { setError(t('auth.passwordTooShort')); return; }
+    const upgrade = !signup && passwordTooShort(password);
+    if (upgrade) markPasswordUpgrade(sessionStorage, email);
+    setPending(true);
     const {data,error:err} = signup ? await client.auth.signUp({email,password}) : await client.auth.signInWithPassword({email,password});
     setPending(false);
-    if (err) setError(t(authErrorKey(err)));
+    if (err) { if (upgrade) clearPasswordUpgrade(sessionStorage); setError(t(authErrorKey(err))); }
     else if (signup && !data.session) setError(t('auth.confirm'));
   }
   async function google() {
@@ -148,7 +154,7 @@ function Auth({client}) {
   }
   return <div className="auth-wrap"><div className="auth-decoration"><span className="auth-logo"><House size={23}/></span><p>{t('auth.brandLine')}</p><h1>{t('auth.tagline')}</h1><p className="auth-intro">{t('auth.intro')}</p><div className="auth-quote"><Bell size={21}/> {t('auth.reminder')}</div></div>
     <div className="auth-card"><LanguageSelector id="auth-language" className="auth-language" label={true}/><div className="brand auth-mobile"><span className="brand-icon"><House size={22}/></span><b>Casa<span>inOrdine</span></b></div><div className="eyebrow">{t('v32.notifications.authEyebrow')}</div><h2>{t(signup?'auth.signupTitle':'auth.title')}</h2><p className="muted">{t(signup?'auth.signupHelp':'auth.loginHelp')}</p>
-      <form onSubmit={submit}><label>{t('auth.email')}<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder={t('ui.emailPlaceholder')}/></label><label>{t('auth.password')}<input type="password" minLength={6} required value={password} onChange={e=>setPassword(e.target.value)} placeholder={t('auth.passwordHint')}/></label>{!signup&&<ForgotPasswordButton client={client} email={email} t={t} onMessage={message=>{setError('');setInfo(message);}}/>}<button className="btn btn-primary full" disabled={pending}>{t(pending?'auth.signingIn':signup?'auth.signUp':'auth.signIn')}<ChevronRight size={17}/></button></form>
+      <form onSubmit={submit}><label>{t('auth.email')}<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder={t('ui.emailPlaceholder')}/></label><label>{t('auth.password')}<input type="password" minLength={signup?MIN_PASSWORD_LENGTH:undefined} autoComplete={signup?'new-password':'current-password'} required value={password} onChange={e=>setPassword(e.target.value)} placeholder={signup?t('auth.passwordHint'):undefined}/></label>{!signup&&<ForgotPasswordButton client={client} email={email} t={t} onMessage={message=>{setError('');setInfo(message);}}/>}<button className="btn btn-primary full" disabled={pending}>{t(pending?'auth.signingIn':signup?'auth.signUp':'auth.signIn')}<ChevronRight size={17}/></button></form>
       <div className="auth-separator">{t('auth.or')}</div><a className="btn btn-soft full" href="/prova" style={{textDecoration:'none',justifyContent:'center'}}><House size={18}/> {t('auth.demo')}</a><button className="btn btn-soft full" onClick={google}><span className="google-dot">G</span> {t('auth.google')}</button>
       {error&&<p className="auth-error">{error}</p>}{info&&!error&&<p className="auth-info" role="status">{info}</p>}<p className="auth-switch">{t(signup?'auth.hasAccount':'auth.noAccount')} <button onClick={()=>{setSignup(!signup);setError('');}}>{t(signup?'auth.signIn':'auth.signUp')}</button></p><p className="privacy-line"><LockKeyhole size={13}/> {t('auth.privacy')}</p>
     </div></div>;
@@ -254,6 +260,8 @@ export default function Page() {
       if(event==='SIGNED_OUT'){window.location.replace('/');return;}
       // Ritorno dal link 'Password dimenticata?': si chiede subito la nuova password.
       if(event==='PASSWORD_RECOVERY')setRecovery(true);
+      // Accesso con una password più corta della regola attuale: si chiede di sceglierne una nuova.
+      else if(session&&needsPasswordUpgrade(sessionStorage,session.user?.email))setRecovery('upgrade');
       setUser(session?.user||null);
       // Il rinnovo del token (circa ogni ora) non richiede di ricaricare tutto.
       if(session) {if(event!=='TOKEN_REFRESHED')setTimeout(()=>{reloadRef.current();reloadHomesRef.current();},0);} else {setHomes([]);setActiveHomeId(null);setData({bills:[],utilities:[],tasks:[],suppliers:[],summaries:[],profile:null,reminders:[]});}
@@ -694,7 +702,7 @@ export default function Page() {
           <section className="panel settings-panel"><div className="settings-heading"><span className="settings-icon"><LockKeyhole size={20}/></span><div><h2>{tr('settings.privacyHeading')}</h2><p>{tr('settings.privacyHelp')}</p></div></div><div className="setting-row"><div><b>{tr('settings.account')}</b><small>{demo?tr('settings.demoLocal'):user?.email||tr('settings.personalAccount')}</small></div><ShieldCheck size={20} className="subtle-green"/></div><div className="setting-row"><div><b>{tr('settings.sharing')}</b><small>{tr('settings.sharingHelp')}</small></div><button className="btn btn-soft" onClick={()=>changePage('household')}>{tr('settings.manageHomes')}</button></div>{!demo&&<button className="btn btn-soft" onClick={signOut}><LogOut size={17}/> {tr('settings.signout')}</button>}</section></div>{!demo&&user&&<DeleteAccountPanel client={client} user={user} t={tr} onNotify={notify}/>}</>}
       </div>
     </main>
-    {recovery&&<PasswordRecoveryDialog client={client} t={tr} onDone={message=>{setRecovery(false);notify(message);}}/>}
+    {recovery&&<PasswordRecoveryDialog client={client} t={tr} reason={recovery==='upgrade'?'upgrade':'recovery'} onDone={message=>{clearPasswordUpgrade(sessionStorage);setRecovery(false);notify(message);}}/>}
     {capture&&<div className="modal-overlay"><div className="modal capture-modal" role="dialog" aria-modal="true" aria-labelledby="capture-title" tabIndex={-1} ref={dialogRef}>
       <div className="modal-head"><div><div className="eyebrow">{tr('nav.connect')}</div><h2 id="capture-title">{tr('capture.title')}</h2></div><button className="icon-button" onClick={()=>setCapture(null)} aria-label={tr('ui.close')}><X size={20}/></button></div>
       <div className="modal-form"><p className="muted">{tr('capture.intro',{file:capture.file.name})}</p>

@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { KeyRound, Trash2 } from 'lucide-react';
+import { passwordTooShort, MIN_PASSWORD_LENGTH } from '../lib/password-policy.mjs';
 
 // «Password dimenticata?» nella schermata di accesso: manda il link di Supabase per una nuova
 // password, che riporta all'app con l'evento PASSWORD_RECOVERY.
@@ -18,12 +19,13 @@ export function ForgotPasswordButton({ client, email, t, onMessage }) {
   return <button type="button" className="link-button" onClick={send} disabled={pending}>{t('account.forgot')}</button>;
 }
 
-// Finestra per la nuova password dopo il link ricevuto via email.
-export function PasswordRecoveryDialog({ client, t, onDone }) {
+// Finestra per la nuova password: dopo il link ricevuto via email («recovery») oppure dopo un
+// accesso con una password più corta di 8 caratteri («upgrade»).
+export function PasswordRecoveryDialog({ client, t, onDone, reason = 'recovery' }) {
   const [password, setPassword] = useState(''), [pending, setPending] = useState(false), [error, setError] = useState('');
   async function save(e) {
     e.preventDefault(); setError('');
-    if (password.length < 8) { setError(t('account.newPassword')); return; }
+    if (passwordTooShort(password)) { setError(t('account.newPassword')); return; }
     setPending(true);
     try {
       const { error: err } = await client.auth.updateUser({ password });
@@ -37,9 +39,9 @@ export function PasswordRecoveryDialog({ client, t, onDone }) {
     }
   }
   return <div className="modal-overlay"><div className="modal" role="dialog" aria-modal="true" aria-labelledby="recovery-title">
-    <div className="modal-head"><div><h2 id="recovery-title"><KeyRound size={20}/> {t('account.newPasswordTitle')}</h2></div></div>
+    <div className="modal-head"><div><h2 id="recovery-title"><KeyRound size={20}/> {t('account.newPasswordTitle')}</h2>{reason === 'upgrade' && <p>{t('account.passwordUpgrade')}</p>}</div></div>
     <form className="modal-form" onSubmit={save}>
-      <label>{t('account.newPassword')}<input type="password" autoComplete="new-password" minLength={8} required autoFocus value={password} onChange={e => setPassword(e.target.value)}/></label>
+      <label>{t('account.newPassword')}<input type="password" autoComplete="new-password" minLength={MIN_PASSWORD_LENGTH} required autoFocus value={password} onChange={e => setPassword(e.target.value)}/></label>
       {error && <p className="auth-error">{error}</p>}
       <button className="btn btn-primary full" disabled={pending}>{t('account.savePassword')}</button>
     </form>
