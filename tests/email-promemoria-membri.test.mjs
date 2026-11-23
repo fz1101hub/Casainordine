@@ -41,7 +41,7 @@ test('il cron manda una email per bolletta e persona, registrata prima dell’in
   const slot = run.indexOf("upsertMany(admin, 'reminder_email_log'"), send = run.indexOf('email.send(w.address');
   assert.ok(slot > 0 && send > slot, 'la riga del registro si scrive prima dell’invio');
   assert.match(run, /email\.send\(w\.address, w\.bill, languageOf\(w\.userId\), appUrl, w\.userId\)/);
-  assert.match(cron, /email:emailOn\?\{send:email\.reminder\}:null/);
+  assert.match(cron, /email:emailOn\?\{send:email\.reminder,sendMany:email\.reminderMany\}:null/);
   assert.match(cron, /const emailConfigured = \(\) => Boolean\(process\.env\.RESEND_API_KEY && process\.env\.RESEND_FROM\);/);
 });
 

@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import { createClient } from '@supabase/supabase-js';
 import { startFakeSupabase } from './helpers/fake-supabase.mjs';
 import { runDailyJobs, runDeferredPushes } from '../lib/daily-jobs.mjs';
-import { emailReminder, emailSummary } from '../lib/reminder-email.mjs';
+import { emailReminder, emailSummary, sendReminderEmails, sendSummaryEmails } from '../lib/reminder-email.mjs';
 import { billDuePushCopy, billSummaryPushCopy } from '../lib/notification-push-copy.mjs';
 import { billReminderCopy } from '../lib/notification-copy.mjs';
 
@@ -29,7 +29,9 @@ const push = { configured: () => true, send: async (device, payload) => {
   if (device.endpoint.includes('vecchio')) throw Object.assign(new Error('Gone'), { statusCode: 410 });
   pushes.push({ user: device.user_id, endpoint: device.endpoint, payload });
 } };
-const email = { configured: () => true, reminder: emailReminder, summary: emailSummary };
+// Come in produzione: email a blocchi (/emails/batch), una per una solo se il blocco non parte.
+const email = { configured: () => true, reminder: emailReminder, summary: emailSummary, reminderMany: sendReminderEmails, summaryMany: sendSummaryEmails };
+let resendCalls = 0;
 const day = (today, utc) => ({ today, now: new Date(`${today}T${utc}:00Z`), appUrl: 'https://casa.example', push, email });
 const sentTo = user => pushes.filter(p => p.user === user);
 
@@ -39,7 +41,12 @@ test.before(async () => {
   process.env.SUPABASE_SECRET_KEY = 'chiave-di-servizio-finta';
   // Solo Resend è finto: le altre richieste (Supabase) vanno al server finto.
   globalThis.fetch = async (url, init) => {
-    if (String(url).startsWith('https://api.resend.com/')) { emails.push(JSON.parse(init.body)); return Response.json({ id: `email-${emails.length}` }); }
+    if (String(url).startsWith('https://api.resend.com/')) {
+      resendCalls++;
+      const body = JSON.parse(init.body);
+      if (Array.isArray(body)) { emails.push(...body); return Response.json({ data: body.map((_, i) => ({ id: `email-${emails.length}-${i}` })) }); }
+      emails.push(body); return Response.json({ id: `email-${emails.length}` });
+    }
     return realFetch(url, init);
   };
   fake = await startFakeSupabase();
@@ -113,6 +120,8 @@ test('08:00 — promemoria, email e riepilogo; la push di chi è nell’orario s
   assert.equal(summary.to, 'anna@example.org');
   assert.equal((summary.html.match(/<li\b/g) || []).length, 3);
   assert.equal(fake.rows('bill_summaries').length, 1);
+  // Due chiamate a Resend: una per i promemoria, una per i riepiloghi.
+  assert.equal(resendCalls, 2);
   // Pulizia: restano solo gli inviti ancora aperti.
   assert.deepEqual(fake.rows('home_invites').map(i => i.id), ['inv-aperto']);
 });

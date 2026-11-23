@@ -72,7 +72,8 @@ const RESERVED = new Set(['select', 'order', 'limit', 'offset', 'on_conflict', '
 // Collegamenti incorporati che l'app chiede (select con tabella(colonne)): colonna → tabella.
 const EMBED = { homes: 'home_id', bills: 'bill_id' };
 
-export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = false } = {}) {
+// latency: millisecondi di attesa per ogni richiesta (per le prove con molti dati: rete simulata).
+export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = false, latency = 0 } = {}) {
   const state = { tables: {}, tokens: new Map(), users: new Map(), passwords: new Map(), rpc: {}, removed: [], files: {}, uploads: [], requests: [], deletedUsers: [], rejectKeys: new Set() };
   const table = name => (state.tables[name] ||= []);
   const isOwner = (user, homeId) => table('homes').some(h => h.id === homeId && h.owner_id === user.id);
@@ -161,6 +162,7 @@ export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = fa
     },
   };
   const server = createServer(async (req, res) => {
+    if (latency) await new Promise(done => setTimeout(done, latency));
     const url = new URL(req.url, 'http://x');
     const chunks = [];
     for await (const c of req) chunks.push(c);

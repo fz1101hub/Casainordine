@@ -127,6 +127,10 @@ try {
   check(!config.includes(process.env.SUPABASE_SECRET_KEY || 'chiave-di-servizio-finta'), 'senza mostrare il valore della chiave');
   const settingsViolations = await axe();
   check(settingsViolations.length === 0, `nessuna violazione WCAG in «Impostazioni» con accesso ${settingsViolations.join(' ')}`);
+  // 7c. «Esporta calendario (.ics)»: dal 22 al 23 novembre il pulsante non faceva niente (funzione tolta per errore).
+  const [icsDownload] = await Promise.all([page.waitForEvent('download', { timeout: 10000 }).catch(() => null), page.getByRole('button', { name: 'Esporta calendario (.ics)' }).click()]);
+  const ics = icsDownload ? readFileSync(await icsDownload.path(), 'utf8') : '';
+  check(/^BEGIN:VCALENDAR\r\n/.test(ics) && /SUMMARY:Pagamento: (Luce|Gas) di casa/.test(ics) && /scadenze-personali\.ics$/.test(icsDownload?.suggestedFilename() || ''), '«Esporta calendario» scarica il file .ics con le bollette da pagare');
 
   // 8. Uscita.
   const login = async (email, password) => {

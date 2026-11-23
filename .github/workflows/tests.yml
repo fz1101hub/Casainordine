@@ -104,6 +104,9 @@ jobs:
       - name: Eliminazione dell'account (telefono condiviso)
         timeout-minutes: 4
         run: node scripts/prove-eliminazione-account.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
+      - name: Lavoro notturno con molti dati (400 persone, 4000 bollette)
+        timeout-minutes: 4
+        run: node scripts/prove-notte.mjs http://localhost:3000
 
   database:
     # Migrazioni e prove del database su PostgreSQL 17 (la versione di Supabase), con un
