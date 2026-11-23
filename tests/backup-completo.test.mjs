@@ -108,6 +108,7 @@ test('file di backup: versione 2, senza percorsi privati, nota su ciò che manca
   assert.equal('storage_path' in out.documents[0], false);
   const page = readFileSync(new URL('../app/HomeExtra.jsx', import.meta.url), 'utf8');
   assert.match(page, /collectBackupTables\(client,\{homeId:homeId\|\|null,userId:user\?\.id,known:\{maintenance_assets:rows\.assets\}\}\)/);
-  assert.match(page, /bundle\.not_included=tr\('extra\.backup\.notIncluded'\)/);
+  // Backup JSON o .zip con i file (in quello .zip i file dei documenti ci sono).
+  assert.match(page, /bundle\.not_included=tr\(zipTools\?'extra\.backup\.zipNotIncluded':'extra\.backup\.notIncluded'\)/);
   for (const [lang, dict] of Object.entries(TRANSLATIONS)) assert.ok((dict['extra.backup.notIncluded'] || '').length > 60, lang);
 });

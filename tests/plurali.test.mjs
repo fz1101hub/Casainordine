@@ -62,6 +62,8 @@ const NO_SINGULAR = {
   'professional.stats': 'il singolare è professional.statsOne',
   'seasonal.window': '{months} è un elenco di mesi, non un numero',
   'stock.addAll': 'il numero è tra parentesi: «tutte (1)» va bene',
+  'extra.backup.zipDone': 'il numero è dopo i due punti: «File inclusi: 1» va bene',
+  'extra.backup.zipMissing': 'il numero è dopo i due punti: «non inclusi: 1» va bene',
 };
 test('nessun testo con un numero senza singolare', () => {
   const it = TRANSLATIONS.it;
