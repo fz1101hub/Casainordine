@@ -54,7 +54,7 @@ function fileBytes(buffer, contentType) {
 const RESERVED = new Set(['select', 'order', 'limit', 'offset', 'on_conflict', 'columns']);
 
 export async function startFakeSupabase({ port = 0, lenientRpc = false } = {}) {
-  const state = { tables: {}, tokens: new Map(), users: new Map(), passwords: new Map(), rpc: {}, removed: [], files: {}, uploads: [], requests: [], deletedUsers: [] };
+  const state = { tables: {}, tokens: new Map(), users: new Map(), passwords: new Map(), rpc: {}, removed: [], files: {}, uploads: [], requests: [], deletedUsers: [], rejectKeys: new Set() };
   const table = name => (state.tables[name] ||= []);
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
@@ -123,6 +123,8 @@ export async function startFakeSupabase({ port = 0, lenientRpc = false } = {}) {
     }
     const rest = path.match(/^\/rest\/v1\/([^/]+)$/);
     if (!rest) return send(404, { message: `percorso non gestito: ${path}` });
+    // Chiave rifiutata (per esempio di un altro progetto).
+    if (state.rejectKeys.has(req.headers.apikey)) return send(401, { message: 'Invalid API key', hint: 'Double check your Supabase `anon` or `service_role` API key.' });
     const name = rest[1], rows = table(name);
     const filters = [...url.searchParams.entries()].filter(([k]) => !RESERVED.has(k));
     const selected = () => rows.filter(r => filters.every(([col, expr]) => matches(r, col, expr)));
