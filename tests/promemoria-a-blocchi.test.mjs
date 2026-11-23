@@ -16,6 +16,7 @@ function fakeAdmin(db) {
       in(col, vals) { filters.push(r => vals.includes(r[col])); return reader; },
       neq(col, val) { filters.push(r => r[col] !== val); return reader; },
       eq(col, val) { filters.push(r => r[col] === val); return reader; },
+      is(col, val) { filters.push(r => (r[col] ?? null) === val); return reader; },
       async range(a, b) { count('read', table); return { data: db[table].filter(r => filters.every(f => f(r))).slice(a, b + 1), error: null }; },
     };
     return {
@@ -30,6 +31,20 @@ function fakeAdmin(db) {
         }
         const result = { data: inserted, error: null };
         return { select: async () => result, then: (ok, ko) => Promise.resolve(result).then(ok, ko) };
+      },
+      update(patch) {
+        count('write', table);
+        const conds = [];
+        const q = {
+          eq(col, val) { conds.push(r => r[col] === val); return q; },
+          is(col, val) { conds.push(r => (r[col] ?? null) === val); return q; },
+          async select() {
+            const selected = db[table].filter(r => conds.every(c => c(r)));
+            for (const row of selected) Object.assign(row, patch);
+            return { data: selected, error: null };
+          }
+        };
+        return q;
       },
       delete() {
         count('write', table);
@@ -151,4 +166,19 @@ test('readIn: gruppi di 100 id, pagine da 1000 righe, id ripetuti o vuoti ignora
   assert.equal(out.length, 2500);
   assert.equal(admin.calls.read.t, 2 + 1, 'primo gruppo (1667 righe): 2 pagine; secondo (833): 1');
   assert.deepEqual(await readIn(admin, 't', '*', 'bill_id', []), []);
+});
+
+test('email fallita: un nuovo cron la recupera una volta, senza doppioni', async () => {
+  const admin = fakeAdmin(world());
+  let attempts = 0;
+  const email = { send: async () => ++attempts === 1 ? { error: 'Resend temporarily unavailable' } : { sent: true } };
+  const args = { today: TODAY, appUrl: 'https://casa.example', email };
+  await processBillReminders(admin, [BILLS[1]], { ...args, counts: counts() });
+  const saved = admin.db.reminder_email_log[0];
+  assert.equal(saved.sent_at, null);
+  assert.equal(saved.error, 'Resend temporarily unavailable');
+  await processBillReminders(admin, [BILLS[1]], { ...args, counts: counts() });
+  assert.ok(saved.sent_at, 'secondo tentativo consegnato');
+  await processBillReminders(admin, [BILLS[1]], { ...args, counts: counts() });
+  assert.equal(attempts, 2, 'un messaggio riuscito non viene ripetuto');
 });

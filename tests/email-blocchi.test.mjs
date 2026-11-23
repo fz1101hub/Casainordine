@@ -47,6 +47,7 @@ test('blocco rifiutato (un indirizzo non valido): si riprova una per una, le alt
   const results = await sendEmailBatch([message(1), { ...message(2), to: 'non-valido' }, message(3)], noWait);
   assert.deepEqual(calls.map(c => c.url.split('/').pop()), ['batch', 'emails', 'emails', 'emails']);
   assert.deepEqual(results.map(r => r.sent ? 'ok' : r.error), ['ok', 'Invalid `to` field', 'ok']);
+  assert.ok(calls.slice(1).every(c => /^casa-[0-9a-f]{48}$/.test(c.headers['Idempotency-Key'])), 'idempotenza anche nel fallback per singola email');
 });
 
 test('promemoria a blocchi: un\'email che non si può preparare ha il suo errore e non ferma le altre', async () => {
