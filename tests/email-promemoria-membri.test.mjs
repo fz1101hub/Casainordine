@@ -32,16 +32,16 @@ test('ognuno sceglie: promemoria spenti o email spente bloccano l’email', () =
 });
 
 test('il cron manda una email per bolletta e persona, registrata prima dell’invio', () => {
-  const cron = read('../app/api/cron/route.js');
-  assert.match(cron, /reminderEmailRecipients\(bill,members\)/);
-  assert.match(cron, /wantsReminderEmail\(profile\)/);
-  assert.match(cron, /from\('reminder_email_log'\)\.upsert\(\{bill_id:bill\.id,user_id:userId,reminder_date:today\},\s*\{onConflict:'bill_id,user_id',ignoreDuplicates:true\}\)/);
-  const upsert = cron.indexOf("from('reminder_email_log').upsert"), send = cron.indexOf('emailReminder(profile.email');
-  assert.ok(upsert > 0 && send > upsert, 'la riga del registro si scrive prima dell’invio');
-  // Lingua di chi riceve, non di chi ha inserito la bolletta.
-  assert.match(cron, /user_language_preferences'\)\.select\('language'\)\.eq\('user_id',userId\)/);
-  // Il promemoria nell'app resta di chi ha inserito la bolletta, uno al giorno.
-  assert.match(cron, /onConflict:'bill_id,reminder_date',ignoreDuplicates:true/);
+  // Dal 23 novembre i promemoria sono a blocchi (lib/reminder-run.mjs); il comportamento è
+  // provato in tests/promemoria-a-blocchi.test.mjs, qui resta il controllo dell'ordine.
+  const run = read('../lib/reminder-run.mjs'), cron = read('../app/api/cron/route.js');
+  assert.match(run, /reminderEmailRecipients\(bill, membersOf\(bill\)\)/);
+  assert.match(run, /wantsReminderEmail\(profile\)/);
+  assert.match(run, /upsertMany\(admin, 'reminder_email_log', [^;]*\{ onConflict: 'bill_id,user_id', ignoreDuplicates: true \}/);
+  const slot = run.indexOf("upsertMany(admin, 'reminder_email_log'"), send = run.indexOf('email.send(w.address');
+  assert.ok(slot > 0 && send > slot, 'la riga del registro si scrive prima dell’invio');
+  assert.match(run, /email\.send\(w\.address, w\.bill, languageOf\(w\.userId\), appUrl\)/);
+  assert.match(cron, /email:process\.env\.RESEND_API_KEY&&process\.env\.RESEND_FROM\?\{send:emailReminder\}:null/);
 });
 
 test('migrazione v50: scelta personale e registro solo per il server', () => {

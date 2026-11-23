@@ -38,9 +38,10 @@ test('Cron: finestra, un solo promemoria per bolletta e persona, niente stime pa
   const s=source('app/api/cron/route.js');
   assert.match(s,/\.gte\('due_date',reminderRange\.from\)\.lte\('due_date',reminderRange\.to\)\.is\('paid_at',null\)/);
   assert.doesNotMatch(s,/\.eq\('due_date',target\)/);
-  assert.match(s,/from\('reminders'\)\.select\('bill_id'\)\.in\('bill_id',billIds\)\.neq\('reminder_date',today\)/);
-  assert.match(s,/if \(alreadyReminded\.has\(bill\.id\)\) continue;/);
-  assert.match(s,/from\('push_delivery_log'\)\.select\('reminder_date'\)\.eq\('bill_id',bill\.id\)\.eq\('user_id',userId\)\.not\('sent_at','is',null\)\.neq\('reminder_date',today\)/);
+  assert.match(s,/readIn\(admin,'reminders','bill_id','bill_id',\(bills\|\|\[\]\)\.map\(b=>b\.id\),q=>q\.neq\('reminder_date',today\)\)/);
+  assert.match(s,/\(bills\|\|\[\]\)\.filter\(b=>!alreadyReminded\.has\(b\.id\)\)/);
+  // Una sola push riuscita per bolletta e persona (lib/reminder-run.mjs, provato in promemoria-a-blocchi).
+  assert.match(source('lib/reminder-run.mjs'),/log\.filter\(r => r\.sent_at && r\.reminder_date !== today\)/);
   assert.match(s,/days:daysUntil\(today,bill\.due_date\)/);
   assert.match(s,/let date = firstRecurringFrom\(u\.next_due_date,today,u\.frequency,u\.billing_day\)/);
 });

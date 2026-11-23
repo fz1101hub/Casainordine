@@ -115,9 +115,11 @@ test('Cron: segreto confrontato a tempo costante su entrambe le route',()=>{
   }
 });
 test('Cron promemoria: l’email va solo a chi è ancora membro della casa',()=>{
-  const s=source('app/api/cron/route.js');
-  assert.match(s,/isHomeMember\(admin,bill\.home_id,bill\.user_id\)/);
-  assert.ok(s.indexOf('isHomeMember(admin,bill.home_id')<s.indexOf("admin.from('reminders').upsert"));
+  // Promemoria a blocchi (lib/reminder-run.mjs): la riga del promemoria nasce solo per chi è
+  // ancora membro; il caso è provato anche in tests/promemoria-a-blocchi.test.mjs.
+  const s=source('lib/reminder-run.mjs');
+  assert.match(s,/\(!bill\.home_id \|\| membersOf\(bill\)\.some\(m => m\.user_id === bill\.user_id\)\)/);
+  assert.ok(s.indexOf('membersOf(bill).some(m => m.user_id === bill.user_id)')<s.indexOf("upsertMany(admin, 'reminders'"));
 });
 test('Cron email: rotazione sull’ultimo tentativo, anche fallito, con limite di tempo',()=>{
   const s=source('app/api/mail/cron/route.js');
