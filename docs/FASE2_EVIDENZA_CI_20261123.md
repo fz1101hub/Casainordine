@@ -40,3 +40,10 @@ Verifica tramite GitHub Actions API per la PR #88:
 - Job `test` e `database`: entrambi `completed / success`. Nel job `test` risultano `success` i passi di installazione, controllo dipendenze, test logici, build Next.js, browser demo senza database, lingue, accessibilità e prove delle sezioni. Nel job `database` risulta `success` il passo delle prove su migrazioni/regole/funzioni in ambiente CI.
 - **G01:** evidenza CI positiva per il commit `93dd74c` e i passi previsti dal workflow; non equivale all'esecuzione locale indipendente, né a prove con account o DB di produzione. Il comando linguistico nel workflow mantiene l'URL esplicito: non è attestata l'esecuzione senza argomenti.
 - **G02–G04, F01–F10, X01–X04:** ancora `BLOCKED` nel registro di collaudo reale. La Fase 3 resta non autorizzata. Nessun deploy o intervento sui dati effettuato con questa verifica.
+
+## Riscontro CI sul commit `48ce0a3` — 23 novembre 2026, ore 14:39 CET
+
+- Commit esatto `48ce0a3f817b94c8b5d9939b3cdb6a366de68ea6` (head della PR #88 verificato via GitHub).
+- [GitHub Actions run 45175584682](https://github.com/fz1101hub/Casainordine/actions/runs/45175584682), workflow `Test automatici`, run numero 1907: API GitHub riporta `completed / success` per lo SHA indicato.
+- Questa verifica attesta **l'esito complessivo della run**, non la lettura indipendente dei log di ogni singolo passo. Il gate G01 dispone dunque di evidenza CI sul commit `48ce0a3`, limitata al workflow; non si attribuiscono nuove prove reali o verifiche manuali.
+- **G02–G04, F01–F10, X01–X04: BLOCKED.** Nessuna evidenza aggiuntiva di login con due account, RLS sul Supabase effettivo, migrazioni applicate in produzione, email, notifiche o URL pubblico. Fase 3 non autorizzata.
