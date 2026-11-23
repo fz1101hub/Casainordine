@@ -17,7 +17,11 @@
     "test:accessibility": "node scripts/check-accessibility.mjs",
     "test:sections": "node scripts/prove-sezioni.mjs",
     "test:db": "bash scripts/db-tests.sh",
-    "test:access": "node scripts/prove-con-accesso.mjs"
+    "test:access": "node scripts/prove-con-accesso.mjs",
+    "test:roles": "node scripts/prove-ruoli.mjs",
+    "test:access-languages": "node scripts/prove-lingue-accesso.mjs",
+    "test:access-offline": "node scripts/prove-offline-accesso.mjs",
+    "test:access-phone": "node scripts/prove-telefono-accesso.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "5.3.0",

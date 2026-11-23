@@ -64,6 +64,7 @@ const EMBED = { homes: 'home_id', bills: 'bill_id' };
 export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = false } = {}) {
   const state = { tables: {}, tokens: new Map(), users: new Map(), passwords: new Map(), rpc: {}, removed: [], files: {}, uploads: [], requests: [], deletedUsers: [], rejectKeys: new Set() };
   const table = name => (state.tables[name] ||= []);
+  const isOwner = (user, homeId) => table('homes').some(h => h.id === homeId && h.owner_id === user.id);
   const memberOf = (user, homeId) => table('home_members').some(m => m.home_id === homeId && m.user_id === user.id);
   // Regole di accesso semplificate.
   const visible = (name, row, user) => {
@@ -88,15 +89,64 @@ export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = fa
     invite_home_member: ({ target_home, invite_email, invite_role }, _s, user) => {
       if (!table('homes').some(h => h.id === target_home && h.owner_id === user.id)) throw fail('42501', 'Solo il proprietario può invitare');
       const secret = randomBytes(32).toString('hex');
-      table('home_invites').push({ id: `inv-${table('home_invites').length + 1}`, home_id: target_home, email: String(invite_email).toLowerCase(), role: invite_role, token_hash: hash(secret), invited_by: user.id, accepted_at: null, expires_at: new Date(Date.now() + 7 * 864e5).toISOString() });
+      table('home_invites').push({ id: `inv-${table('home_invites').length + 1}`, home_id: target_home, email: String(invite_email).toLowerCase(), role: invite_role, token_hash: hash(secret), created_by: user.id, claimed_at: null, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 7 * 864e5).toISOString() });
       return secret;
     },
     accept_home_invite: ({ secret }, _s, user) => {
-      const invite = table('home_invites').find(i => i.token_hash === hash(String(secret)) && !i.accepted_at);
+      const invite = table('home_invites').find(i => i.token_hash === hash(String(secret)) && !i.claimed_at);
       if (!invite || invite.email !== user.email) throw fail('42501', 'Invito non valido o destinato a un altro indirizzo');
-      invite.accepted_at = new Date().toISOString();
+      invite.claimed_at = new Date().toISOString();
       table('home_members').push({ home_id: invite.home_id, user_id: user.id, email: user.email, role: invite.role, joined_at: new Date().toISOString() });
       return invite.home_id;
+    },
+    change_home_member_role: ({ target_home, target_user, new_role }, _s, user) => {
+      if (!isOwner(user, target_home)) throw fail('42501', 'Solo il proprietario cambia i ruoli');
+      if (!['editor', 'viewer'].includes(new_role)) throw fail('22023', 'Ruolo non valido');
+      for (const m of table('home_members')) if (m.home_id === target_home && m.user_id === target_user && m.role !== 'owner') m.role = new_role;
+      return null;
+    },
+    remove_home_member: ({ target_home, target_user }, _s, user) => {
+      if (!isOwner(user, target_home) || target_user === user.id) throw fail('42501', 'Operazione non consentita');
+      state.tables.home_members = table('home_members').filter(m => !(m.home_id === target_home && m.user_id === target_user));
+      return null;
+    },
+    leave_home: ({ target_home }, _s, user) => {
+      if (isOwner(user, target_home)) throw fail('42501', 'Il proprietario non può lasciare la casa');
+      state.tables.home_members = table('home_members').filter(m => !(m.home_id === target_home && m.user_id === user.id));
+      return null;
+    },
+    delete_home: ({ target_home, confirm_name }, _s, user) => {
+      const home = table('homes').find(h => h.id === target_home);
+      if (!home || home.owner_id !== user.id || home.name !== confirm_name) throw fail('42501', 'Operazione non consentita');
+      state.tables.homes = table('homes').filter(h => h.id !== target_home);
+      state.tables.home_members = table('home_members').filter(m => m.home_id !== target_home);
+      for (const name of Object.keys(state.tables)) if (name !== 'homes') state.tables[name] = state.tables[name].filter(r => r.home_id !== target_home);
+      return null;
+    },
+    // Azioni fatte offline: una volta sola per persona e codice della bozza, come v20_apply_offline_*.
+    v20_apply_offline_task: ({ p_client_id, title_text, due_on }, _s, user) => {
+      const done = table('offline_import_log').find(l => l.user_id === user.id && l.client_id === p_client_id);
+      if (done) return done.record_id;
+      const id = `task-${table('house_tasks').length + 1}`;
+      table('house_tasks').push({ id, user_id: user.id, home_id: null, title: String(title_text).trim(), due_date: due_on || null, done: false, created_at: new Date().toISOString() });
+      table('offline_import_log').push({ user_id: user.id, client_id: p_client_id, record_id: id });
+      return id;
+    },
+    v20_apply_offline_shopping: ({ p_client_id, p_title, p_home_id }, _s, user) => {
+      const member = table('home_members').find(m => m.home_id === p_home_id && m.user_id === user.id);
+      if (!member || !['owner', 'editor'].includes(member.role)) throw fail('42501', 'Non hai permessi di modifica');
+      const done = table('offline_import_log').find(l => l.user_id === user.id && l.client_id === p_client_id);
+      if (done) return done.record_id;
+      const id = `shop-${table('home_shopping').length + 1}`;
+      table('home_shopping').push({ id, home_id: p_home_id, created_by: user.id, title: String(p_title).trim(), quantity: '1', checked: false, created_at: new Date().toISOString() });
+      table('offline_import_log').push({ user_id: user.id, client_id: p_client_id, record_id: id });
+      return id;
+    },
+    revoke_home_invite: ({ invite_id }, _s, user) => {
+      const invite = table('home_invites').find(i => i.id === invite_id);
+      if (!invite || !isOwner(user, invite.home_id)) throw fail('42501', 'Operazione non consentita');
+      state.tables.home_invites = table('home_invites').filter(i => i.id !== invite_id);
+      return null;
     },
   };
   const server = createServer(async (req, res) => {
