@@ -46,6 +46,7 @@ create table if not exists public.home_project_phases (
  created_at timestamptz not null default now()
 );
 create index if not exists idx_home_project_phases_project on public.home_project_phases(project_id);
+create index if not exists idx_home_project_phases_created_by on public.home_project_phases(created_by);
 
 create table if not exists public.home_project_quotes (
  id uuid primary key default gen_random_uuid(),
@@ -62,6 +63,7 @@ create table if not exists public.home_project_quotes (
  check (professional_id is not null or char_length(btrim(supplier)) >= 2)
 );
 create index if not exists idx_home_project_quotes_project on public.home_project_quotes(project_id);
+create index if not exists idx_home_project_quotes_created_by on public.home_project_quotes(created_by);
 create index if not exists idx_home_project_quotes_professional on public.home_project_quotes(professional_id) where professional_id is not null;
 create index if not exists idx_home_project_quotes_document on public.home_project_quotes(document_id) where document_id is not null;
 
@@ -77,6 +79,7 @@ create table if not exists public.home_project_expenses (
  created_at timestamptz not null default now()
 );
 create index if not exists idx_home_project_expenses_project on public.home_project_expenses(project_id);
+create index if not exists idx_home_project_expenses_created_by on public.home_project_expenses(created_by);
 create index if not exists idx_home_project_expenses_quote on public.home_project_expenses(quote_id) where quote_id is not null;
 create index if not exists idx_home_project_expenses_document on public.home_project_expenses(document_id) where document_id is not null;
 
@@ -91,6 +94,7 @@ create table if not exists public.home_project_photos (
  unique (project_id, document_id)
 );
 create index if not exists idx_home_project_photos_project on public.home_project_photos(project_id);
+create index if not exists idx_home_project_photos_created_by on public.home_project_photos(created_by);
 create index if not exists idx_home_project_photos_document on public.home_project_photos(document_id);
 
 create or replace function public.v47_touch() returns trigger

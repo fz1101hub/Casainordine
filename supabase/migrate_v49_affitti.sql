@@ -64,7 +64,7 @@ create index if not exists idx_home_lease_reports_created_by on public.home_leas
 create table if not exists public.home_lease_photos (
  id uuid primary key default gen_random_uuid(),
  report_id uuid not null references public.home_lease_reports(id) on delete cascade,
- storage_path text not null unique check (storage_path ~ '^[0-9a-f-]{36}/[0-9a-f-]{36}\.(jpg|png|webp)$'),
+ storage_path text not null unique check (storage_path ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp)$'),
  room text not null default '' check (char_length(room) <= 80),
  caption text not null default '' check (char_length(caption) <= 200),
  uploaded_by uuid default auth.uid() references auth.users(id) on delete set null,
@@ -85,10 +85,11 @@ create or replace function public.v49_is_landlord(target uuid) returns boolean
 language sql stable security definer set search_path = '' as $$
  select exists(select 1 from public.home_leases l where l.id = target and public.v19_can_edit(l.user_id, l.home_id))
 $$;
--- Contratto dal percorso di un file («<id contratto>/<id>.jpg»); null se il percorso non è valido.
+-- Contratto dal percorso di un file («<id contratto>/<id>.jpg»); null se il percorso non è valido
+-- (solo un id ben formato diventa uuid: i nomi di altri bucket non danno errori).
 create or replace function public.v49_lease_from_path(path text) returns uuid
 language sql immutable set search_path = '' as $$
- select case when path ~ '^[0-9a-f-]{36}/' then split_part(path, '/', 1)::uuid end
+ select case when path ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/' then split_part(path, '/', 1)::uuid end
 $$;
 revoke all on function public.v49_lease_can(uuid, boolean) from public, anon;
 revoke all on function public.v49_is_landlord(uuid) from public, anon;
@@ -147,11 +148,11 @@ drop policy if exists v49_leases_invite on public.home_leases;
 drop policy if exists v49_leases_insert on public.home_leases;
 drop policy if exists v49_leases_update on public.home_leases;
 drop policy if exists v49_leases_delete on public.home_leases;
+-- Una sola regola di lettura: locatore (e la sua casa), inquilino che ha accettato, oppure chi ha
+-- l'indirizzo email dell'invito finché non è accettato.
 create policy v49_leases_read on public.home_leases for select to authenticated
- using (public.v19_can_read(user_id, home_id) or tenant_id = (select auth.uid()));
--- Un invito si vede solo dall'indirizzo a cui è rivolto, finché non è accettato.
-create policy v49_leases_invite on public.home_leases for select to authenticated
- using (tenant_id is null and status = 'invited' and tenant_email = lower(coalesce((select auth.jwt()) ->> 'email', '')));
+ using (public.v19_can_read(user_id, home_id) or tenant_id = (select auth.uid())
+  or (tenant_id is null and status = 'invited' and tenant_email = lower(coalesce((select auth.jwt()) ->> 'email', ''))));
 create policy v49_leases_insert on public.home_leases for insert to authenticated
  with check (user_id = (select auth.uid()) and public.v19_can_edit(user_id, home_id) and tenant_id is null and status = 'invited');
 create policy v49_leases_update on public.home_leases for update to authenticated

@@ -23,19 +23,19 @@ Ogni funzione richiede flusso realmente utilizzabile, permessi per utente/casa c
 
 - [x] **Ricerca universale**: ricerca trasversale di bollette, attività, contratti, documenti e oggetti; risultati per tipo e permessi rispettati; nessuna ricerca indiscriminata fra account. — #59 (Ctrl/Cmd+K o «/»).
 - [x] **Acquisizione intelligente unica**: unica azione foto/PDF con classificazione locale e suggerimento di destinazione bolletta, ricevuta o garanzia, con conferma prima di scrivere. — #60.
-- [x] **Automazioni personalizzate**: regole soglia importi, rinnovi, frequenze; simulazione, sospensione, cron e deduplica avvisi; autorizzazione di proprietario/editor. — #61; serve `migrate_v43_automazioni.sql` sul database.
+- [x] **Automazioni personalizzate**: regole soglia importi, rinnovi, frequenze; simulazione, sospensione, cron e deduplica avvisi; autorizzazione di proprietario/editor. — #61; `migrate_v43_automazioni.sql` applicata il 23 novembre 2026.
 
 ### 3.4 — Cura quotidiana
 
-- [x] **Professionisti di fiducia**: contatti, professione, note private/condivise, costi e interventi associati a manutenzioni. — #62; serve `migrate_v44_professionisti.sql` sul database.
-- [x] **Programma stagionale**: checklist adattabili per stagione, località e tipi d'immobile; azioni ricorrenti e completamento. — #63; serve `migrate_v45_stagionale.sql` sul database.
-- [x] **Scorte domestiche**: scorte, soglie, decrementi, proposta prodotto in lista spesa senza aggiunte silenziose. — #64; serve `migrate_v46_scorte.sql` sul database.
+- [x] **Professionisti di fiducia**: contatti, professione, note private/condivise, costi e interventi associati a manutenzioni. — #62; `migrate_v44_professionisti.sql` applicata il 23 novembre 2026.
+- [x] **Programma stagionale**: checklist adattabili per stagione, località e tipi d'immobile; azioni ricorrenti e completamento. — #63; `migrate_v45_stagionale.sql` applicata il 23 novembre 2026.
+- [x] **Scorte domestiche**: scorte, soglie, decrementi, proposta prodotto in lista spesa senza aggiunte silenziose. — #64; `migrate_v46_scorte.sql` applicata il 23 novembre 2026.
 
 ### 4.0 — Evoluzione completa
 
-- [x] **Progetti e lavori**: schede progetto, fasi, preventivi, spese, foto prima/dopo e fornitori. — #65; serve `migrate_v47_progetti.sql` sul database.
-- [x] **Fondo sostituzioni**: vita utile indicativa, costi stimati, risparmio mensile e disclaimer delle stime. — #66; serve `migrate_v48_fondo.sql` sul database.
-- [x] **Profilo locatore/inquilino**: immobili e contratti, verbali ingresso/uscita, foto e letture, accesso separato per ruolo senza esposizione dati privati. — #67; serve `migrate_v49_affitti.sql` sul database.
+- [x] **Progetti e lavori**: schede progetto, fasi, preventivi, spese, foto prima/dopo e fornitori. — #65; `migrate_v47_progetti.sql` applicata il 23 novembre 2026.
+- [x] **Fondo sostituzioni**: vita utile indicativa, costi stimati, risparmio mensile e disclaimer delle stime. — #66; `migrate_v48_fondo.sql` applicata il 23 novembre 2026.
+- [x] **Profilo locatore/inquilino**: immobili e contratti, verbali ingresso/uscita, foto e letture, accesso separato per ruolo senza esposizione dati privati. — #67; `migrate_v49_affitti.sql` applicata il 23 novembre 2026.
 - [x] **Casa Control**: pannello facoltativo, indicatori calcolati da eventi veri, formula trasparente, gestione mancanza dati e nessun punteggio arbitrario. — #68; nessuna migrazione.
 
 ## Fase 3 — Solo dopo le due fasi precedenti: audit indipendente e correzioni
