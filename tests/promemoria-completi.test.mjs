@@ -62,6 +62,10 @@ test.before(async () => {
   fake.seed('bills', [bill(B1, { title: TITLE, due_date: '2026-12-03' }), bill(B2, { title: 'Già pagata', due_date: '2026-12-03', paid_at: '2026-11-30T10:00:00Z' }),
     bill(B3, { title: 'Acqua', due_date: '2026-12-11' }), bill(B4, { user_id: PIERO, home_id: null, title: 'Telefono di Piero', supplier: 'Tim', due_date: '2026-12-02' })]);
   fake.seed('utilities', [{ id: 'u-gas', user_id: ANNA, home_id: null, category: 'Gas', supplier: 'Eni', estimated_amount: 40, frequency: 'monthly', billing_day: 20, next_due_date: '2026-12-20', active: true }]);
+  // Inviti: uno usato, uno scaduto, uno aperto. Il lavoro giornaliero tiene solo quello aperto.
+  fake.seed('home_invites', [{ id: 'inv-usato', home_id: HOME, email: 'luca@example.org', claimed_at: '2026-11-02T10:00:00Z', expires_at: '2026-11-09T10:00:00Z' },
+    { id: 'inv-scaduto', home_id: HOME, email: 'mai@example.org', claimed_at: null, expires_at: '2026-11-30T10:00:00Z' },
+    { id: 'inv-aperto', home_id: HOME, email: 'nuova@example.org', claimed_at: null, expires_at: '2026-12-05T10:00:00Z' }]);
   fake.seed('home_contracts', [{ id: 'c-casa', user_id: ANNA, home_id: null, supplier: 'Assicurazione Casa', service: 'Polizza', renewal_on: '2026-12-31', alert_days: 30 }]);
 });
 test.after(async () => { globalThis.fetch = realFetch; await fake?.close(); });
@@ -97,6 +101,8 @@ test('08:00 — promemoria, email e riepilogo; la push di chi è nell’orario s
   assert.equal(summary.to, 'anna@example.org');
   assert.equal((summary.html.match(/<li>/g) || []).length, 3);
   assert.equal(fake.rows('bill_summaries').length, 1);
+  // Pulizia: restano solo gli inviti ancora aperti.
+  assert.deepEqual(fake.rows('home_invites').map(i => i.id), ['inv-aperto']);
 });
 
 test('08:07 — il secondo giro non rimanda niente; Piero, fuori dall’orario silenzioso, riceve la sua push', async () => {

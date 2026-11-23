@@ -29,5 +29,6 @@ test('la CI controlla l’accessibilità e la pagina offline aggiornata arriva a
   assert.match(script, /'wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'/);
   assert.match(script, /width: 320/);
   // Pagina offline e testi cambiati: nuova versione della cache, altrimenti i telefoni tengono la vecchia.
-  assert.match(read('public/sw.js'), /const CACHE='casa-shell-v43';/);
+  // v44: bozze offline cancellate con l'account (lib/offline-queue.js e public/offline-standalone.js).
+  assert.match(read('public/sw.js'), /const CACHE='casa-shell-v44';/);
 });
