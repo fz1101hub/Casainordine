@@ -37,7 +37,11 @@ async function crawl(browser, lang) {
   for (const start of ['/', '/prova']) {
     await page.goto(BASE + start, { waitUntil: 'networkidle' });
     await note(start);
-    const nav = page.locator('nav button, aside button');
+    // Menu in gruppi: si aprono tutti, poi si provano le voci (non le intestazioni dei gruppi).
+    const closed = page.locator('nav .nav-group-head[aria-expanded="false"]');
+    for (let n = 0; n < 8 && await closed.count(); n++) await closed.first().click().catch(() => {});
+    await note(`${start} gruppi`);
+    const nav = page.locator('nav button:not(.nav-group-head), aside button:not(.nav-group-head)');
     const count = await nav.count();
     for (let i = 0; i < count; i++) {
       try { await nav.nth(i).click({ timeout: 2000 }); await settle(); } catch { continue; }

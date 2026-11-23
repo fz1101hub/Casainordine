@@ -19,6 +19,11 @@ try {
 
   await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
   check(await page.locator('h1').count() > 0, 'la Home si apre');
+  // Menu in gruppi: si aprono tutti prima di provare le voci.
+  check(await page.locator('nav .nav-group-head').count() === 4, 'il menu ha 4 gruppi');
+  const closed = page.locator('nav .nav-group-head[aria-expanded="false"]');
+  for (let n = 0; n < 8 && await closed.count(); n++) await closed.first().click();
+  check(await closed.count() === 0, 'i gruppi del menu si aprono');
   for (const name of ['Bollette', 'Consumi e previsioni', 'SOS Casa', 'Importa e collega', 'Impostazioni']) {
     const button = page.getByRole('button', { name, exact: true }).first();
     if (!(await button.count())) { check(false, `voce di menu «${name}»`); continue; }

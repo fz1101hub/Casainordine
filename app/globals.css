@@ -473,3 +473,17 @@
 .control-card>p{margin:0;font-size:.84rem;color:var(--muted);line-height:1.45;flex:1}
 .control-card.missing>b,.control-card.unavailable>b{color:var(--muted)}
 .control-card .btn{align-self:flex-start}
+
+/* Menu in gruppi */
+.nav-group{display:flex;flex-direction:column;gap:5px}
+.nav-group-head{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;border:0;background:none;padding:14px 16px 7px;font-size:11px;letter-spacing:1.1px;text-transform:uppercase;font-weight:800;color:var(--muted);text-align:left;border-radius:8px}
+.nav-group-head:hover{color:var(--green)}
+.nav-group-head:focus-visible{outline:2px solid #b1dcd3;outline-offset:1px}
+.nav-group-head svg{flex-shrink:0;transition:transform .15s}
+.nav-group-head[aria-expanded="true"] svg{transform:rotate(90deg)}
+.nav-group-items{display:flex;flex-direction:column;gap:5px}
+.nav-group-items[hidden]{display:none}
+/* Le voci tengono la loro altezza: se non c'è spazio scorre il menu, non si schiacciano le voci. */
+.sidebar .nav>.nav-item,.sidebar .nav>.nav-group,.nav-group-items>.nav-item{flex-shrink:0}
+/* Sul telefono e sugli schermi bassi il riquadro informativo lascia lo spazio al menu. */
+@media(max-width:900px),(max-height:960px){.sidebar-info{display:none}}
