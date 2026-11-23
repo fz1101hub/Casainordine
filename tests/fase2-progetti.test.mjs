@@ -59,6 +59,7 @@ test('Migrazione v47: voci legate al progetto, riferimenti dello stesso spazio, 
   assert.match(sql, new RegExp(`status in \\(${QUOTE_STATUSES.map(s => `'${s}'`).join(',')}\\)`));
   assert.match(sql, new RegExp(`kind in \\(${PHOTO_KINDS.map(s => `'${s}'`).join(',')}\\)`));
   assert.match(sql, /'altro','foto','preventivo'/);
+  for (const table of ['phases', 'quotes', 'expenses', 'photos']) assert.match(sql, new RegExp(`idx_home_project_${table}_created_by on public\\.home_project_${table}\\(created_by\\)`), table);
   assert.match(sql, /create policy v47_read on public\.%I for select to authenticated using \(public\.v47_project_access\(project_id, false\)\)/);
   assert.match(sql, /created_by uuid default auth\.uid\(\) references auth\.users\(id\) on delete set null/);
   assert.match(sql, /raise exception 'Professionista non appartenente allo spazio'/);

@@ -44,7 +44,10 @@ test('Foto nella cartella del contratto, solo immagini', () => {
   assert.equal(leasePhotoPath(lease, 'application/pdf'), '');
   // Lo stesso formato che accetta il database.
   const sql = read('supabase/migrate_v49_affitti.sql');
-  assert.match(sql, /storage_path ~ '\^\[0-9a-f-\]\{36\}\/\[0-9a-f-\]\{36\}\\\.\(jpg\|png\|webp\)\$'/);
+  const uuid = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+  assert.ok(sql.includes(`storage_path ~ '^${uuid}/${uuid}\\.(jpg|png|webp)$'`));
+  // Solo un id ben formato diventa uuid: un nome qualsiasi di un altro bucket non dà errori.
+  assert.ok(sql.includes(`select case when path ~ '^${uuid}/' then split_part(path, '/', 1)::uuid end`));
 });
 
 test('Migrazione v49: ruoli separati, inviti per email, firme, foto private', () => {
@@ -54,6 +57,8 @@ test('Migrazione v49: ruoli separati, inviti per email, firme, foto private', ()
   // Inquilino: legge solo contratto, verbali e foto; scrive solo a contratto attivo.
   assert.match(sql, /or \(l\.tenant_id = \(select auth\.uid\(\)\) and \(not write or l\.status = 'active'\)\)/);
   assert.match(sql, /tenant_id is null and status = 'invited' and tenant_email = lower\(coalesce\(\(select auth\.jwt\(\)\) ->> 'email', ''\)\)/);
+  // Una sola regola di lettura (i controlli di Supabase segnalano più regole permissive sulla stessa azione).
+  assert.equal((sql.match(/create policy \w+ on public\.home_leases for select/g) || []).length, 1);
   assert.match(sql, /with check \(user_id = \(select auth\.uid\(\)\) and public\.v19_can_edit\(user_id, home_id\) and tenant_id is null and status = 'invited'\)/);
   assert.doesNotMatch(sql.match(/grant update \(property_label[^)]*\) on public\.home_leases/)[0], /tenant_id|user_id|home_id/);
   assert.match(sql, /grant update \(report_date, rooms, readings, notes\) on public\.home_lease_reports to authenticated;/, 'le firme passano solo da v49_sign_report');
