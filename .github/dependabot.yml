@@ -1,0 +1,38 @@
+# Aggiornamenti automatici delle librerie (scelta dell'utente, 23 novembre 2026: «Aggiornamenti delle librerie»).
+# Una volta a settimana Dependabot propone gli aggiornamenti come PR; si uniscono solo con le prove
+# verdi (test, accesso, database). Minori e correzioni arrivano raggruppati in una PR per tipo; le
+# versioni maggiori, che possono rompere qualcosa, arrivano una per volta.
+# Gli avvisi e gli aggiornamenti di sicurezza si attivano a parte, nelle impostazioni del repository
+# (Settings → Code security): questo file non li sostituisce.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Rome
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: deps
+    groups:
+      app-minori:
+        dependency-type: production
+        update-types: [minor, patch]
+      sviluppo-minori:
+        dependency-type: development
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Rome
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: ci
+    groups:
+      azioni:
+        patterns: ["*"]
