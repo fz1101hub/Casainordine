@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { useLanguage } from './LanguageProvider';
 import { friendlyError } from '../lib/friendly-error.mjs';
-import { readBackup, restorePlan, existingCounts, existingDocumentIds, previewBySection, runRestore, restoreTotals, RestoreFileError, SKIP_REASONS } from '../lib/backup-restore.mjs';
+import { readBackup, restorePlan, stableCopyIds, isCopy, existingCounts, existingDocumentIds, previewBySection, runRestore, restoreTotals, RestoreFileError, SKIP_REASONS } from '../lib/backup-restore.mjs';
 
 const MAX_BYTES = 20 * 1024 * 1024;
 // Backup .zip con i file (lib/backup-files.mjs, caricato solo quando serve): si legge tutto in memoria.
@@ -36,7 +36,8 @@ export default function BackupRestore({ client, user, homeId, canWrite, onNotify
       // Spese divise: solo se chi ha pagato e chi divide sono ancora nella casa.
       let members = null;
       if (homeId) { const { data, error } = await client.from('home_members').select('user_id').eq('home_id', homeId); if (error) throw error; members = (data || []).map(m => m.user_id); }
-      const plan = restorePlan(backup, target, { existingDocuments: await existingDocumentIds(client, backup, target), members });
+      const copyIds = isCopy(backup, target) ? await stableCopyIds(backup, target) : null;
+      const plan = restorePlan(backup, target, { copyIds, existingDocuments: await existingDocumentIds(client, backup, target), members });
       if (!plan.steps.length) { setState({ stage: 'idle' }); onNotify(tr('extra.restore.nothing')); return; }
       const existing = await existingCounts(client, plan);
       setState({ stage: 'preview', backup, plan, rows: previewBySection(plan, existing), otherSpace: plan.copy });

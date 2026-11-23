@@ -182,3 +182,32 @@ test('email fallita: un nuovo cron la recupera una volta, senza doppioni', async
   await processBillReminders(admin, [BILLS[1]], { ...args, counts: counts() });
   assert.equal(attempts, 2, 'un messaggio riuscito non viene ripetuto');
 });
+
+
+// Il cron riprende l'email fallita ieri anche se il promemoria in app esiste già.
+test('promemoria già visto ieri: email fallita ritentata oggi senza nuovo avviso in app', async () => {
+  const admin = fakeAdmin(world()), bill = BILLS[1], attempts = [];
+  const email = { send: async (...args) => {
+    attempts.push(args[0]);
+    return attempts.length === 1 ? { error: 'Resend non disponibile' } : { sent: true };
+  } };
+  const yesterday = counts();
+  await processBillReminders(admin, [bill], { today: TODAY, appUrl: 'https://casa.example', counts: yesterday, email });
+  assert.equal(yesterday.notifications_created, 1);
+  assert.equal(admin.db.reminder_email_log[0].sent_at, null);
+  const today = counts();
+  await processBillReminders(admin, [bill], { today: '2026-11-24', appUrl: 'https://casa.example',
+    counts: today, alreadyReminded: new Set([bill.id]), email });
+  assert.equal(today.notifications_created, 0);
+  assert.equal(admin.db.reminders.length, 1);
+  assert.ok(admin.db.reminder_email_log[0].sent_at);
+  assert.equal(attempts.length, 2);
+  const third = counts();
+  await processBillReminders(admin, [bill], { today: '2026-11-24', appUrl: 'https://casa.example',
+    counts: third, alreadyReminded: new Set([bill.id]), email });
+  assert.equal(attempts.length, 2, 'una consegna riuscita non si ripete');
+});
+test('il cron passa tutte le bollette ai registri di retry ma non ripete gli avvisi interni', () => {
+  const file = readFileSync(new URL('../lib/daily-jobs.mjs', import.meta.url), 'utf8');
+  assert.match(file, /await processBillReminders\(admin,bills\|\|\[\],\{today,appUrl,counts,alreadyReminded/);
+});
