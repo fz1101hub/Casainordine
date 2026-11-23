@@ -21,7 +21,8 @@
     "test:roles": "node scripts/prove-ruoli.mjs",
     "test:access-languages": "node scripts/prove-lingue-accesso.mjs",
     "test:access-offline": "node scripts/prove-offline-accesso.mjs",
-    "test:access-phone": "node scripts/prove-telefono-accesso.mjs"
+    "test:access-screens": "node scripts/prove-schermi-accesso.mjs",
+    "test:keyboard": "node scripts/prove-tastiera-accesso.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "5.3.0",

@@ -92,9 +92,12 @@ jobs:
       - name: Bozze offline con accesso
         timeout-minutes: 4
         run: node scripts/prove-offline-accesso.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
-      - name: Telefono con accesso (360 px)
+      - name: Telefono e computer con accesso (360 e 1360 px)
+        timeout-minutes: 8
+        run: node scripts/prove-schermi-accesso.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
+      - name: Tastiera e lettori di schermo
         timeout-minutes: 6
-        run: node scripts/prove-telefono-accesso.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
+        run: node scripts/prove-tastiera-accesso.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
 
   database:
     # Migrazioni e prove del database su PostgreSQL 17 (la versione di Supabase), con un

@@ -1,7 +1,7 @@
 // Supabase finto per le prove delle API: un server HTTP locale che risponde come Auth, PostgREST e
 // Storage per quello che usano le route di app/api. Le route girano senza modifiche, con il client
 // Supabase vero: si controlla che cosa chiedono e che cosa cambia nei dati.
-// Gestisce: utenti per token, filtri eq/neq/in/is/not.is/gte/gt/lte/lt, ordinamento, limit/range,
+// Gestisce: utenti per token, filtri eq/neq/in/is/not.is/gte/gt/lte/lt/like/ilike e or=(...), ordinamento, limit/range,
 // conteggi (HEAD o count=exact), oggetti singoli, insert, upsert con on_conflict, update, delete,
 // rpc con funzioni registrate, rimozione e elenco dei file, utenti per l'amministrazione.
 // Per il browser (scripts/prove-con-accesso.mjs): CORS, accesso con email e password (token in
@@ -24,7 +24,14 @@ const parseValue = v => (v === 'null' ? null : v === 'true' ? true : v === 'fals
 const splitList = s => s.replace(/^\(|\)$/g, '').split(',').map(x => x.replace(/^"|"$/g, ''));
 const same = (a, b) => (a === null || a === undefined ? b === null : String(a) === String(b));
 
+// or=(a.ilike."*x*",b.eq.1): basta una condizione (la ricerca dell'app usa ilike su più colonne).
+function anyOf(row, expr) {
+  const parts = expr.replace(/^\(|\)$/g, '').match(/(?:[^,"]|"[^"]*")+/g) || [];
+  return parts.some(part => { const [col, ...rest] = part.split('.'); return matches(row, col, rest.join('.').replace(/"/g, '')); });
+}
+
 function matches(row, col, expr) {
+  if (col === 'or') return anyOf(row, expr);
   const [op, ...rest] = expr.split('.');
   const raw = rest.join('.');
   const value = row[col];
@@ -38,6 +45,10 @@ function matches(row, col, expr) {
     case 'gt': return value !== null && value !== undefined && String(value) > raw;
     case 'lte': return value !== null && value !== undefined && String(value) <= raw;
     case 'lt': return value !== null && value !== undefined && String(value) < raw;
+    case 'ilike': case 'like': {
+      const pattern = new RegExp(`^${raw.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/[*%]/g, '.*')}$`, op === 'ilike' ? 'is' : 's');
+      return value !== null && value !== undefined && pattern.test(String(value));
+    }
     default: throw new Error(`filtro non gestito: ${col}=${expr}`);
   }
 }
