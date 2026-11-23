@@ -331,7 +331,7 @@
 .search-results>p{padding:10px 6px;margin:0;font-size:12.5px}
 .search-results h3{font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin:12px 6px 6px}
 .search-result{display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;text-align:left;border:0;background:transparent;border-radius:10px;padding:10px 8px;color:var(--ink)}
-.search-result:hover,.search-result:focus-visible{background:#eef6f2;outline:none}
+.search-result:hover,.search-result:focus-visible{background:#eef6f2}.search-result:focus-visible{outline:2px solid var(--green);outline-offset:-2px}
 .search-result b{font-size:13px}
 .search-result small{font-size:11.5px;color:var(--muted)}
 @media(max-width:650px){.search-overlay{padding-top:0}.search-dialog{border-radius:0;max-width:none;min-height:100vh}.search-results{max-height:none}}
@@ -520,15 +520,16 @@ input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):
 .config-item code{font-size:11.5px;background:#f3f6f3;padding:1px 5px;border-radius:5px;overflow-wrap:anywhere}.config-note{margin:12px 0 0;font-size:12px}
 .config-item .config-level{font-weight:600;color:var(--muted);font-size:11.5px}
 
-/* Telefono (scripts/prove-telefono-accesso.mjs): testo di almeno 12 px e comandi di almeno 24 px. */
+/* Schermi (scripts/prove-schermi-accesso.mjs): testo di almeno 12 px su ogni schermo; sul telefono
+   anche comandi di almeno 24 px. Le regole elencate qui sotto avevano testo da 9 a 11,9 px. */
+.profile-copy b,.profile-copy small,.overdue-notice button,.text-link,.quick-panel .btn,.bills-table td,.table-identity b,.utility-detail,.utility-detail strong,.token-box label,.demo-banner,.modal-form label,.auth-card label,.auth-decoration>p:first-of-type,.page-heading p,.stat-top,.stat-card small,.mini-bill-info b,.bell-entry p strong,.document-review-head small,.document-review ul,.document-card .document-privacy,.mail-provider-label,.hub-item small,.hub-invite-url code,.hub-fieldset legend,.extra-field,.extra-item small,.extra-pill,.home3-card-link,.testdrive-brand small,.testdrive-footer,.testdrive-navigation button,.testdrive-seed-content small,.language-picker small,.search-scope,.search-results h3,.search-result small,.automation-sim,.automation-notify legend,.seasonal-features legend,.project-tiles small,.project-photos>div>small,.replacement-tiles small+small,.control-card>p,.nav-group-head,.config-item code,.config-item .config-level{font-size:12px}
+small{font-size:max(12px,.8333em)}
 .searchbox:focus-within{outline:2px solid var(--green);outline-offset:1px}
 .searchbox input{align-self:stretch;min-height:38px}
 .searchbox input::placeholder{color:var(--muted)}
 @media(max-width:650px){
-.profile-copy b,.profile-copy small,.overdue-notice button,.text-link,.quick-panel .btn,.bills-table td,.table-identity b,.utility-detail,.utility-detail strong,.token-box label,.demo-banner,.modal-form label,.auth-card label,.auth-decoration>p:first-of-type,.page-heading p,.stat-top,.stat-card small,.mini-bill-info b,.bell-entry p strong,.document-review-head small,.document-review ul,.document-card .document-privacy,.mail-provider-label,.hub-item small,.hub-invite-url code,.hub-fieldset legend,.extra-field,.extra-item small,.extra-pill,.home3-card-link,.testdrive-brand small,.testdrive-footer,.testdrive-navigation button,.testdrive-seed-content small,.language-picker small,.search-scope,.search-results h3,.search-result small,.automation-sim,.automation-notify legend,.seasonal-features legend,.project-tiles small,.project-photos>div>small,.replacement-tiles small+small,.control-card>p,.nav-group-head,.config-item code,.config-item .config-level{font-size:12px}
 /* !important: alcune sezioni fissano caselle più piccole con regole più specifiche. */
 input[type=checkbox],input[type=radio]{width:24px!important;height:24px!important;flex:0 0 24px!important}
-small{font-size:max(12px,.8333em)}
 summary{min-height:24px;padding-block:3px}
 .text-link,.auth-switch button{min-height:24px}
 .task-check{width:24px;height:24px}
@@ -538,3 +539,11 @@ summary{min-height:24px;padding-block:3px}
 /* I campi con testo sotto i 16 px fanno ingrandire la pagina all'iPhone: la regola sopra (max-width:760px)
    vale già per input, qui anche per select e textarea, che alcune sezioni rimpiccioliscono con regole più specifiche. */
 @media(max-width:760px){select,textarea{font-size:16px!important}}
+/* Tastiera (scripts/prove-tastiera-accesso.mjs): «Vai al contenuto» compare solo quando lo si
+   raggiunge con Tab; il contenuto riceve la selezione senza contorno (è un'area, non un comando);
+   il campo della ricerca mostra il contorno sul riquadro, perché il campo non ha bordo. */
+.skip-link{position:fixed;left:12px;top:-60px;z-index:1000;background:#16776b;color:#fff;padding:10px 16px;border-radius:9px;font-weight:700;text-decoration:none;transition:top .15s}
+.skip-link:focus{top:12px;outline:3px solid #0d3f39;outline-offset:2px}
+#contenuto:focus{outline:none}
+.search-field:focus-within{box-shadow:inset 0 0 0 2px var(--green)}
+

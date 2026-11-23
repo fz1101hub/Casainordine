@@ -1,13 +1,14 @@
-// Telefono con accesso (scelta dell'utente, 23 novembre 2026), contro il Supabase finto (vedi
-// scripts/prove-con-accesso.mjs): schermo da 360 px, tocco. Per l'accesso e per ogni voce del menu,
-// nello spazio personale e nella casa condivisa, controlla che la pagina non scorra di lato, che
-// pulsanti, campi e caselle misurino almeno 24 × 24 px (WCAG 2.5.8), che il testo sia di almeno
-// 12 px e quello dei campi di almeno 16 px (sotto i 16 px l'iPhone ingrandisce la pagina), che il
-// menu si apra e si chiuda e che le finestre stiano nello schermo.
-// Uso: node scripts/prove-telefono-accesso.mjs [indirizzo dell'app]
+// Telefono e computer con accesso (scelte dell'utente, 23 novembre 2026), contro il Supabase finto
+// (vedi scripts/prove-con-accesso.mjs). Due schermi: telefono da 360 px con il tocco e computer da
+// 1360 px. Per l'accesso e per ogni voce del menu, nello spazio personale e nella casa condivisa,
+// controlla che la pagina non scorra di lato, che il testo sia di almeno 12 px e non sia
+// schiacciato in una colonna sottile, e che le finestre stiano nello schermo. Sul telefono anche:
+// pulsanti, campi e caselle di almeno 24 × 24 px (WCAG 2.5.8), testo dei campi di almeno 16 px
+// (sotto, l'iPhone ingrandisce la pagina) e menu che si apre e si chiude.
+// Uso: node scripts/prove-schermi-accesso.mjs [indirizzo dell'app]
 import { BASE, checker, startScenario, openPage, launch } from './accesso-comune.mjs';
 
-const { check, finish } = checker('Prove sul telefono con accesso');
+const { check, finish } = checker('Prove su telefono e computer con accesso');
 const { fake, person } = await startScenario();
 const anna = person('anna', '11111111-1111-4111-8111-111111111111', 'anna@example.org');
 const luca = person('luca', '22222222-2222-4222-8222-222222222222', 'luca@example.org');
@@ -22,7 +23,6 @@ fake.seed('bills', [
 ]);
 fake.seed('house_tasks', [{ id: 'task-tel', user_id: anna.id, home_id: HOME, title: 'Controllare la caldaia prima dell\'inverno', due_date: '2026-12-01', done: false, created_at: '2026-11-04T10:00:00Z' }]);
 
-const W = 360;
 // Problemi della schermata: elementi oltre il bordo destro (fuori da un contenitore che scorre),
 // comandi sotto i 24 px, testo sotto i 12 px, campi sotto i 16 px.
 const measure = page => page.evaluate(() => {
@@ -62,32 +62,32 @@ const measure = page => page.evaluate(() => {
   return out;
 });
 
-const problems = { wide: [], small: [], tiny: [], fields: [], narrow: [] };
-async function inspect(page, where) {
-  const m = await measure(page);
-  if (m.scroll > W + 1) problems.wide.push(`${where}: la pagina è larga ${m.scroll} px`);
-  for (const key of ['wide', 'small', 'tiny', 'fields', 'narrow']) for (const item of m[key]) problems[key].push(`${where}: ${item}`);
-}
-const report = (key, message) => check(problems[key].length === 0, `${message}${problems[key].length ? ` — ${problems[key].length}: ${problems[key].slice(0, 6).join(' | ')}` : ''}`);
-
-const browser = await launch();
-try {
-  const ui = await openPage(browser, { viewport: { width: W, height: 740 }, device: { isMobile: true, hasTouch: true, deviceScaleFactor: 2 } });
+async function screen(browser, { label, width, height, device = {}, phone }) {
+  const problems = { wide: [], small: [], tiny: [], fields: [], narrow: [] };
+  const inspect = async (page, where) => {
+    const m = await measure(page);
+    if (m.scroll > width + 1) problems.wide.push(`${where}: la pagina è larga ${m.scroll} px`);
+    for (const key of ['wide', 'small', 'tiny', 'fields', 'narrow']) for (const item of m[key]) problems[key].push(`${where}: ${item}`);
+  };
+  const report = (key, message) => check(problems[key].length === 0, `${label}: ${message}${problems[key].length ? ` — ${problems[key].length}: ${problems[key].slice(0, 6).join(' | ')}` : ''}`);
+  const ui = await openPage(browser, { viewport: { width, height }, device });
   const { page } = ui;
   await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
   await inspect(page, 'accesso');
   let violations = await ui.axe();
-  check(violations.length === 0, `nessuna violazione WCAG nella schermata di accesso ${violations.join(' ')}`);
-  check(await ui.login(anna), 'Anna entra dal telefono');
+  check(violations.length === 0, `${label}: nessuna violazione WCAG nella schermata di accesso ${violations.join(' ')}`);
+  check(await ui.login(anna), `${label}: Anna entra`);
 
-  // Menu: nascosto, si apre con il pulsante, si chiude dopo la scelta.
-  const burger = page.locator('.burger');
-  check(await burger.isVisible() && !(await page.locator('.sidebar.sidebar-show').count()), 'sul telefono il menu è chiuso e c\'è il pulsante per aprirlo');
-  await burger.click();
-  check(await page.locator('.sidebar.sidebar-show').count() === 1, 'il pulsante apre il menu');
-  await inspect(page, 'menu aperto');
-  await ui.go('Bollette');
-  check(!(await page.locator('.sidebar.sidebar-show').count()), 'scelta una voce, il menu si chiude');
+  if (phone) {
+    // Menu: nascosto, si apre con il pulsante, si chiude dopo la scelta.
+    const burger = page.locator('.burger');
+    check(await burger.isVisible() && !(await page.locator('.sidebar.sidebar-show').count()), 'sul telefono il menu è chiuso e c\'è il pulsante per aprirlo');
+    await burger.click();
+    check(await page.locator('.sidebar.sidebar-show').count() === 1, 'il pulsante apre il menu');
+    await inspect(page, 'menu aperto');
+    await ui.go('Bollette');
+    check(!(await page.locator('.sidebar.sidebar-show').count()), 'scelta una voce, il menu si chiude');
+  }
 
   // Ogni voce del menu, nello spazio personale e nella casa.
   let visited = 0;
@@ -109,7 +109,7 @@ try {
       visited++;
     }
   }
-  check(visited >= 60, `visitate ${visited} schermate (tutte le voci del menu, in due spazi)`);
+  check(visited >= 60, `${label}: visitate ${visited} schermate (tutte le voci del menu, in due spazi)`);
 
   // Una finestra dell'app: il modulo della nuova bolletta deve stare nello schermo.
   await ui.go('Bollette');
@@ -117,19 +117,27 @@ try {
   const modal = page.locator('.modal').first();
   await modal.waitFor({ timeout: 5000 });
   const box = await modal.boundingBox();
-  check(box && box.x >= 0 && box.x + box.width <= W + 1, `il modulo della nuova bolletta sta nello schermo (${box ? Math.round(box.x) + '–' + Math.round(box.x + box.width) : '?'} px)`);
+  check(box && box.x >= 0 && box.x + box.width <= width + 1, `${label}: il modulo della nuova bolletta sta nello schermo (${box ? Math.round(box.x) + '–' + Math.round(box.x + box.width) : '?'} px)`);
   await inspect(page, 'nuova bolletta');
   violations = await ui.axe();
-  check(violations.length === 0, `nessuna violazione WCAG nel modulo della nuova bolletta ${violations.join(' ')}`);
+  check(violations.length === 0, `${label}: nessuna violazione WCAG nel modulo della nuova bolletta ${violations.join(' ')}`);
   await page.keyboard.press('Escape');
 
   report('wide', 'nessuna pagina scorre di lato e niente esce dallo schermo');
-  report('small', 'pulsanti, campi e caselle di almeno 24 × 24 px');
+  // Sul computer si usano mouse e tastiera: la misura dei comandi si controlla solo sul telefono.
+  if (phone) report('small', 'pulsanti, campi e caselle di almeno 24 × 24 px');
   report('tiny', 'testo di almeno 12 px');
   report('narrow', 'nessun testo lungo schiacciato in una colonna sotto i 110 px');
-  report('fields', 'testo dei campi di almeno 16 px (niente ingrandimento automatico sull\'iPhone)');
-  check(await ui.logout(), 'Anna esce dal menu del telefono');
-  check(ui.errors.length === 0, `nessun errore JavaScript${ui.errors.length ? ': ' + ui.errors.slice(0, 3).join(' | ') : ''}`);
+  if (phone) report('fields', 'testo dei campi di almeno 16 px (niente ingrandimento automatico sull\'iPhone)');
+  check(await ui.logout(), `${label}: Anna esce dal menu`);
+  check(ui.errors.length === 0, `${label}: nessun errore JavaScript${ui.errors.length ? ': ' + ui.errors.slice(0, 3).join(' | ') : ''}`);
+  await ui.context.close();
+}
+
+const browser = await launch();
+try {
+  await screen(browser, { label: 'telefono', width: 360, height: 740, device: { isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, phone: true });
+  await screen(browser, { label: 'computer', width: 1360, height: 900 });
 } finally {
   await browser.close();
   await fake.close();
