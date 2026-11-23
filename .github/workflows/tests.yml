@@ -48,3 +48,31 @@ jobs:
       - name: Sezioni della Fase 2 (creare, modificare ed eliminare nella demo)
         timeout-minutes: 6
         run: node scripts/prove-sezioni.mjs http://localhost:3000
+
+  database:
+    # Migrazioni e prove del database su PostgreSQL 17 (la versione di Supabase), con un
+    # sostituto minimo di Supabase: regole di accesso, trigger, vincoli e funzioni privilegiate.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Prove del database (migrazioni, regole di accesso, funzioni)
+        env:
+          PGHOST: localhost
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: postgres
+        run: bash scripts/db-tests.sh

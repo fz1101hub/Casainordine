@@ -30,8 +30,10 @@ Ordine completo di installazione su un database nuovo, in quest'ordine:
 16. `migrate_v47_progetti.sql`: progetti e lavori con fasi, preventivi (anche da professionisti di fiducia), spese e foto prima/durante/dopo; nell'archivio due tipi nuovi, «foto» e «preventivo». Finché non è eseguita, la sezione Progetti dice che va attivata.
 17. `migrate_v48_fondo.sql`: fondo sostituzioni, con tipo, durata, costo stimato e somma già da parte per gli oggetti delle Manutenzioni. Finché non è eseguita, la sezione mostra le scadenze indicative senza salvare.
 18. `migrate_v49_affitti.sql`: affitti tra locatore e inquilino, con invito per email, verbali d'ingresso e d'uscita firmati da entrambi e foto nel bucket privato `lease-files`; ciascuna parte vede solo contratto, verbali e foto. Finché non è eseguita, la sezione Affitti dice che va attivata.
+19. `migrate_v50_email_promemoria.sql`: email di promemoria anche a editor e lettori, con la scelta personale di non riceverle.
+20. `migrate_v51_sicurezza_funzioni.sql`: le 11 funzioni che servono solo alle regole di accesso escono dall'API (schema `private`); restano chiamabili le 20 azioni dell'app, ognuna con i propri controlli. Gli inviti d'affitto si vedono e si accettano solo con l'email verificata, come gli inviti alle case.
 
-Ogni script è in una sola transazione e si può rieseguire.
+Ogni script è in una sola transazione e si può rieseguire. Dopo la v51 le migrazioni precedenti non vanno più rieseguite: cercherebbero le funzioni di controllo nello schema `public` e si fermerebbero senza cambiare niente.
 
 
 ### Controlli programmati con Supabase Cron
@@ -408,6 +410,8 @@ curl -X POST 'https://TUO-DOMINIO.it/api/ingest' \
 - Non mettere password dei fornitori nel campo «Codice cliente».
 
 ## Verifiche
+
+`npm run test:db` installa tutte le migrazioni su un PostgreSQL vuoto, con un sostituto minimo di Supabase (`supabase/tests/`), e prova regole di accesso, trigger, vincoli e funzioni come utenti diversi: proprietario, editor, lettore, estraneo, account con email non verificata. `supabase/tests/sicurezza_funzioni_test.sql` tiene anche l'elenco chiuso delle funzioni privilegiate chiamabili dall'app: una nuova funzione fa fallire la prova finché non viene controllata e aggiunta. Servono `psql` e le variabili `PGHOST`, `PGPORT`, `PGUSER` (ed eventualmente `PGPASSWORD`); la CI lo esegue a ogni PR con PostgreSQL 17, la versione di Supabase. `migrate_v35_cron.sql` resta fuori perché richiede pg_cron e pg_net.
 
 `npm test` esegue oltre 400 test automatici (novembre 2026) su date italiane, rinnovi, CSV, estrazione dei campi, OAuth Google/Microsoft (state/PKCE), validazione provider IMAP, cifratura credenziali, sicurezza degli allegati, riconoscimento prudente delle conferme di pagamento e apprendimento isolato dei mittenti. L’OCR reale va provato in un browser con file di esempio; il riconoscimento è probabilistico.
 
