@@ -1,5 +1,8 @@
 import { authenticatedUser,getAdmin,json,failure } from '../../../../lib/server.mjs';
 import { validPushSubscription } from '../../../../lib/push.mjs';
+// Dispositivi per persona: il cron manda una notifica a ognuno, quindi un numero senza limite
+// renderebbe lento il giro per tutti.
+export const MAX_PUSH_DEVICES=10;
 
 export async function GET(request){
  try{const user=await authenticatedUser(request);if(!user)return json({error:'unauthorized'},401);
@@ -13,6 +16,8 @@ export async function POST(request){
  if(!parsed)return json({error:'pushInvalid'},400);
  const admin=getAdmin();const {data:existing,error:findError}=await admin.from('push_subscriptions').select('user_id').eq('endpoint',parsed.endpoint).maybeSingle();
  if(findError)throw findError;if(existing&&existing.user_id!==user.id)return json({error:'pushOtherAccount'},409);
+ if(!existing){const {count,error:countError}=await admin.from('push_subscriptions').select('id',{count:'exact',head:true}).eq('user_id',user.id);
+  if(countError)throw countError;if((count||0)>=MAX_PUSH_DEVICES)return json({error:'pushLimit'},429);}
  const {error}=await admin.from('push_subscriptions').upsert({...parsed,user_id:user.id},{onConflict:'endpoint'});
  if(error)throw error;return json({ok:true});
  }catch(e){return failure(e,'pushEnable',500,'push');}
