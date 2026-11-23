@@ -464,3 +464,12 @@
 .rental-compare{background:#fbf7ee;border:1px solid #efe3c6;border-radius:12px;padding:.8rem 1rem}
 .rental-compare h3{margin:0 0 .4rem}
 .rental-compare p{margin:.2rem 0}
+/* Casa Control (Fase 2) */
+.control-intro ul{margin:.4rem 0 1rem;padding-left:1.2rem;display:flex;flex-direction:column;gap:.25rem}
+.control-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem}
+.control-card{display:flex;flex-direction:column;gap:.45rem;padding:1rem 1.1rem}
+.control-card>small{color:var(--muted);font-weight:600}
+.control-card>b{font-size:1.8rem;font-variant-numeric:tabular-nums;line-height:1.1}
+.control-card>p{margin:0;font-size:.84rem;color:var(--muted);line-height:1.45;flex:1}
+.control-card.missing>b,.control-card.unavailable>b{color:var(--muted)}
+.control-card .btn{align-self:flex-start}

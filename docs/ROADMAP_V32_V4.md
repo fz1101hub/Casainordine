@@ -36,7 +36,7 @@ Ogni funzione richiede flusso realmente utilizzabile, permessi per utente/casa c
 - [x] **Progetti e lavori**: schede progetto, fasi, preventivi, spese, foto prima/dopo e fornitori. — #65; serve `migrate_v47_progetti.sql` sul database.
 - [x] **Fondo sostituzioni**: vita utile indicativa, costi stimati, risparmio mensile e disclaimer delle stime. — #66; serve `migrate_v48_fondo.sql` sul database.
 - [x] **Profilo locatore/inquilino**: immobili e contratti, verbali ingresso/uscita, foto e letture, accesso separato per ruolo senza esposizione dati privati. — #67; serve `migrate_v49_affitti.sql` sul database.
-- [ ] **Casa Control**: pannello facoltativo, indicatori calcolati da eventi veri, formula trasparente, gestione mancanza dati e nessun punteggio arbitrario.
+- [x] **Casa Control**: pannello facoltativo, indicatori calcolati da eventi veri, formula trasparente, gestione mancanza dati e nessun punteggio arbitrario. — #68; nessuna migrazione.
 
 ## Fase 3 — Solo dopo le due fasi precedenti: audit indipendente e correzioni
 
