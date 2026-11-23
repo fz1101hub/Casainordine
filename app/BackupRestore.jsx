@@ -3,13 +3,12 @@ import { useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { useLanguage } from './LanguageProvider';
 import { friendlyError } from '../lib/friendly-error.mjs';
-import { readBackup, restorePlan, existingCounts, existingDocumentIds, previewBySection, runRestore, restoreTotals, RestoreFileError } from '../lib/backup-restore.mjs';
+import { readBackup, restorePlan, existingCounts, existingDocumentIds, previewBySection, runRestore, restoreTotals, RestoreFileError, SKIP_REASONS } from '../lib/backup-restore.mjs';
 
 const MAX_BYTES = 20 * 1024 * 1024;
 // Backup .zip con i file (lib/backup-files.mjs, caricato solo quando serve): si legge tutto in memoria.
 const MAX_ZIP_BYTES = 400 * 1024 * 1024;
 const looksLikeZip = file => /\.zip$/i.test(file.name || '') || /zip/.test(file.type || '');
-const REASONS = ['files', 'twoParties', 'otherPeople', 'appOnly', 'settings', 'unknown'];
 
 // «Ripristina da backup» in Notifiche e backup: legge il file (.json, o .zip con i documenti), mostra
 // cosa contiene e quante voci ci sono già, poi aggiunge solo ciò che manca nello spazio attivo
@@ -34,7 +33,10 @@ export default function BackupRestore({ client, user, homeId, canWrite, onNotify
         backup = { ...readBackup(text), files };
       } else backup = readBackup(await file.text());
       const target = { homeId: homeId || null, userId: user?.id };
-      const plan = restorePlan(backup, target, { existingDocuments: await existingDocumentIds(client, backup, target) });
+      // Spese divise: solo se chi ha pagato e chi divide sono ancora nella casa.
+      let members = null;
+      if (homeId) { const { data, error } = await client.from('home_members').select('user_id').eq('home_id', homeId); if (error) throw error; members = (data || []).map(m => m.user_id); }
+      const plan = restorePlan(backup, target, { existingDocuments: await existingDocumentIds(client, backup, target), members });
       if (!plan.steps.length) { setState({ stage: 'idle' }); onNotify(tr('extra.restore.nothing')); return; }
       const existing = await existingCounts(client, plan);
       setState({ stage: 'preview', backup, plan, rows: previewBySection(plan, existing), otherSpace: plan.copy });
@@ -49,7 +51,8 @@ export default function BackupRestore({ client, user, homeId, canWrite, onNotify
     setState(s => ({ ...s, stage: 'running', done: 0, total: plan.steps.length }));
     try {
       const result = await runRestore(client, plan, { onProgress: p => setState(s => ({ ...s, done: p.done })) });
-      setState(s => ({ ...s, stage: 'done', totals: restoreTotals(result), quotaFull: Boolean(result.home_documents?.quotaFull) }));
+      setState(s => ({ ...s, stage: 'done', totals: restoreTotals(result), quotaFull: Boolean(result.home_documents?.quotaFull),
+        needsUpdate: Object.values(result).some(c => c.needsUpdate) }));
       onRefresh();
     } catch (e) {
       setState(s => ({ ...s, stage: 'preview' }));
@@ -58,7 +61,7 @@ export default function BackupRestore({ client, user, homeId, canWrite, onNotify
   }
 
   const space = tr(homeId ? 'extra.restore.space.home' : 'extra.restore.space.personal');
-  const skipped = REASONS.filter(r => state.plan?.skipped?.[r]).map(r => tr('extra.restore.reason.' + r));
+  const skipped = SKIP_REASONS.filter(r => state.plan?.skipped?.[r]).map(r => tr('extra.restore.reason.' + r));
   return <div className="restore-box">
     <label className={`btn btn-soft upload-label${!canWrite || busy ? ' disabled' : ''}`}>
       <RotateCcw size={15} aria-hidden="true" /> {tr(state.stage === 'reading' ? 'extra.restore.reading' : 'extra.restore.button')}
@@ -79,6 +82,7 @@ export default function BackupRestore({ client, user, homeId, canWrite, onNotify
       {state.stage === 'running' && <p role="status">{tr('extra.restore.running', { done: state.done, total: state.total })}</p>}
       {state.stage === 'done' && <><p role="status"><b>{tr('extra.restore.done', state.totals)}</b></p>
         {state.quotaFull && <p className="extra-alert">{tr('extra.restore.quotaFull')}</p>}
+        {state.needsUpdate && <p className="extra-alert">{tr('extra.restore.needsUpdate')}</p>}
         <button type="button" className="btn btn-soft" onClick={() => setState({ stage: 'idle' })}>{tr('extra.restore.close')}</button></>}
     </section>}
   </div>;

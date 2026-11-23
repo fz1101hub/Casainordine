@@ -38,12 +38,12 @@ insert into allowed values ('accept_home_invite'),('add_home_expense'),('add_hom
  ('change_home_member_role'),('confirm_payment_receipt'),('create_home'),('delete_home'),('invite_home_member'),
  ('leave_home'),('remove_home_member'),('revoke_home_invite'),('v20_apply_offline_shopping'),('v20_apply_offline_task'),
  ('v20_register_pagopa'),('v20_restore_deleted'),('v21_create_vacation_share'),('v21_revoke_vacation_share'),
- ('v36_my_storage_used'),('v49_accept_lease'),('v49_sign_report');
+ ('v36_my_storage_used'),('v49_accept_lease'),('v49_sign_report'),('v52_restore_vehicle_deadline');
 insert into results select 'funzione privilegiata chiamabile non controllata: public.'||p.proname, false
  from pg_proc p join pg_namespace n on n.oid=p.pronamespace
  where n.nspname='public' and p.prosecdef and has_function_privilege('authenticated',p.oid,'execute')
   and p.proname not in (select name from allowed);
-insert into results select 'le 20 azioni dell''app restano chiamabili', count(*)=20
+insert into results select 'le 21 azioni dell''app restano chiamabili', count(*)=21
  from pg_proc p join pg_namespace n on n.oid=p.pronamespace
  where n.nspname='public' and p.prosecdef and has_function_privilege('authenticated',p.oid,'execute')
   and p.proname in (select name from allowed);
@@ -159,6 +159,28 @@ select pg_temp.refused('l''estraneo non aggiunge scadenze all''auto degli altri'
 select pg_temp.refused('l''auto di un''altra casa non si usa', $$select public.add_home_vehicle_deadline(pg_temp.id('home_x')::uuid,pg_temp.id('car')::uuid,'Bollo','2027-03-01',15000,12)$$);
 select pg_temp.as_user('00000000-0000-0000-0000-00000000000e');
 select pg_temp.works('l''editor aggiunge una scadenza dell''auto', $$select public.add_home_vehicle_deadline(pg_temp.id('home')::uuid,pg_temp.id('car')::uuid,'Bollo','2027-03-01',15000,12)$$);
+-- Ripristino di una scadenza (v52): si collega a bolletta e utenza già ripristinate, senza rifarle.
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+insert into public.bills(home_id,title,amount,due_date) values (pg_temp.id('home_x')::uuid,'Bolletta dell''estraneo',5,'2027-01-01');
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000e');
+insert into public.bills(id,home_id,title,amount,due_date,paid_at) values ('60000000-0000-4000-8000-000000000001',pg_temp.id('home')::uuid,'Assicurazione · Panda',300,'2026-06-01',now());
+reset role;
+insert into ids select 'bill_x', id::text from public.bills where title='Bolletta dell''estraneo';
+set role authenticated;
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000f');
+select pg_temp.refused('il lettore non ripristina scadenze', $$select public.v52_restore_vehicle_deadline(pg_temp.id('home')::uuid,pg_temp.id('car')::uuid,'Assicurazione','2026-06-01',12,'60000000-0000-4000-8000-000000000001',null,null)$$);
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000c');
+select pg_temp.refused('l''estraneo non ripristina scadenze nella casa', $$select public.v52_restore_vehicle_deadline(pg_temp.id('home')::uuid,pg_temp.id('car')::uuid,'Assicurazione','2026-06-01',12,null,null,null)$$);
+select pg_temp.refused('l''estraneo non collega l''auto degli altri alla sua casa', $$select public.v52_restore_vehicle_deadline(pg_temp.id('home_x')::uuid,pg_temp.id('car')::uuid,'Assicurazione','2026-06-01',12,null,null,null)$$);
+select pg_temp.as_user('00000000-0000-0000-0000-00000000000e');
+select pg_temp.refused('bolletta di un''altra casa rifiutata', $$select public.v52_restore_vehicle_deadline(pg_temp.id('home')::uuid,pg_temp.id('car')::uuid,'Assicurazione','2026-06-01',12,pg_temp.id('bill_x')::uuid,null,null)$$);
+select pg_temp.refused('tipo di scadenza non valido rifiutato', $$select public.v52_restore_vehicle_deadline(pg_temp.id('home')::uuid,pg_temp.id('car')::uuid,'Multa','2026-06-01',12,null,null,null)$$);
+select pg_temp.refused('ripetizione non valida rifiutata', $$select public.v52_restore_vehicle_deadline(pg_temp.id('home')::uuid,pg_temp.id('car')::uuid,'Bollo','2026-06-01',6,null,null,null)$$);
+select pg_temp.works('l''editor ripristina una scadenza collegata alla bolletta', $$select public.v52_restore_vehicle_deadline(pg_temp.id('home')::uuid,pg_temp.id('car')::uuid,'Assicurazione','2026-06-01',12,'60000000-0000-4000-8000-000000000001',null,'62000000-0000-4000-8000-000000000001')$$);
+insert into results select 'scadenza già presente: niente di nuovo', public.v52_restore_vehicle_deadline(pg_temp.id('home')::uuid,pg_temp.id('car')::uuid,'Assicurazione','2026-06-01',12,'60000000-0000-4000-8000-000000000001',null,'62000000-0000-4000-8000-000000000001') is null;
+insert into results select 'la scadenza punta alla bolletta già pagata, senza crearne un''altra',
+ (select b.paid_at is not null from public.home_vehicle_deadlines d join public.bills b on b.id=d.bill_id where d.id='62000000-0000-4000-8000-000000000001')
+ and (select count(*) from public.bills where title like 'Assicurazione%')=1;
 
 -- ---------------------------------------------------------------------------------------
 -- Ricevute di pagamento
