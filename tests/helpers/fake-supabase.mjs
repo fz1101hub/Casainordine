@@ -6,6 +6,11 @@
 // rpc con funzioni registrate, rimozione e elenco dei file, utenti per l'amministrazione.
 // Per il browser (scripts/prove-con-accesso.mjs): CORS, accesso con email e password (token in
 // forma di JWT), uscita, caricamento e scaricamento dei file, porta fissa.
+// Con rls: true, per le richieste fatte con il token di un utente, una versione semplificata delle
+// regole di accesso (ognuno vede il proprio spazio e le case di cui è membro) e le funzioni delle
+// case (create_home, invite_home_member, accept_home_invite). Le regole vere sono provate a parte,
+// sul database (scripts/db-tests.sh): qui servono solo a far comportare l'app come con Supabase.
+import { createHash, randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
 
 const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -53,9 +58,47 @@ function fileBytes(buffer, contentType) {
 
 const RESERVED = new Set(['select', 'order', 'limit', 'offset', 'on_conflict', 'columns']);
 
-export async function startFakeSupabase({ port = 0, lenientRpc = false } = {}) {
+// Collegamenti incorporati che l'app chiede (select con tabella(colonne)): colonna → tabella.
+const EMBED = { homes: 'home_id', bills: 'bill_id' };
+
+export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = false } = {}) {
   const state = { tables: {}, tokens: new Map(), users: new Map(), passwords: new Map(), rpc: {}, removed: [], files: {}, uploads: [], requests: [], deletedUsers: [], rejectKeys: new Set() };
   const table = name => (state.tables[name] ||= []);
+  const memberOf = (user, homeId) => table('home_members').some(m => m.home_id === homeId && m.user_id === user.id);
+  // Regole di accesso semplificate.
+  const visible = (name, row, user) => {
+    if (name === 'homes') return memberOf(user, row.id);
+    if (name === 'home_members') return memberOf(user, row.home_id);
+    if (name === 'home_invites') return table('homes').some(h => h.id === row.home_id && h.owner_id === user.id) || row.email === user.email;
+    if (name === 'profiles') return row.id === user.id;
+    if (row.home_id) return memberOf(user, row.home_id);
+    if ('user_id' in row) return row.user_id === user.id;
+    return true;
+  };
+  const hash = v => createHash('sha256').update(v).digest('hex');
+  const fail = (code, message) => Object.assign(new Error(message), { code });
+  // Funzioni delle case, con gli stessi controlli essenziali di quelle vere.
+  const homeRpc = {
+    create_home: ({ home_name }, _s, user) => {
+      const id = `10000000-0000-4000-8000-${String(table('homes').length + 1).padStart(12, '0')}`;
+      table('homes').push({ id, name: home_name, owner_id: user.id, created_at: new Date().toISOString() });
+      table('home_members').push({ home_id: id, user_id: user.id, email: user.email, role: 'owner', joined_at: new Date().toISOString() });
+      return id;
+    },
+    invite_home_member: ({ target_home, invite_email, invite_role }, _s, user) => {
+      if (!table('homes').some(h => h.id === target_home && h.owner_id === user.id)) throw fail('42501', 'Solo il proprietario può invitare');
+      const secret = randomBytes(32).toString('hex');
+      table('home_invites').push({ id: `inv-${table('home_invites').length + 1}`, home_id: target_home, email: String(invite_email).toLowerCase(), role: invite_role, token_hash: hash(secret), invited_by: user.id, accepted_at: null, expires_at: new Date(Date.now() + 7 * 864e5).toISOString() });
+      return secret;
+    },
+    accept_home_invite: ({ secret }, _s, user) => {
+      const invite = table('home_invites').find(i => i.token_hash === hash(String(secret)) && !i.accepted_at);
+      if (!invite || invite.email !== user.email) throw fail('42501', 'Invito non valido o destinato a un altro indirizzo');
+      invite.accepted_at = new Date().toISOString();
+      table('home_members').push({ home_id: invite.home_id, user_id: user.id, email: user.email, role: invite.role, joined_at: new Date().toISOString() });
+      return invite.home_id;
+    },
+  };
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
     const chunks = [];
@@ -115,11 +158,15 @@ export async function startFakeSupabase({ port = 0, lenientRpc = false } = {}) {
     }
     // RPC
     const rpc = path.match(/^\/rest\/v1\/rpc\/([^/]+)$/);
+    const caller = state.tokens.get(String(req.headers.authorization || '').replace(/^Bearer\s+/i, ''));
     if (rpc) {
+      if (rls && caller && homeRpc[rpc[1]] && !state.rpc[rpc[1]]) {
+        try { return send(200, await homeRpc[rpc[1]](body || {}, state, caller)); } catch (e) { return send(400, { code: e.code || 'P0001', message: e.message }); }
+      }
       const fn = state.rpc[rpc[1]];
       if (!fn && lenientRpc) return send(200, null);
       if (!fn) return send(404, { code: 'PGRST202', message: `function ${rpc[1]} not found` });
-      try { return send(200, await fn(body || {}, state)); } catch (e) { return send(400, { code: e.code || 'P0001', message: e.message }); }
+      try { return send(200, await fn(body || {}, state, caller)); } catch (e) { return send(400, { code: e.code || 'P0001', message: e.message }); }
     }
     const rest = path.match(/^\/rest\/v1\/([^/]+)$/);
     if (!rest) return send(404, { message: `percorso non gestito: ${path}` });
@@ -127,12 +174,16 @@ export async function startFakeSupabase({ port = 0, lenientRpc = false } = {}) {
     if (state.rejectKeys.has(req.headers.apikey)) return send(401, { message: 'Invalid API key', hint: 'Double check your Supabase `anon` or `service_role` API key.' });
     const name = rest[1], rows = table(name);
     const filters = [...url.searchParams.entries()].filter(([k]) => !RESERVED.has(k));
-    const selected = () => rows.filter(r => filters.every(([col, expr]) => matches(r, col, expr)));
+    const selected = () => rows.filter(r => filters.every(([col, expr]) => matches(r, col, expr)) && (!rls || !caller || visible(name, r, caller)));
+    // Collegamenti incorporati: select=...,homes(id,name) aggiunge la casa a ogni riga.
+    const embeds = [...String(url.searchParams.get('select') || '').matchAll(/(\w+)(?:!\w+)?\(/g)].map(m => m[1]).filter(e => EMBED[e]);
+    const withEmbeds = list => embeds.length ? list.map(r => ({ ...r, ...Object.fromEntries(embeds.map(e => [e, table(e).find(x => x.id === r[EMBED[e]]) || null])) })) : list;
     const prefer = String(req.headers.prefer || '');
     const wantsObject = String(req.headers.accept || '').includes('vnd.pgrst.object');
     const reply = (list, status = 200) => {
       const headers = { 'content-range': `0-${Math.max(list.length - 1, 0)}/${list.length}` };
       if (req.method === 'HEAD') { res.writeHead(status, { ...cors, ...headers }); return res.end(); }
+      list = withEmbeds(list);
       if (wantsObject) return list.length === 1 ? send(status, list[0], headers) : send(406, { code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned' });
       if (!prefer.includes('return=representation') && req.method !== 'GET') return send(status === 200 ? 204 : status, undefined, headers);
       return send(status, list, headers);
