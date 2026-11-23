@@ -35,12 +35,15 @@ const sentTo = user => pushes.filter(p => p.user === user);
 
 test.before(async () => {
   process.env.RESEND_API_KEY = 're_prova'; process.env.RESEND_FROM = 'Casa in Ordine <casa@example.org>';
+  // La chiave di servizio firma i collegamenti per smettere di ricevere le email (lib/email-unsubscribe.mjs).
+  process.env.SUPABASE_SECRET_KEY = 'chiave-di-servizio-finta';
   // Solo Resend è finto: le altre richieste (Supabase) vanno al server finto.
   globalThis.fetch = async (url, init) => {
     if (String(url).startsWith('https://api.resend.com/')) { emails.push(JSON.parse(init.body)); return Response.json({ id: `email-${emails.length}` }); }
     return realFetch(url, init);
   };
   fake = await startFakeSupabase();
+  process.env.NEXT_PUBLIC_SUPABASE_URL = fake.url;
   admin = createClient(fake.url, 'chiave-di-servizio-finta', { auth: { persistSession: false, autoRefreshToken: false } });
   const profile = (id, email, extra = {}) => ({ id, email, reminders_enabled: true, reminder_emails: true, summary_frequency: 'off', ...extra });
   fake.seed('profiles', [profile(ANNA, 'anna@example.org', { summary_frequency: 'daily' }), profile(LUCA, 'luca@example.org', { reminder_emails: false }),
@@ -89,17 +92,26 @@ test('08:00 — promemoria, email e riepilogo; la push di chi è nell’orario s
   assert.deepEqual(fake.rows('push_deferred').find(r => r.user_id === PIERO).payload, billDuePushCopy({ language: 'de', name: 'Telefono di Piero', days: 1 }));
   assert.equal(body.deferred_push, 4);
   // Email: proprietaria ed editor che le vogliono (Luca le ha spente, le lettrici non le ricevono), più Piero.
-  const reminderMails = emails.filter(e => !e.html.includes('<ul>'));
+  const reminderMails = emails.filter(e => !e.html.includes('<ul'));
   assert.deepEqual(reminderMails.map(e => e.to).sort(), ['anna@example.org', 'piero@example.org']);
   const toAnna = reminderMails.find(e => e.to === 'anna@example.org'), toPiero = reminderMails.find(e => e.to === 'piero@example.org');
   assert.equal(toAnna.subject, `Casa in Ordine · ${billReminderCopy({ language: 'it', name: TITLE, dueDate: '2026-12-03' }).subject}`);
   assert.equal(toPiero.subject, `Casa in Ordine · ${billReminderCopy({ language: 'de', name: 'Telefono di Piero', dueDate: '2026-12-02' }).subject}`);
   assert.ok(!toAnna.html.includes('<b>casa</b>') && toAnna.html.includes('&lt;b&gt;casa&lt;/b&gt; &amp; gas'), 'il titolo è testo, non HTML');
   assert.match(toAnna.html, /href="https:\/\/casa\.example"/);
+  assert.match(toAnna.html, /^<!doctype html><html lang="it">/);
+  // Versione solo testo con gli stessi contenuti (il titolo resta com'è), e piè con la disiscrizione.
+  assert.ok(toAnna.text.includes(TITLE) && toAnna.text.includes('https://casa.example'));
+  assert.match(toPiero.text, /Erinnerungen per E-Mail/);
+  // Intestazioni per «Annulla iscrizione» con un clic (RFC 8058): collegamento firmato, per Anna e per i promemoria.
+  const stop = new URL(toAnna.headers['List-Unsubscribe'].slice(1, -1));
+  assert.equal(toAnna.headers['List-Unsubscribe-Post'], 'List-Unsubscribe=One-Click');
+  assert.deepEqual([stop.origin + stop.pathname, stop.searchParams.get('u'), stop.searchParams.get('t'), stop.searchParams.get('l')], ['https://casa.example/api/email/unsubscribe', ANNA, 'reminder', 'it']);
+  assert.ok(toAnna.html.includes(stop.toString().replace(/&/g, '&amp;')) && toAnna.text.includes(stop.toString()), 'lo stesso collegamento in fondo all\'email');
   // Riepilogo giornaliero di Anna: bollette aperte fino a fine mese, anche quella stimata appena creata.
-  const summary = emails.find(e => e.html.includes('<ul>'));
+  const summary = emails.find(e => e.html.includes('<ul'));
   assert.equal(summary.to, 'anna@example.org');
-  assert.equal((summary.html.match(/<li>/g) || []).length, 3);
+  assert.equal((summary.html.match(/<li\b/g) || []).length, 3);
   assert.equal(fake.rows('bill_summaries').length, 1);
   // Pulizia: restano solo gli inviti ancora aperti.
   assert.deepEqual(fake.rows('home_invites').map(i => i.id), ['inv-aperto']);
@@ -142,7 +154,7 @@ test('il giorno dopo — niente doppioni; un riepilogo nuovo; le voci vecchie sc
   assert.equal(status, 200, JSON.stringify(body.errors));
   // Le bollette già ricordate non si ricordano più (una volta per bolletta), anche se ancora in finestra.
   assert.equal(pushes.length, pushesBefore);
-  assert.equal(emails.filter(e => !e.html.includes('<ul>')).length, 2);
+  assert.equal(emails.filter(e => !e.html.includes('<ul')).length, 2);
   assert.equal(emails.length, emailsBefore + 1, 'solo il riepilogo giornaliero di Anna');
   assert.deepEqual(fake.rows('push_deferred').map(r => r.dedupe_key), ['summary:2026-12-02']);
   // Anna spegne le push dei riepiloghi prima della fine dell'orario silenzioso: la voce si toglie senza invio.
@@ -152,6 +164,22 @@ test('il giorno dopo — niente doppioni; un riepilogo nuovo; le voci vecchie sc
   const run = await runDeferredPushes(admin, { today: '2026-12-02', now: new Date('2026-12-02T08:37:00Z'), push });
   assert.equal(run.body.deferred_expired, 1);
   assert.equal(pushes.length, pushesBefore);
+  assert.deepEqual(fake.rows('push_deferred'), []);
+});
+
+test('Anna smette di ricevere il riepilogo dal collegamento dell\'email: il giorno dopo non arriva più', async () => {
+  const summaryMail = emails.filter(e => e.html.includes('<ul')).at(-1);
+  const stop = summaryMail.headers['List-Unsubscribe'].slice(1, -1);
+  assert.match(stop, /t=summary/);
+  const { POST } = await import('../app/api/email/unsubscribe/route.js');
+  // Come Gmail: POST al collegamento con «List-Unsubscribe=One-Click».
+  const res = await POST(new Request(stop, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'List-Unsubscribe=One-Click' }));
+  assert.equal(res.status, 200);
+  assert.equal(fake.rows('profiles').find(p => p.id === ANNA).summary_frequency, 'off');
+  const before = emails.length;
+  const { status } = await runDailyJobs(admin, day('2026-12-03', '07:07'));
+  assert.equal(status, 200);
+  assert.equal(emails.length, before, 'nessun riepilogo');
   assert.deepEqual(fake.rows('push_deferred'), []);
 });
 
