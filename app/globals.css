@@ -546,4 +546,7 @@ summary{min-height:24px;padding-block:3px}
 .skip-link:focus{top:12px;outline:3px solid #0d3f39;outline-offset:2px}
 #contenuto:focus{outline:none}
 .search-field:focus-within{box-shadow:inset 0 0 0 2px var(--green)}
+/* Telefono: il menu aperto sta sopra gli avvisi. Prima un avviso (che resta finché non lo si chiude)
+   copriva «Esci» e il profilo in fondo al menu (scripts/prove-eliminazione-account.mjs). */
+@media(max-width:900px){.sidebar.sidebar-show{z-index:120}}
 

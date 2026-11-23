@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { KeyRound, Trash2 } from 'lucide-react';
 import { passwordTooShort, MIN_PASSWORD_LENGTH } from '../lib/password-policy.mjs';
+import { forgetAccountOnDevice } from '../lib/account-device.js';
 
 // «Password dimenticata?» nella schermata di accesso: manda il link di Supabase per una nuova
 // password, che riporta all'app con l'evento PASSWORD_RECOVERY.
@@ -62,7 +63,9 @@ export function DeleteAccountPanel({ client, user, t, onNotify }) {
       const response = await fetch('/api/account/delete', { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm_email: confirm.trim() }) });
       const body = await response.json().catch(() => ({}));
       if (response.ok) {
-        // L'account non esiste più: si esce solo da questo dispositivo e si ricarica.
+        // L'account non esiste più: si tolgono dal dispositivo bozze, copie SOS e notifiche
+        // dell'account, si esce solo da questo dispositivo e si ricarica.
+        await forgetAccountOnDevice(user.id).catch(() => null);
         await client.auth.signOut({ scope: 'local' }).catch(() => null);
         try { Object.keys(localStorage).filter(k => /^sb-.+-auth-token/.test(k)).forEach(k => localStorage.removeItem(k)); } catch {}
         window.location.replace('/');

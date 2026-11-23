@@ -13,7 +13,7 @@ const browserTests = readdirSync(new URL('../scripts/', import.meta.url))
   .filter(name => /from '(?:\.\/accesso-comune|\.\.\/tests\/helpers\/fake-supabase)\.mjs'/.test(readFileSync(new URL(`../scripts/${name}`, import.meta.url), 'utf8')));
 
 test('ci sono le prove con accesso attese', () => {
-  for (const name of ['prove-con-accesso.mjs', 'prove-ruoli.mjs', 'prove-lingue-accesso.mjs', 'prove-offline-accesso.mjs', 'prove-schermi-accesso.mjs', 'prove-tastiera-accesso.mjs'])
+  for (const name of ['prove-con-accesso.mjs', 'prove-ruoli.mjs', 'prove-lingue-accesso.mjs', 'prove-offline-accesso.mjs', 'prove-schermi-accesso.mjs', 'prove-tastiera-accesso.mjs', 'prove-eliminazione-account.mjs'])
     assert.ok(browserTests.includes(name), `manca scripts/${name}`);
 });
 

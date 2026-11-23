@@ -98,6 +98,9 @@ jobs:
       - name: Tastiera e lettori di schermo
         timeout-minutes: 6
         run: node scripts/prove-tastiera-accesso.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
+      - name: Eliminazione dell'account (telefono condiviso)
+        timeout-minutes: 4
+        run: node scripts/prove-eliminazione-account.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
 
   database:
     # Migrazioni e prove del database su PostgreSQL 17 (la versione di Supabase), con un

@@ -193,7 +193,12 @@ export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = fa
     const admin = path.match(/^\/auth\/v1\/admin\/users\/([^/]+)$/);
     if (admin) {
       const user = state.users.get(admin[1]);
-      if (req.method === 'DELETE') { state.deletedUsers.push(admin[1]); state.users.delete(admin[1]); return send(200, {}); }
+      if (req.method === 'DELETE') {
+        // Come Supabase: dopo la cancellazione i token dell'utente non valgono più (getUser risponde 401).
+        state.deletedUsers.push(admin[1]); state.users.delete(admin[1]);
+        for (const [token, owner] of state.tokens) if (owner.id === admin[1]) state.tokens.delete(token);
+        return send(200, {});
+      }
       return user ? send(200, user) : send(404, { code: 404, msg: 'User not found' });
     }
     // Storage: file singoli (caricamento e scaricamento)
@@ -215,7 +220,12 @@ export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = fa
     const storage = path.match(/^\/storage\/v1\/object\/(list\/)?([^/]+)$/);
     if (storage) {
       if (storage[1]) return send(200, (state.files[storage[2]] || []).filter(f => f.name.startsWith(body?.prefix || '')).map(f => ({ name: f.name.slice((body?.prefix || '').length).replace(/^\//, ''), id: f.name })));
-      if (req.method === 'DELETE') { state.removed.push(...(body?.prefixes || []).map(p => `${storage[2]}/${p}`)); return send(200, (body?.prefixes || []).map(name => ({ name }))); }
+      if (req.method === 'DELETE') {
+        const names = new Set(body?.prefixes || []);
+        state.removed.push(...[...names].map(p => `${storage[2]}/${p}`));
+        if (state.files[storage[2]]) state.files[storage[2]] = state.files[storage[2]].filter(f => !names.has(f.name));
+        return send(200, [...names].map(name => ({ name })));
+      }
     }
     // RPC
     const rpc = path.match(/^\/rest\/v1\/rpc\/([^/]+)$/);

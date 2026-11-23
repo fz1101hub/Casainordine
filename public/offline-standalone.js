@@ -31,3 +31,10 @@ export async function listDrafts(accountId){const db=await openDb();return new P
  tx.oncomplete=()=>db.close();tx.onerror=()=>db.close();
 });}
 export async function removeDraft(id){return transaction('readwrite',store=>store.delete(id));}
+// Account cancellato: le sue bozze (anche i file) spariscono dal dispositivo. Restano quelle di altri
+// account e quelle salvate senza accesso, che non si sa di chi siano.
+export async function removeAccountDrafts(accountId){
+ if(!accountId)return 0;let removed=0;
+ await transaction('readwrite',store=>{const req=store.openCursor();req.onsuccess=()=>{const cursor=req.result;if(!cursor)return;if(cursor.value?.owner===accountId){cursor.delete();removed++;}cursor.continue();};return req;});
+ return removed;
+}
