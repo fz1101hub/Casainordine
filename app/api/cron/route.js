@@ -1,8 +1,8 @@
 import { getAdmin, json, scheduledCallAuthorized, publicAppUrl } from '../../../lib/server.mjs';
 import { processBillReminders, readIn } from '../../../lib/reminder-run.mjs';
+import { processSummaries } from '../../../lib/summary-run.mjs';
 import { addDaysISO, nextRecurringDue, todayRome, euro } from '../../../lib/dates.mjs';
 import { reminderWindow, daysUntil, firstRecurringFrom } from '../../../lib/reminder-window.mjs';
-import { shouldSendSummary, monthEndISO, upcomingSummaryBills } from '../../../lib/summary-schedule.mjs';
 import { sendPush, configuredPush } from '../../../lib/push.mjs';
 import { processExtraAlerts, pushAllowed } from '../../../lib/extra-alerts.mjs';
 import { processAutomations } from '../../../lib/automation-alerts.mjs';
@@ -97,59 +97,10 @@ export async function GET(request) {
     // A monthly list is independent of daily mailbox scans and the fixed T-3 reminder.
     const {data:profiles,error:summaryProfileError}=await admin.from('profiles').select('id,email,summary_frequency,summary_weekday,summary_month_day').neq('summary_frequency','off').limit(1000);
     if(summaryProfileError)throw summaryProfileError;
-    for(const profile of profiles||[]){
-      if(!shouldSendSummary(profile,today))continue;
-      const {data:personalBills,error:queryError}=await admin.from('bills').select('id,title,supplier,amount,due_date,paid_at')
-        .eq('user_id',profile.id).is('home_id',null).is('paid_at',null).gte('due_date',today).lte('due_date',monthEndISO(today)).order('due_date').limit(1000);
-      if(queryError){counts.errors.push(`Riepilogo utente ${profile.id} non riuscito`);continue;}
-      const {data:memberships,error:memberErr}=await admin.from('home_members').select('home_id').eq('user_id',profile.id).limit(30);
-      if(memberErr){counts.errors.push(`Riepilogo casa ${profile.id} non riuscito`);continue;}
-      let sharedBills=[];
-      if(memberships?.length){
-        const {data:shared,error:sharedErr}=await admin.from('bills').select('id,title,supplier,amount,due_date,paid_at')
-          .in('home_id',memberships.map(m=>m.home_id)).is('paid_at',null).gte('due_date',today).lte('due_date',monthEndISO(today)).limit(1000);
-        if(sharedErr){counts.errors.push(`Riepilogo casa ${profile.id}: ${sharedErr.message}`);continue;}
-        sharedBills=shared||[];
-      }
-      const uniqueBills=[...new Map([...(personalBills||[]),...sharedBills].map(b=>[b.id,b])).values()];
-      const items=upcomingSummaryBills(uniqueBills,today);
-      if(!items.length)continue;
-      const total=items.reduce((n,b)=>n+Number(b.amount),0);
-      const {data:recap,error:recapErr}=await admin.from('bill_summaries').upsert({user_id:profile.id,summary_date:today,bill_count:items.length,total_amount:total},
-        {onConflict:'user_id,summary_date',ignoreDuplicates:true}).select('id,email_sent_at').maybeSingle();
-      if(recapErr){counts.errors.push(`Riepilogo: ${recapErr.message}`);continue;}
-      if(!recap)continue;
-      counts.summaries_created++;
-      const {data:digestPreferences}=await admin.from('user_alert_preferences').select('*').eq('user_id',profile.id).maybeSingle();
-      if(configuredPush()&&pushAllowed(digestPreferences||{},'digest')){
-        const {data:devices}=await admin.from('push_subscriptions').select('id,endpoint,p256dh,auth_secret').eq('user_id',profile.id).limit(10);
-        let pushCopy=null;
-        if(devices?.length){
-          const {data:languagePreference,error:languageError}=await admin.from('user_language_preferences').select('language').eq('user_id',profile.id).maybeSingle();
-          if(languageError)counts.errors.push(`Lingua push riepilogo ${profile.id}: ${languageError.message}`);
-          else pushCopy=billSummaryPushCopy({language:languagePreference?.language||'it',count:items.length,total});
-        }
-        let sent=false;
-        for(const device of pushCopy?(devices||[]):[]){
-          try{
-            await sendPush(device,pushCopy);
-            counts.summary_push_sent++;sent=true;
-          }catch(e){
-            if(e.statusCode===404||e.statusCode===410)await admin.from('push_subscriptions').delete().eq('id',device.id).eq('user_id',profile.id);
-            else counts.errors.push(`Push riepilogo ${profile.id}: ${String(e.message).slice(0,120)}`);
-          }
-        }
-        if(sent)await admin.from('bill_summaries').update({push_sent_at:new Date().toISOString()}).eq('id',recap.id);
-      }
-      if(profile.email){
-        try{
-          const {data:languagePreference,error:languageError}=await admin.from('user_language_preferences').select('language').eq('user_id',profile.id).maybeSingle();
-          if(languageError)throw languageError;
-          const result=await emailSummary(profile.email,items,today,languagePreference?.language||'it',appUrl);
-          if(result.sent){await admin.from('bill_summaries').update({email_sent_at:new Date().toISOString(),email_error:null}).eq('id',recap.id);counts.summary_emails_sent++;}
-        }catch(e){await admin.from('bill_summaries').update({email_error:String(e.message).slice(0,150)}).eq('id',recap.id);counts.errors.push(`Email riepilogo ${profile.id} non riuscita`);}
-      }
-    }
+    // A blocchi (lib/summary-run.mjs): letture una volta per tipo di dato.
+    await processSummaries(admin,profiles||[],{today,appUrl,counts,
+      push:configuredPush()?{allowed:pref=>pushAllowed(pref,'digest'),copy:billSummaryPushCopy,send:sendPush}:null,
+      email:process.env.RESEND_API_KEY&&process.env.RESEND_FROM?{send:emailSummary}:null});
     await processExtraAlerts(admin,today,counts,{sendPush,configuredPush});
     await processAutomations(admin,today,counts,{sendPush,configuredPush});
     await processV20Alerts(admin,today,counts,{sendPush,configuredPush});

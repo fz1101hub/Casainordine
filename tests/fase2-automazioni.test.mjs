@@ -110,7 +110,18 @@ function fakeAdmin(tables) {
     from(name) {
       const filters = []; let upsertRow = null;
       const builder = {
-        select() { return builder; }, limit() { return builder; },
+        // Dopo un upsert (consegna a blocchi) select() restituisce le righe nuove; altrimenti legge.
+        select() {
+          if (!upsertRow) return builder;
+          const added = [];
+          for (const row of [].concat(upsertRow)) {
+            const exists = alerts.some(a => a.user_id === row.user_id && a.kind === row.kind && a.reference_id === row.reference_id && a.event_date === row.event_date);
+            if (!exists) { alerts.push(row); added.push(row); }
+          }
+          return Promise.resolve({ data: added, error: null });
+        },
+        limit() { return builder; },
+        range(from, to) { return builder.then(result => ({ data: result.data ? result.data.slice(from, to + 1) : null, error: result.error })); },
         eq(column, value) { filters.push(row => row[column] === value); return builder; },
         is(column, value) { filters.push(row => (row[column] ?? null) === value); return builder; },
         in(column, values) { filters.push(row => values.includes(row[column])); return builder; },

@@ -37,12 +37,16 @@ export async function GET(request){
   await admin.from('mail_connection_attempts').delete().lt('created_at',new Date(Date.now()-24*60*60_000).toISOString());
   const expiry=new Date(Date.now()-45*24*60*60_000).toISOString();
   const {data:old}=await admin.from('mail_documents').select('id,storage_path').eq('status','pending').lt('created_at',expiry).limit(100);
+  // A blocchi: tutti i file scaduti in una richiesta allo Storage, tutte le righe in una scrittura.
+  // Se lo Storage non risponde non si tocca niente e si riprova il giorno dopo.
   let expired=0;
-  for(const d of old||[]){
-    const {error:storageError}=await admin.storage.from(MAIL_BUCKET).remove([d.storage_path]);
-    if(storageError)continue;
-    const {error:rowError}=await admin.from('mail_documents').update({status:'dismissed',filename:'[eliminato]',subject:null,sender:null,suggestion:{}}).eq('id',d.id);
-    if(!rowError)expired++;
+  if(old?.length){
+    const {error:storageError}=await admin.storage.from(MAIL_BUCKET).remove(old.map(d=>d.storage_path).filter(Boolean));
+    if(!storageError){
+      const ids=old.map(d=>d.id);
+      const {error:rowError}=await admin.from('mail_documents').update({status:'dismissed',filename:'[eliminato]',subject:null,sender:null,suggestion:{}}).in('id',ids);
+      if(!rowError)expired=ids.length;
+    }
   }
   // Data minimization: keep pending evidence up to 120 days, older history up to 365.
   const receiptsCutoff=new Date(Date.now()-120*86400000).toISOString();
