@@ -49,6 +49,39 @@ jobs:
         timeout-minutes: 6
         run: node scripts/prove-sezioni.mjs http://localhost:3000
 
+  accesso:
+    # L'app con accesso: compilata per un Supabase finto (tests/helpers/fake-supabase.mjs) e provata
+    # nel browser con il client Supabase vero: accesso, dati, backup JSON e .zip, ripristino,
+    # file sbagliati, accessibilità e uscita. La prova del lavoro «test» gira invece in demo.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: chiave-pubblica-finta
+      SUPABASE_SECRET_KEY: chiave-di-servizio-finta
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Installa dipendenze (versioni bloccate da package-lock.json)
+        run: npm ci --no-audit --no-fund
+      - name: Build Next.js per il Supabase finto
+        run: npm run build
+      - name: Browser per la prova (Chromium, versione di package-lock.json)
+        timeout-minutes: 12
+        run: |
+          npx playwright install chromium
+          node -e "require('playwright').chromium.launch().then(b=>b.close())" || npx playwright install-deps chromium
+      - name: Prova con accesso (accesso, dati, backup, ripristino, uscita)
+        timeout-minutes: 6
+        run: |
+          npm start -- -p 3000 > next.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf -o /dev/null http://localhost:3000/ && break; sleep 1; done
+          node scripts/prove-con-accesso.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
+
   database:
     # Migrazioni e prove del database su PostgreSQL 17 (la versione di Supabase), con un
     # sostituto minimo di Supabase: regole di accesso, trigger, vincoli e funzioni privilegiate.

@@ -16,7 +16,8 @@
     "test:languages": "node scripts/check-languages.mjs",
     "test:accessibility": "node scripts/check-accessibility.mjs",
     "test:sections": "node scripts/prove-sezioni.mjs",
-    "test:db": "bash scripts/db-tests.sh"
+    "test:db": "bash scripts/db-tests.sh",
+    "test:access": "node scripts/prove-con-accesso.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "5.3.0",

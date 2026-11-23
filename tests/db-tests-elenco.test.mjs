@@ -38,3 +38,13 @@ test('v51: le funzioni di controllo escono dall\'API e gli affitti vogliono l\'e
   assert.match(sql, /email_confirmed_at is not null/);
   assert.doesNotMatch(sql.replace(/^--.*$/gm, ''), /auth\.jwt\(\)/);
 });
+
+test('la CI prova anche l\'app con accesso, contro il Supabase finto', () => {
+  const ci = readFileSync(new URL('../.github/workflows/tests.yml', import.meta.url), 'utf8');
+  assert.match(ci, /^  accesso:/m);
+  assert.match(ci, /NEXT_PUBLIC_SUPABASE_URL: http:\/\/127\.0\.0\.1:54321/);
+  assert.match(ci, /node scripts\/prove-con-accesso\.mjs http:\/\/localhost:3000/);
+  const script = readFileSync(new URL('../scripts/prove-con-accesso.mjs', import.meta.url), 'utf8');
+  assert.match(script, /startFakeSupabase\(\{ port: PORT/);
+  assert.match(script, /process\.exit\(1\)/, 'una prova non superata ferma la CI');
+});
