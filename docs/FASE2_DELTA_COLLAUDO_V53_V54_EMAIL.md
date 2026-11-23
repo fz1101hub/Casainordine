@@ -31,3 +31,9 @@
 ## Aggiornamento repository — 23 novembre 2026, ore 19:41 CET
 
 La lettura diretta dei metadati GitHub conferma PR #102 `closed / merged`, merge SHA `e2fc4ecd82ab20359e7e8feecc7eaa1f92a001e0`. La PR #88 resta `open / draft`, head `42491db92fe0d4eb1ae657df93ddb648d255d254`; GitHub riporta `mergeable=false`. **Non dedurre la causa della non-mergeability senza analizzare i conflitti e i controlli richiesti.** Prima di integrare la documentazione occorre confrontare la base `main` aggiornata con il branch, preservando eventuali modifiche concorrenti. Il gate E102 è applicabile al prossimo candidato integrato, ma resta `BLOCKED` finché non siano verificati CI sullo SHA candidato e prove reali di invio/disiscrizione. Nessun deploy, migrazione, segreto o dato modificato in questa verifica. Fase 3 non avviata.
+
+## Verifica aggiuntiva — 23 novembre 2026, ore 20:37 CET
+
+- Confronto diretto `main...docs/fase2-collaudo-reale-20261123`: **diverged**, branch avanti di **15 commit** e indietro di **32 commit**; base `main` osservata `18cbc31595d03f29f970cf574b881eb765deb1f1`, merge-base `5ac3c7a8b2477c0a5182ac9346809cafa23b3824`. Il confronto elenca **7 file** differenti: `.github/workflows/tests.yml`, cinque nuovi documenti di collaudo e `docs/ROADMAP_V32_V4.md`. Questo confronto non dimostra da solo l'assenza o la presenza di conflitti: richiede un aggiornamento prudente del branch prima del merge.
+- GitHub Actions sul commit `4f3045e00a46085894b09985d155cb76529ba7c7`: run **#45241095734**, workflow `Test automatici`, `completed / success`. È verificato l'esito complessivo, **non** i singoli log/job né le prove reali. URL: https://github.com/fz1101hub/Casainordine/actions/runs/45241095734
+- Decisione: mantenere PR #88 draft e gate M53/P53/M54/A54/E102/RLS/DEP `BLOCKED`; non fondere il branch divergente senza risoluzione e nuova CI sullo SHA candidato. Nessun audit di Fase 3, deploy o migrazione.
