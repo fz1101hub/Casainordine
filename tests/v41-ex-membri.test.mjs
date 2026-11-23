@@ -71,9 +71,9 @@ test('Account: i file tenuti restano, tutti gli altri si cancellano anche oltre 
   assert.ok(removed.includes('mail-bills:u1/mail.pdf'), 'gli allegati email sono sempre personali');
 });
 
-test('Account: l’API tiene i file condivisi e poi cancella l’utente', () => {
+test('Account: l’API pianifica la pulizia, cancella Auth e solo dopo tocca Storage', () => {
   const route = source('app/api/account/delete/route.js');
-  const order = ['sharedOwnedHomes(admin, user.id)', 'sharedDocumentPaths(admin, user.id)', 'removeUserFiles(admin, user.id, keep)', 'admin.auth.admin.deleteUser(user.id)']
+  const order = ['sharedOwnedHomes(admin, user.id)', 'sharedDocumentPaths(admin, user.id)', 'queueAccountCleanup(admin, user.id, keep)', 'admin.auth.admin.deleteUser(user.id)', 'finishAccountCleanup(admin, user.id)']
     .map(x => route.indexOf(x));
   assert.ok(order.every((v, i) => v > 0 && (i === 0 || v > order[i - 1])), order.join(','));
 });

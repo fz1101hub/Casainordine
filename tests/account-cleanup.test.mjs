@@ -49,7 +49,7 @@ test('un errore di Auth impedisce qualunque eliminazione da Storage', async () =
   assert.equal(await finishAccountCleanup(f.admin, 'u1'), false);
   assert.equal(f.scans(), 0);
   f.status('error');
-  await assert.rejects(finishAccountCleanup(f.admin, 'u1'), /Auth temporarily unavailable/);
+  await assert.rejects(finishAccountCleanup(f.admin, 'u1'), e => e?.message === 'Auth temporarily unavailable');
   assert.equal(f.scans(), 0);
   await discardAccountCleanup(f.admin, 'u1');
   assert.equal(f.jobs.size, 0);
@@ -68,7 +68,7 @@ test('Storage non disponibile: la richiesta resta in coda e il cron può riprend
   const f = fixture();
   await queueAccountCleanup(f.admin, 'u1', new Set(['u1/condiviso.pdf']));
   f.status('deleted'); f.storageFails(true);
-  await assert.rejects(finishAccountCleanup(f.admin, 'u1'), /Storage unavailable/);
+  await assert.rejects(finishAccountCleanup(f.admin, 'u1'), e => e?.message === 'Storage unavailable');
   assert.equal(f.jobs.size, 1);
   f.storageFails(false);
   assert.deepEqual(await runAccountCleanupJobs(f.admin), { cleaned: 1, errors: [] });
