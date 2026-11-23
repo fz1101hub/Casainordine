@@ -1,5 +1,5 @@
 import { authenticatedUser, getAdmin, json } from '../../../../lib/server.mjs';
-import { sharedOwnedHomes, sharedDocumentPaths, queueAccountCleanup, discardAccountCleanup, finishAccountCleanup, revokeGoogleAccess } from '../../../../lib/account-deletion.mjs';
+import { sharedOwnedHomes, sharedDocumentPaths, ownedLeasePhotoPaths, queueAccountCleanup, discardAccountCleanup, finishAccountCleanup, revokeGoogleAccess } from '../../../../lib/account-deletion.mjs';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
@@ -19,8 +19,9 @@ export async function POST(request) {
     const shared = await sharedOwnedHomes(admin, user.id);
     if (shared.length) return json({ error: 'accountOwner', homes: shared.map(h => h.name) }, 409);
     const keep = await sharedDocumentPaths(admin, user.id);
+    const leasePaths = await ownedLeasePhotoPaths(admin, user.id);
     // Se questa scrittura fallisce, l'account resta intatto e nessun file viene cancellato.
-    await queueAccountCleanup(admin, user.id, keep);
+    await queueAccountCleanup(admin, user.id, keep, leasePaths);
     await revokeGoogleAccess(admin, user.id);
     const { error } = await admin.auth.admin.deleteUser(user.id);
     if (error) {

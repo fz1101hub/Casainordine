@@ -6,6 +6,7 @@ begin;
 create table if not exists public.account_cleanup_jobs (
   user_id uuid primary key,
   keep_paths text[] not null default '{}'::text[],
+  lease_paths text[] not null default '{}'::text[],
   created_at timestamptz not null default now(),
   attempts integer not null default 0 check (attempts >= 0),
   last_attempt_at timestamptz,

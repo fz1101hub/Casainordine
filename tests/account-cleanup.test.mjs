@@ -5,7 +5,8 @@ import { queueAccountCleanup, discardAccountCleanup, finishAccountCleanup, runAc
 function fixture() {
   const jobs = new Map(), files = {
     'house-documents': ['a.pdf', 'condiviso.pdf'],
-    'mail-bills': ['b.pdf']
+    'mail-bills': ['b.pdf'],
+    'lease-files': ['lease-1/verbale.jpg']
   };
   let authStatus = 'present', failStorage = false, scans = 0;
   const admin = {
@@ -34,7 +35,7 @@ function fixture() {
         },
         async remove(paths) {
           if (failStorage) return { error: { message: 'Storage unavailable' } };
-          for (const path of paths) files[bucket] = (files[bucket] || []).filter(name => path !== `u1/${name}`);
+          for (const path of paths) files[bucket] = (files[bucket] || []).filter(name => path !== (bucket === 'lease-files' ? name : `u1/${name}`));
           return { error: null };
         },
       };
@@ -57,10 +58,10 @@ test('un errore di Auth impedisce qualunque eliminazione da Storage', async () =
 
 test('dopo Auth=404 elimina solo i file non condivisi e chiude la coda', async () => {
   const f = fixture();
-  await queueAccountCleanup(f.admin, 'u1', new Set(['u1/condiviso.pdf']));
+  await queueAccountCleanup(f.admin, 'u1', new Set(['u1/condiviso.pdf']), ['lease-1/verbale.jpg']);
   f.status('deleted');
   assert.equal(await finishAccountCleanup(f.admin, 'u1'), true);
-  assert.deepEqual(f.files, { 'house-documents': ['condiviso.pdf'], 'mail-bills': [] });
+  assert.deepEqual(f.files, { 'house-documents': ['condiviso.pdf'], 'mail-bills': [], 'lease-files': [] });
   assert.equal(f.jobs.size, 0);
 });
 
