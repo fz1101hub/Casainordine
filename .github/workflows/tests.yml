@@ -48,6 +48,9 @@ jobs:
       - name: Sezioni della Fase 2 (creare, modificare ed eliminare nella demo)
         timeout-minutes: 6
         run: node scripts/prove-sezioni.mjs http://localhost:3000
+      - name: Bollette fotografate (storte, scure, sfocate, piccole, con un'ombra)
+        timeout-minutes: 6
+        run: node scripts/prove-foto.mjs http://localhost:3000
       - name: Email dei promemoria e dei riepiloghi (come si vedono)
         timeout-minutes: 3
         run: node scripts/prove-email.mjs
