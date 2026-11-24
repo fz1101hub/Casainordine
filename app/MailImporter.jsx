@@ -122,6 +122,8 @@ export default function MailImporter({client,onReview,notify,refresh=0,onPayment
           <label className="payment-match-label">{tr('mail.match')}
             <select value={choices[p.id]??p.bill_id??''} onChange={e=>setChoices(v=>({...v,[p.id]:e.target.value}))}>
               <option value="">{tr('mail.selectBill')}</option>{bills.filter(b=>!b.paid_at).map(b=><option key={b.id} value={b.id}>{b.supplier} · {b.title} · {money(Number(b.amount))} · {date(b.due_date)}</option>)}
+              {/* Bolletta proposta di un'altra casa o dello spazio personale (non nell'elenco aperto). */}
+              {p.bill&&!p.bill.paid_at&&!bills.some(b=>b.id===p.bill.id)&&<option value={p.bill.id}>{[p.bill.supplier,p.bill.title,money(Number(p.bill.amount)),date(p.bill.due_date),p.bill.home_name].filter(Boolean).join(' · ')}</option>}
             </select>
           </label>
           <label className="payment-trust-label"><input type="checkbox" checked={!!trusted[p.id]} onChange={e=>setTrusted(v=>({...v,[p.id]:e.target.checked}))}/> {tr('mail.trust')}</label>

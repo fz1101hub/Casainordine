@@ -55,7 +55,7 @@ test('Service creates review candidate but NEVER automatically marks an invoice 
   const operations={updates:[],inserted:[]};
   const mock={from(table){
     const q={
-      eq(){return this;},is(){return this;},gte(){return this;},lte(){return this;},
+      eq(){return this;},is(){return this;},or(){return this;},gte(){return this;},lte(){return this;},
       select(){return this;},
       limit:async()=>({data:table==='bills'?[bill]:[],error:null}),
       maybeSingle:async()=>({data:table==='mail_payment_evidence'?(q.inserted?{id:'evidence1'}:null):table==='profiles'?{auto_confirm_payments:false}:null,error:null}),
@@ -77,7 +77,7 @@ test('Auto-confirmation requires BOTH opt-in AND trust for the exact sender and 
   async function run(optIn,hasTrust){
     const events={updates:[],receipts:[]};
     const admin={from(table){
-      const q={inserted:false,ops:[],select(){return this;},eq(field,value){this.ops.push(['eq',field,value]);return this;},is(){return this;},gte(){return this;},lte(){return this;},
+      const q={inserted:false,ops:[],select(){return this;},eq(field,value){this.ops.push(["eq",field,value]);return this;},is(){return this;},or(){return this;},gte(){return this;},lte(){return this;},
         limit:async()=>({data:table==='bills'?[bill]:[],error:null}),
         maybeSingle:async()=>({data:table==='profiles'?{auto_confirm_payments:optIn}:table==='mail_payment_trusted_senders'?(hasTrust?{id:'trust1'}:null):table==='mail_payment_evidence'?(q.inserted?{id:'evidence1'}:null):table==='bills'?{id:'bill1'}:null,error:null}),
         upsert(row){this.inserted=true;events.receipts.push(row);return this;},

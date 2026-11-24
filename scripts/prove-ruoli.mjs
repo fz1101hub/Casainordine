@@ -34,6 +34,21 @@ try {
 
   // Luca, editor: modifica, ma senza i comandi del proprietario.
   check(await ui.login(luca), 'Luca (editor) entra');
+  // Ricevuta trovata nella casella di Luca per la luce di casa inserita da Anna (24 novembre 2026):
+  // proposta con il nome della casa anche dallo spazio personale, e confermabile da chi modifica.
+  const LUCE = '20000000-0000-4000-8000-0000000000a1';
+  fake.seed('mail_payment_evidence', [{ id: '41000000-0000-4000-8000-0000000000a1', user_id: luca.id, message_id: 'm1', status: 'pending', amount: 55, bill_id: LUCE,
+    sender_email: 'avvisi@banca.example', subject: 'Addebito SDD eseguito', received_at: '2026-11-20T10:00:00Z', created_at: '2026-11-20T10:00:00Z' }]);
+  await ui.go('Importa e collega');
+  const evidence = page.locator('.payment-evidence').first();
+  await evidence.waitFor({ timeout: 10000 }).catch(() => {});
+  const proposal = evidence.locator('select');
+  check(await proposal.inputValue().catch(() => '') === LUCE && /Casa al mare/.test(await proposal.locator('option:checked').innerText().catch(() => '')),
+    'la ricevuta di Luca propone la luce della casa, con il nome della casa');
+  await evidence.locator('.btn-primary').click();
+  await page.waitForTimeout(1500);
+  check(Boolean(fake.rows('bills').find(b => b.id === LUCE).paid_at), 'confermata da Luca: la luce della casa risulta pagata');
+  fake.rows('bills').find(b => b.id === LUCE).paid_at = null;
   await ui.go('Famiglia e inviti');
   check(await spaceButtons() === 1, 'la casa compare una volta sola tra gli spazi di Luca');
   await enterHome();

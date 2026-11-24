@@ -26,7 +26,8 @@
     "test:account-deletion": "node scripts/prove-eliminazione-account.mjs",
     "test:email": "node scripts/prove-email.mjs",
     "test:night": "node scripts/prove-notte.mjs",
-    "test:slow-phone": "node scripts/prove-telefono-lento.mjs"
+    "test:slow-phone": "node scripts/prove-telefono-lento.mjs",
+    "test:photos": "node scripts/prove-foto.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "5.3.0",
