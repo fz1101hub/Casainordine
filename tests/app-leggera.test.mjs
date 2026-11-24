@@ -55,9 +55,10 @@ test('l’app non usa Realtime, Edge Functions né bucket analytics', () => {
 
 test('la Home non scarica all’avvio CSV, piani rate, lettura documenti e controlli antifrode', () => {
   const page = read('app/page.jsx');
-  for (const mod of ['csv', 'rate-plan', 'document-import', 'v20-core']) {
+  for (const mod of ['csv', 'bank-csv', 'rate-plan', 'document-import', 'v20-core']) {
     assert.doesNotMatch(page, new RegExp(`^import [^;]*from '\\.\\./lib/${mod}\\.mjs';`, 'm'), `${mod} importato all'avvio`);
-    assert.match(page, new RegExp(`await import\\('\\.\\./lib/${mod}\\.mjs'\\)`), `${mod} caricato quando serve`);
+    // import() dinamico, da solo o dentro Promise.all (CSV ed estratti conto insieme).
+    assert.match(page, new RegExp(`(?:await |Promise\\.all\\(\\[[^\\]]*)import\\('\\.\\./lib/${mod}\\.mjs'\\)`), `${mod} caricato quando serve`);
   }
   assert.match(page, /import \{ billTitle \} from '\.\.\/lib\/bill-title\.mjs';/);
   assert.match(read('lib/document-import.mjs'), /export \{ billTitle \} from '\.\/bill-title\.mjs';/);

@@ -164,6 +164,27 @@ try {
     check(await button('Attiva il pannello').count() === 1, 'Casa Control: il pannello si spegne');
   });
 
+  // Estratto conto della banca nel caricamento CSV (24 novembre 2026), anche in Windows-1252.
+  await section('Importa e collega', async () => {
+    const { FILE } = await import('../tests/fixtures/estratti-conto.mjs');
+    const before = await page.evaluate(() => (JSON.parse(localStorage.getItem('casainordine-demo-v1') || '{}').bills || []).length);
+    await page.locator('input[type=file][accept*="csv"]').first().setInputFiles({ name: 'movimenti.csv', mimeType: 'text/csv', buffer: Buffer.from(FILE.bancoposta, 'latin1') });
+    const dialog = page.locator('dialog.app-dialog');
+    await dialog.waitFor({ timeout: 5000 });
+    const message = await dialog.innerText();
+    // Nella demo non ci sono bollette aperte uguali: i cinque pagamenti di bollette si aggiungono.
+    check(/Estratto conto/.test(message) && /5 sono bollette da aggiungere/.test(message) && /SMAT/.test(message) && /Enel/.test(message) && !/CONAD|PRELIEVO|STATION/i.test(message), 'Estratto conto: la conferma elenca i pagamenti delle bollette, non la spesa');
+    await dialog.locator('button').last().click(); await settle(800);
+    check(/Estratto conto importato/.test(await toast()), 'Estratto conto: importato');
+    const bank = await page.evaluate(() => (JSON.parse(localStorage.getItem('casainordine-demo-v1') || '{}').bills || []).filter(b => String(b.external_id || '').startsWith('bank:')));
+    check(bank.length === 5 && bank.every(b => b.paid_at), `Estratto conto: cinque bollette già pagate aggiunte (${bank.length})`);
+    await page.locator('input[type=file][accept*="csv"]').first().setInputFiles({ name: 'movimenti.csv', mimeType: 'text/csv', buffer: Buffer.from(FILE.bancoposta, 'latin1') });
+    await settle(1200);
+    check(/già registrati/.test(await toast()) && !(await dialog.isVisible().catch(() => false)), 'Estratto conto: caricato di nuovo, avvisa che è già registrato');
+    const again = await page.evaluate(() => (JSON.parse(localStorage.getItem('casainordine-demo-v1') || '{}').bills || []).length);
+    check(again === before + 5, `Estratto conto: nessun doppione (${again - before})`);
+  });
+
   check(errors.length === 0, `nessun errore JavaScript${errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''}`);
 } finally {
   await browser.close();

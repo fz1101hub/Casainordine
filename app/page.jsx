@@ -485,15 +485,48 @@ export default function Page() {
   async function pay(bill) {const ok=await updateRow('bills',bill.id,{paid_at:bill.paid_at?null:new Date().toISOString()});if(ok)notify(bill.paid_at?tr('v32.payment.reopened'):tr('v32.payment.paid'));}
   async function toggleTask(t) {await updateRow('house_tasks',t.id,{done_at:t.done_at?null:new Date().toISOString()},'tasks');}
   const categoryCode=value=>{const v=String(value||'').trim().toLowerCase();return categories.find(c=>c.toLowerCase()===v||tr('billCategory.'+c).toLowerCase()===v)||'Altro';};
+  // Estratto conto: le uscite che corrispondono a una bolletta da pagare la segnano pagata, gli altri
+  // pagamenti di bollette diventano bollette già pagate; il resto (spesa, carburante, prelievi) no.
+  async function importBankStatement(bank,statement){
+    const plan=bank.billPaymentsFromBank(statement,data.bills);
+    if(!plan.paid.length&&!plan.added.length)throw shownError(tr(plan.already?'v32.import.bankAlready':'v32.import.bankNothing'));
+    const line=(day,supplier,amount,what)=>`• ${formatDay(day,{day:'numeric',month:'short'})} · ${supplier} · ${money(amount)} — ${what}`;
+    const list=[...plan.paid.map(p=>line(p.row.date,p.bill.supplier||p.bill.title,p.row.amount,tr('v32.import.bankMarkPaid'))),
+      ...plan.added.map(b=>line(b.due_date,b.supplier,b.amount,tr('v32.import.bankAdd')))];
+    const shown=list.slice(0,12).join('\n')+(list.length>12?'\n…':'')+(plan.already?'\n'+tr('v32.import.bankAlreadyCount',{count:plan.already}):'');
+    if(!(await askConfirm(tr('v32.import.bankConfirm',{paid:plan.paid.length,added:plan.added.length,skipped:plan.skipped,list:shown}))))return;
+    const added=plan.added.map(({description,...b})=>({...b,title:billTitle(tr,{category:b.category,supplier:b.supplier})}));
+    if(demo){
+      const paidAt=new Map(plan.paid.map(p=>[p.bill.id,`${p.row.date}T12:00:00.000Z`]));
+      localUpdate('bills',x=>{const known=new Set(x.map(b=>b.external_id).filter(Boolean));
+        return [...x.map(b=>paidAt.has(b.id)&&!b.paid_at?{...b,paid_at:paidAt.get(b.id)}:b),...added.filter(b=>!known.has(b.external_id)).map(b=>({...b,id:uuid()}))];});
+    } else {
+      for(const p of plan.paid){const {error}=await client.from('bills').update({paid_at:`${p.row.date}T12:00:00.000Z`}).eq('id',p.bill.id).is('paid_at',null);if(error)throw error;}
+      if(added.length){const {error}=await client.from('bills').upsert(added.map(b=>({...b,user_id:user.id,home_id:activeHomeId})),{onConflict:'user_id,source,external_id',ignoreDuplicates:true});if(error)throw error;}
+      await reload();
+    }
+    notify(tr('v32.import.bankSaved',{paid:plan.paid.length,added:added.length}));
+  }
   async function csvImport(event) {
     if(!canWrite)return notify(tr('v32.feedback.3'));
     const file=event.target.files?.[0];if(!file)return;
     try {
-      const {parseBillsCsv}=await import('../lib/csv.mjs');
-      const text=await file.text(),parsed=parseBillsCsv(text),errors=parsed.errors.map(e=>tr(e.key,e.params));
+      const [{parseBillsCsv},bank]=await Promise.all([import('../lib/csv.mjs'),import('../lib/bank-csv.mjs')]);
+      // UTF-8 o Windows-1252 (CSV salvati da Excel e da molte banche): prima «Società» diventava «Soci�t�».
+      const text=bank.decodeCsvBytes(await file.arrayBuffer());
+      let parsed;
+      try{parsed=parseBillsCsv(text);}
+      catch(csvError){
+        // Non è un elenco di bollette: forse è l'estratto conto della banca o di PayPal.
+        const statement=csvError?.i18nKey==='csv.columnsRequired'?bank.parseBankStatement(text):null;
+        if(!statement)throw csvError;
+        await importBankStatement(bank,statement);return;
+      }
+      const errors=parsed.errors.map(e=>tr(e.key,e.params));
       // Categorie scritte nella lingua dell'app («Electricity», «Strom»…) → codice; il titolo mancante si propone.
       const bills=parsed.bills.map(b=>{const category=categoryCode(b.category);return {...b,category,title:b.title||billTitle(tr,{category,supplier:b.supplier})};});
-      if(!bills.length) throw new Error(errors.slice(0,3).join(' · ') || tr('csv.noValidRows'));
+      // shownError: il motivo (righe non valide) si mostra; con un Error semplice compariva l'errore generico.
+      if(!bills.length) throw shownError(errors.slice(0,3).join(' · ') || tr('csv.noValidRows'));
       if(!(await askConfirm(tr('v32.import.csvConfirm',{count:bills.length,excluded:errors.length?tr('v32.import.csvExcluded',{count:errors.length}):''}))))return;
       if(demo)localUpdate('bills',x=>[...x,...bills.map(b=>({...b,id:uuid()}))]);
       else {const {error}=await client.from('bills').insert(bills.map(b=>({...b,user_id:user.id,home_id:activeHomeId})));if(error)throw error;await reload();}

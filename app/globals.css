@@ -552,3 +552,6 @@ select{min-height:24px}
    copriva «Esci» e il profilo in fondo al menu (scripts/prove-eliminazione-account.mjs). */
 @media(max-width:900px){.sidebar.sidebar-show{z-index:120}}
 
+
+/* Finestra di conferma: i messaggi su più righe (per esempio l'elenco dell'estratto conto). */
+#app-dialog-message{white-space:pre-line}
