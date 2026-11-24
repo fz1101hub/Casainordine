@@ -1,6 +1,7 @@
 'use client';
 // Professionisti di fiducia (Fase 2, 3.3): contatti e nota condivisa con la casa, una nota privata
 // per ciascuno e gli interventi collegati dal registro delle manutenzioni, con il totale speso.
+import { selectIn } from '../lib/select-all.mjs';
 import { useCallback, useEffect, useState } from 'react';
 import { HardHat, Phone, Mail, Pencil, Trash2, Info, Lock } from 'lucide-react';
 import { useLanguage, useSection } from './LanguageProvider';
@@ -37,7 +38,7 @@ function ProfessionalsSection({ client, demo, user, homeId, canWrite, onNotify =
     }
     const ids = (people.data || []).map(p => p.id);
     const [own, done, items] = await Promise.all([
-      ids.length ? client.from('home_professional_notes').select('professional_id,note').in('professional_id', ids) : { data: [] },
+      ids.length ? selectIn((part, count) => client.from('home_professional_notes').select('professional_id,note', count ? { count: 'exact' } : undefined).in('professional_id', part).order('professional_id'), ids) : { data: [] },
       ids.length ? scope(client.from('maintenance_events').select('id,asset_id,done_on,cost,description,professional_id')).not('professional_id', 'is', null).order('done_on', { ascending: false }).limit(600) : { data: [] },
       ids.length ? scope(client.from('maintenance_assets').select('id,name')).limit(600) : { data: [] },
     ]);

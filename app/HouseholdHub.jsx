@@ -1,4 +1,5 @@
 'use client';
+import { selectIn } from '../lib/select-all.mjs';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Trash2, UserPlus, Copy, House, Car, Wallet, ShoppingBasket, Users, ShieldCheck, CheckCircle2, X } from 'lucide-react';
 import { todayRome} from '../lib/dates.mjs';
@@ -59,7 +60,8 @@ export default function HouseholdHub({client,demo,user,homes,homeId,role,onChang
     ]);
     // Solo le quote delle spese di questa casa (prima: le prime 1000 di tutte le case visibili).
     const expenseIds=(e.data||[]).map(x=>x.id);
-    const s=expenseIds.length?await client.from('home_expense_shares').select('expense_id,user_id,amount').in('expense_id',expenseIds).limit(5000):{data:[],error:null};
+    // A gruppi di 100 id (lib/select-all.mjs): 250 id nell'indirizzo erano vicini al limite di Supabase.
+    const s=expenseIds.length?await selectIn((part,count)=>client.from('home_expense_shares').select('expense_id,user_id,amount',count?{count:'exact'}:undefined).in('expense_id',part).order('expense_id').order('user_id'),expenseIds):{data:[],error:null};
     // Saldi su TUTTE le spese della casa, calcolati nel database (migrate_v34_saldi.sql).
     // Senza la migrazione si ripiega sul calcolo nel browser, limitato alle ultime 250 spese.
     const totals=await client.rpc('v33_home_balances',{home:homeId});

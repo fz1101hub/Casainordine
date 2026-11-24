@@ -1,6 +1,7 @@
 'use client';
 // Progetti e lavori (Fase 2, 3.3): scheda del lavoro con fasi, preventivi (anche da professionisti di
 // fiducia), spese e foto prima/durante/dopo; i conti dicono budget, accettato, speso e residuo.
+import { selectIn } from '../lib/select-all.mjs';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Hammer, Plus, Trash2, Pencil, FileText, Camera, Info, Check } from 'lucide-react';
 import { useLanguage, useSection } from './LanguageProvider';
@@ -34,7 +35,7 @@ function ProjectsSection({ client, demo, user, homeId, canWrite, onNotify = () =
   // Collegamenti temporanei ai file (foto e preventivi): validi un'ora, solo per chi può vedere il documento.
   const attachDocuments = useCallback(async (ids) => {
     if (!ids.length) return {};
-    const { data } = await client.from('home_documents').select('id,storage_path,name,mime_type').in('id', ids);
+    const { data } = await selectIn((part, count) => client.from('home_documents').select('id,storage_path,name,mime_type', count ? { count: 'exact' } : undefined).in('id', part).order('id'), ids);
     const rows = data || [];
     const signed = rows.length ? await client.storage.from('house-documents').createSignedUrls(rows.map(r => r.storage_path), 3600) : { data: [] };
     const urls = new Map((signed.data || []).map(s => [s.path, s.signedUrl]));
