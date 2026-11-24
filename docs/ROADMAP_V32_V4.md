@@ -38,6 +38,12 @@ Ogni funzione richiede flusso realmente utilizzabile, permessi per utente/casa c
 - [x] **Profilo locatore/inquilino**: immobili e contratti, verbali ingresso/uscita, foto e letture, accesso separato per ruolo senza esposizione dati privati. — #67; `migrate_v49_affitti.sql` applicata il 23 novembre 2026.
 - [x] **Casa Control**: pannello facoltativo, indicatori calcolati da eventi veri, formula trasparente, gestione mancanza dati e nessun punteggio arbitrario. — #68; nessuna migrazione.
 
+## Collaudo di accettazione ancora aperto (23 novembre 2026)
+
+Protocollo operativo e matrice PASS/FAIL/BLOCKED: [docs/FASE2_COLLAUDO_REALE.md](FASE2_COLLAUDO_REALE.md). La presenza di codice e test demo non chiude il collaudo reale; verificare anche migrazioni successive alla v49, account separati, email, notifiche e mobile prima di passare alla Fase 3.
+
+Aggiornamento 24 novembre 2026: recuperati cinque documenti sul branch di integrazione basato su main. Il workflow tests.yml di main e quello del commit b428755 hanno lo stesso SHA blob: nessuna sostituzione necessaria. CI della nuova PR e collaudo reale ancora da verificare. La verifica online della 3.2 resta aperta; nessuna dichiarazione di completamento delle fasi 1 e 2.
+
 ## Fase 3 — Solo dopo le due fasi precedenti: audit indipendente e correzioni
 
 - [ ] Revisione separata e critica dell'intero repository; inventario API, flussi, autorizzazioni, dipendenze e dati.
