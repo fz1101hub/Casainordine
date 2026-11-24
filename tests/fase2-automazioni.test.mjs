@@ -121,6 +121,7 @@ function fakeAdmin(tables) {
           return Promise.resolve({ data: added, error: null });
         },
         limit() { return builder; },
+        order() { return builder; },
         range(from, to) { return builder.then(result => ({ data: result.data ? result.data.slice(from, to + 1) : null, error: result.error })); },
         eq(column, value) { filters.push(row => row[column] === value); return builder; },
         is(column, value) { filters.push(row => (row[column] ?? null) === value); return builder; },
