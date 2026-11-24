@@ -55,7 +55,7 @@ const receipt={subject:'Ricevuta di pagamento bolletta Enel Energia',sender:'"En
 function mockAdmin({bills,role=null}){
   const events={updates:[],queries:[]};
   const admin={from(table){
-    const q={inserted:false,select(){return this;},eq(f,v){events.queries.push([table,f,v]);return this;},is(){return this;},gte(){return this;},lte(){return this;},
+    const q={inserted:false,select(){return this;},eq(f,v){events.queries.push([table,f,v]);return this;},is(){return this;},or(){return this;},gte(){return this;},lte(){return this;},
       limit:async()=>({data:table==='bills'?bills:[],error:null}),
       maybeSingle:async()=>({data:table==='profiles'?{auto_confirm_payments:true}:table==='mail_payment_trusted_senders'?{id:'t1'}:
         table==='mail_payment_evidence'?(q.inserted?{id:'e1'}:null):table==='home_members'?(role?{role}:null):table==='bills'?{id:bills[0].id}:null,error:null}),

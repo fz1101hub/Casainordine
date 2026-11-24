@@ -12,8 +12,23 @@ export async function GET(request){
     .select('id,sender_email,subject,amount,received_at,bill_id,status,created_at')
     .eq('user_id',user.id).eq('status','pending').order('created_at',{ascending:false}).limit(100);
   if(error)return json({error:'paymentsLoad'},500);
+  // La bolletta proposta può essere di una casa condivisa, non visibile nello spazio aperto
+  // nell'app: si manda con la ricevuta (solo se la persona la può ancora segnare pagata).
+  const ids=[...new Set((data||[]).map(p=>p.bill_id).filter(validId))];
+  const proposed=new Map();
+  if(ids.length){
+    const {data:rows,error:billsError}=await admin.from('bills').select('id,user_id,home_id,title,supplier,amount,due_date,paid_at').in('id',ids);
+    if(billsError)return json({error:'paymentsLoad'},500);
+    const homeIds=[...new Set((rows||[]).map(b=>b.home_id).filter(validId))];
+    const {data:homes}=homeIds.length?await admin.from('homes').select('id,name').in('id',homeIds):{data:[]};
+    for(const b of rows||[]){
+      if(!(await canEditBill(admin,b,user.id).catch(()=>false)))continue;
+      proposed.set(b.id,{id:b.id,title:b.title,supplier:b.supplier,amount:b.amount,due_date:b.due_date,paid_at:b.paid_at,home_name:(homes||[]).find(h=>h.id===b.home_id)?.name||null});
+    }
+  }
+  const payments=(data||[]).map(p=>({...p,bill:proposed.get(p.bill_id)||null,bill_id:proposed.has(p.bill_id)?p.bill_id:null}));
   const {data:trusted,error:trustError}=await admin.from('mail_payment_trusted_senders').select('id,sender_email,supplier_key').eq('user_id',user.id).order('created_at',{ascending:false}).limit(100);
-  return trustError?json({error:'paymentsTrustedLoad'},500):json({payments:data||[],trusted_senders:trusted||[]});
+  return trustError?json({error:'paymentsTrustedLoad'},500):json({payments,trusted_senders:trusted||[]});
 }
 
 export async function PATCH(request){
@@ -32,17 +47,19 @@ export async function PATCH(request){
   }
   const selected=bill_id||receipt.bill_id;
   if(!validId(selected))return json({error:'paymentsChooseBill'},400);
+  // Anche una bolletta della casa inserita da un altro membro: decide canEditBill qui sotto.
   const {data:bill,error:bError}=await admin.from('bills').select('id,user_id,home_id,supplier,amount,paid_at')
-    .eq('id',selected).eq('user_id',user.id).maybeSingle();
+    .eq('id',selected).maybeSingle();
   if(bError||!bill)return json({error:'billNotFound'},404);
   // In una casa condivisa serve ancora il ruolo di proprietario o editor (un lettore non paga).
   const allowed=await canEditBill(admin,bill,user.id).catch(()=>null);
   if(allowed===null)return json({error:'paymentsPermissionCheck'},500);
-  if(!allowed)return json({error:'paymentsForbidden'},403);
+  // La bolletta personale di un altro non deve nemmeno risultare esistente.
+  if(!allowed)return bill.home_id?json({error:'paymentsForbidden'},403):json({error:'billNotFound'},404);
   if(bill.paid_at)return json({error:'paymentsAlreadyPaid'},409);
   if(Math.round(Number(bill.amount)*100)!==Math.round(Number(receipt.amount)*100))return json({error:'paymentsAmountMismatch'},409);
   const {data:paid,error:paymentError}=await admin.from('bills').update({paid_at:receipt.received_at})
-    .eq('id',bill.id).eq('user_id',user.id).is('paid_at',null).select('id').maybeSingle();
+    .eq('id',bill.id).is('paid_at',null).select('id').maybeSingle();
   if(paymentError)return json({error:'paymentsBillUpdate'},500);
   if(!paid)return json({error:'paymentsBillUpdated'},409);
   const {error:markedError}=await admin.from('mail_payment_evidence').update({status:'confirmed',bill_id:bill.id,reviewed_at:new Date().toISOString()})

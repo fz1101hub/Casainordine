@@ -24,14 +24,35 @@ const parseValue = v => (v === 'null' ? null : v === 'true' ? true : v === 'fals
 const splitList = s => s.replace(/^\(|\)$/g, '').split(',').map(x => x.replace(/^"|"$/g, ''));
 const same = (a, b) => (a === null || a === undefined ? b === null : String(a) === String(b));
 
-// or=(a.ilike."*x*",b.eq.1): basta una condizione (la ricerca dell'app usa ilike su più colonne).
-function anyOf(row, expr) {
-  const parts = expr.replace(/^\(|\)$/g, '').match(/(?:[^,"]|"[^"]*")+/g) || [];
-  return parts.some(part => { const [col, ...rest] = part.split('.'); return matches(row, col, rest.join('.').replace(/"/g, '')); });
+// or=(a.ilike."*x*",b.eq.1,and(c.eq.2,d.is.null),e.in.(x,y)): basta una condizione; and(...)
+// le vuole tutte (la ricerca usa ilike su più colonne, i pagamenti and/in annidati).
+function splitTop(list) {
+  const parts = []; let depth = 0, quoted = false, current = '';
+  for (const ch of list) {
+    if (ch === '"') quoted = !quoted;
+    if (!quoted && ch === '(') depth++;
+    if (!quoted && ch === ')') depth--;
+    if (!quoted && depth === 0 && ch === ',') { parts.push(current); current = ''; continue; }
+    current += ch;
+  }
+  if (current) parts.push(current);
+  return parts;
 }
+function logic(row, expr, every) {
+  const parts = splitTop(expr.replace(/^\(|\)$/g, ''));
+  const test = part => {
+    const nested = part.match(/^(and|or)\((.*)\)$/);
+    if (nested) return logic(row, nested[2], nested[1] === 'and');
+    const [col, ...rest] = part.split('.');
+    return matches(row, col, rest.join('.').replace(/"/g, ''));
+  };
+  return every ? parts.every(test) : parts.some(test);
+}
+const anyOf = (row, expr) => logic(row, expr, false);
 
 function matches(row, col, expr) {
   if (col === 'or') return anyOf(row, expr);
+  if (col === 'and') return logic(row, expr, true);
   const [op, ...rest] = expr.split('.');
   const raw = rest.join('.');
   const value = row[col];
