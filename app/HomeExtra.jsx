@@ -1,4 +1,5 @@
 'use client';
+import { selectAll } from '../lib/select-all.mjs';
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {Archive,BarChart3,Bell,Check,Download,House,Plus,ShieldCheck,Trash2,UploadCloud,Wrench} from 'lucide-react';
 import {readRatePlanDocument} from '../lib/document-reader.js';
@@ -60,7 +61,8 @@ export default function HomeExtra({client,demo,user,homeId,canWrite,bills=[],uti
   if(!client){setRows(initial);setLoading(false);return;}
   setLoading(true);
   const keys=Object.keys(tables);
-  const responses=await Promise.all([...keys.map(k=>homeId?client.from(tables[k]).select('*').eq('home_id',homeId).order('created_at',{ascending:false}).limit(600):client.from(tables[k]).select('*').is('home_id',null).order('created_at',{ascending:false}).limit(600)),client.from('user_alerts').select('*').order('created_at',{ascending:false}).limit(100),client.from('user_alert_preferences').select('*').eq('user_id',user.id).maybeSingle()]);
+  // Tutte le righe, a pagine (prima al massimo 600: il backup perdeva le più vecchie senza avvisare).
+  const responses=await Promise.all([...keys.map(k=>selectAll(count=>{const q=client.from(tables[k]).select('*',count?{count:'exact'}:undefined);return (homeId?q.eq('home_id',homeId):q.is('home_id',null)).order('created_at',{ascending:false}).order('id',{ascending:true});})),client.from('user_alerts').select('*').order('created_at',{ascending:false}).limit(100),client.from('user_alert_preferences').select('*').eq('user_id',user.id).maybeSingle()]);
   // Cambiando casa in fretta può arrivare per ultima la risposta della casa precedente: si scarta.
   if(seq!==loadSeq.current)return;
   const errors=responses.filter(r=>r.error);

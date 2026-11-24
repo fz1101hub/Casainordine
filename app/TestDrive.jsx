@@ -45,7 +45,7 @@ export default function TestDrive(){
  const displayData=useMemo(()=>localizeDemoFixtures(data,tr),[data,tr]);
  const extras=useMemo(()=>({shopping:displayData.shopping,assets:displayData.assets,contracts:displayData.contracts,decisions:displayData.decisions,inventory:displayData.inventory}),[displayData]);
  const tasksOpen=data.tasks.filter(t=>!t.done_at), billsOpen=data.bills.filter(b=>!b.paid_at);
- const briefing=useMemo(()=>buildFiveMinuteBriefing({bills:displayData.bills,tasks:displayData.tasks,assets:displayData.assets,contracts:displayData.contracts,decisions:displayData.decisions,inventory:displayData.inventory,today:todayRome(),copy:textGroup(tr,'briefing.')}),[displayData,tr]);
+ const briefing=useMemo(()=>buildFiveMinuteBriefing({bills:displayData.bills,tasks:displayData.tasks,assets:displayData.assets,contracts:displayData.contracts,decisions:displayData.decisions,inventory:displayData.inventory,today:todayRome(),copy:textGroup(tr,'briefing.'),paymentDue:days=>tr(days===0?'briefing.briefingPaymentToday':'briefing.briefingPaymentDue',{days})}),[displayData,tr]);
  const nav=id=>{setScreen(NAV.some(n=>n.id===id)?id:'overview');setNotice('');if(typeof window!=='undefined')window.scrollTo({top:0,behavior:'smooth'});};
  const toggleBill=(bill)=>{setData(old=>({...old,bills:old.bills.map(b=>b.id===bill.id?{...b,paid_at:b.paid_at?null:new Date().toISOString()}:b)}));setNotice(tr('demo.updated.bill'));};
  const toggleTask=(task)=>{setData(old=>({...old,tasks:old.tasks.map(t=>t.id===task.id?{...t,done_at:t.done_at?null:new Date().toISOString()}:t)}));setNotice(tr('demo.updated.task'));};

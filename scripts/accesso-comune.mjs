@@ -16,8 +16,9 @@ export function checker(title) {
   return { check, finish, failures };
 }
 
-export async function startScenario() {
-  const fake = await startFakeSupabase({ port: PORT, lenientRpc: true, rls: true });
+// options: altre opzioni del Supabase finto (per esempio maxRows: 1000, come il progetto vero).
+export async function startScenario(options = {}) {
+  const fake = await startFakeSupabase({ port: PORT, lenientRpc: true, rls: true, ...options });
   fake.state.rpc.v36_my_storage_used = () => 0;
   const people = {};
   const person = (key, id, email) => {

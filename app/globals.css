@@ -555,3 +555,4 @@ select{min-height:24px}
 
 /* Finestra di conferma: i messaggi su più righe (per esempio l'elenco dell'estratto conto). */
 #app-dialog-message{white-space:pre-line}
+.bills-more{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;padding:16px 8px 4px}

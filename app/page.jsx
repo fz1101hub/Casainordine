@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import {
   LayoutDashboard, ReceiptText, PlugZap, House, UploadCloud, Settings, Bell,
   Plus, Search, CheckCircle2, CalendarDays, LogOut, ArrowUpRight, TrendingDown,
@@ -12,6 +12,7 @@ import { addDaysISO, nextRecurringDue, todayRome, normalizeDate, euro } from '..
 import { BILL_CATEGORIES } from '../lib/bill-categories.mjs';
 // Lettura di CSV, piani rate e documenti: moduli scaricati solo quando servono (import()).
 import { billTitle } from '../lib/bill-title.mjs';
+import { selectAll } from '../lib/select-all.mjs';
 import { downloadCalendar } from '../lib/calendar-download.js';
 import { ForgotPasswordButton, PasswordRecoveryDialog, DeleteAccountPanel } from './AccountSecurity';
 import { MIN_PASSWORD_LENGTH, passwordTooShort, markPasswordUpgrade, clearPasswordUpgrade, needsPasswordUpgrade } from '../lib/password-policy.mjs';
@@ -95,6 +96,7 @@ const menu = [
   {id:'settings',icon:Settings},
 ];
 const menuIcons = Object.fromEntries(menu.map(({id,icon})=>[id,icon]));
+const BILL_PAGE = 100;
 const billDefault = {title:'',supplier:'',category:'Luce',amount:'',due_date:addDaysISO(todayRome(),7),paid:false};
 // Dati in più letti da un documento (lib/document-import.mjs): periodo e consumo si salvano con la
 // bolletta (servono ai grafici dei consumi), POD e PDR si mostrano solo per controllo.
@@ -214,10 +216,13 @@ export default function Page() {
     if (!client) return;
     const seq=++dataSeq.current;
     const scope=q=>activeHomeId?q.eq('home_id',activeHomeId):q.is('home_id',null);
+    // Bollette, utenze e attività possono superare le 1000 righe (il massimo di Supabase per richiesta):
+    // si leggono a pagine (lib/select-all.mjs), con l'id come ultimo ordine.
+    const all=(table,order)=>selectAll(count=>scope(client.from(table).select('*',count?{count:'exact'}:undefined)).order(order,{ascending:true}).order('id',{ascending:true}));
     const [b,u,t,p,r,sp,sm] = await Promise.all([
-      scope(client.from('bills').select('*')).order('due_date',{ascending:true}),
-      scope(client.from('utilities').select('*')).order('next_due_date',{ascending:true}),
-      scope(client.from('house_tasks').select('*')).order('due_date',{ascending:true}),
+      all('bills','due_date'),
+      all('utilities','next_due_date'),
+      all('house_tasks','due_date'),
       client.from('profiles').select('*').single(),
       client.from('reminders').select('*,bills(id,title,supplier,due_date,amount,paid_at,home_id)').order('created_at',{ascending:false}).limit(30),
       client.from('user_suppliers').select('*').order('created_at',{ascending:true}),
@@ -636,15 +641,25 @@ export default function Page() {
   const spent=monthBills.filter(b=>b.paid_at).reduce((a,b)=>a+Number(b.amount),0);
   const dueAmount=open.reduce((a,b)=>a+Number(b.amount),0);
   const overdue=open.filter(b=>b.due_date<today);
-  const filteredBills=bills.filter(b=>{
-    const q=search.trim().toLowerCase();
-    if(q&&!`${b.title} ${b.supplier} ${b.category}`.toLowerCase().includes(q))return false;
-    if(billFilter==='unpaid'&&b.paid_at)return false;
-    if(billFilter==='paid'&&!b.paid_at)return false;
-    if(billFilter==='soon'&&!!b.paid_at)return false;
-    if(billFilter==='soon'&&b.due_date>soon)return false;
-    return true;
-  }).sort((a,b)=>a.due_date.localeCompare(b.due_date));
+  // Elenco delle bollette con anni di storico (scripts/prove-molti-dati.mjs): prima 3000 righe in
+  // ordine dalla più vecchia, 10 s per aprire l'elenco su un telefono lento e più di 1 s per lettera
+  // nella ricerca. Ora: prima le bollette da pagare (dalla scadenza più vicina), poi le pagate dalla più
+  // recente; 100 righe alla volta; filtro ricalcolato solo quando servono; ricerca «differita».
+  const deferredSearch=useDeferredValue(search);
+  const filteredBills=useMemo(()=>{
+    const q=deferredSearch.trim().toLowerCase();
+    return bills.filter(b=>{
+      if(q&&!`${b.title} ${b.supplier} ${b.category}`.toLowerCase().includes(q))return false;
+      if(billFilter==='unpaid'&&b.paid_at)return false;
+      if(billFilter==='paid'&&!b.paid_at)return false;
+      if(billFilter==='soon'&&!!b.paid_at)return false;
+      if(billFilter==='soon'&&b.due_date>soon)return false;
+      return true;
+    }).sort((a,b)=>Boolean(a.paid_at)-Boolean(b.paid_at)||(a.paid_at?b.due_date.localeCompare(a.due_date):a.due_date.localeCompare(b.due_date)));
+  },[bills,deferredSearch,billFilter,soon]);
+  const [billRows,setBillRows]=useState(BILL_PAGE);
+  useEffect(()=>{setBillRows(BILL_PAGE);},[deferredSearch,billFilter,activeHomeId]);
+  const visibleBills=filteredBills.slice(0,billRows);
   const recentMonths=Array.from({length:6},(_,i)=>{const d=new Date(`${today.slice(0,7)}-01T12:00:00Z`);d.setUTCMonth(d.getUTCMonth()-5+i);return d.toISOString().slice(0,7);});
   const monthly=recentMonths.map(m=>({label:new Date(`${m}-01T12:00:00Z`).toLocaleDateString(locale,{month:'short',timeZone:'UTC'}), total:bills.filter(b=>b.due_date.startsWith(m)).reduce((sum,b)=>sum+Number(b.amount),0)}));
   const maxMonthly=Math.max(...monthly.map(x=>x.total),1);
@@ -729,7 +744,7 @@ export default function Page() {
         </>}
         {tab==='bills'&&<><div className="page-heading"><div><div className="eyebrow">{tr('bills.eyebrow')}</div><h1>{tr('bills.heading')}</h1><p>{tr('bills.help')}</p></div><div className="heading-actions"><label className="btn btn-soft upload-label"><FileImage size={17}/> {tr('bills.upload')}<input type="file" accept=".pdf,application/pdf,.jpg,.jpeg,image/jpeg,.png,image/png,.webp,image/webp" onChange={documentImport} disabled={documentState.busy} hidden/></label><button className="btn btn-primary" onClick={()=>openModal('bill')}><Plus size={18}/> {tr('bills.add')}</button></div></div>
           <section className="panel padded"><div className="table-controls"><div className="searchbox"><Search size={18} aria-hidden="true"/><input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder={tr('bills.search')} aria-label={tr('bills.search')}/></div><div className="filter-tabs">{[['all',tr('general.all')],['unpaid',tr('bills.filter.unpaid')],['soon',tr('bills.filter.soon')],['paid',tr('bills.filter.paid')]].map(([k,label])=><button key={k} onClick={()=>setBillFilter(k)} className={billFilter===k?'selected':''}>{label}</button>)}</div></div>
-            {filteredBills.length?<div className="table-scroll"><table className="bills-table"><thead><tr><th>{tr('bills.column.bill')}</th><th>{tr('bills.column.due')}</th><th>{tr('bills.column.amount')}</th><th>{tr('bills.column.status')}</th><th>{tr('bills.column.actions')}</th></tr></thead><tbody>{filteredBills.map(b=><tr key={b.id}><td><div className="table-identity"><CategoryIcon value={b.category}/><div><b>{b.title}</b><small>{b.supplier||tr('billCategory.'+b.category)} {b.is_estimate?' · '+tr('bills.estimated'):''}</small></div></div></td><td><DateText iso={b.due_date}/></td><td className="amount-cell">{money(b.amount)}</td><td><Status bill={b}/></td><td><div className="actions"><button className={`action-btn ${b.paid_at?'muted-action':'pay-action'}`} title={b.paid_at?tr('demo.bill.reopen'):tr('demo.bill.markPaid')} onClick={()=>pay(b)}>{b.paid_at?<RefreshCcw size={16}/>:<Check size={17}/>}</button><button className="action-btn muted-action" title={tr('ui.delete')} onClick={()=>deleteRow('bills',b.id)}><Trash2 size={16}/></button></div></td></tr>)}</tbody></table></div>:<Empty icon={Filter} title={tr('bills.empty.title')} body={tr('bills.empty.help')} action={()=>openModal('bill')} button={tr('form.addBill')}/>}</section>
+            {filteredBills.length?<div className="table-scroll"><table className="bills-table"><thead><tr><th>{tr('bills.column.bill')}</th><th>{tr('bills.column.due')}</th><th>{tr('bills.column.amount')}</th><th>{tr('bills.column.status')}</th><th>{tr('bills.column.actions')}</th></tr></thead><tbody>{visibleBills.map(b=><tr key={b.id}><td><div className="table-identity"><CategoryIcon value={b.category}/><div><b>{b.title}</b><small>{b.supplier||tr('billCategory.'+b.category)} {b.is_estimate?' · '+tr('bills.estimated'):''}</small></div></div></td><td><DateText iso={b.due_date}/></td><td className="amount-cell">{money(b.amount)}</td><td><Status bill={b}/></td><td><div className="actions"><button className={`action-btn ${b.paid_at?'muted-action':'pay-action'}`} title={b.paid_at?tr('demo.bill.reopen'):tr('demo.bill.markPaid')} onClick={()=>pay(b)}>{b.paid_at?<RefreshCcw size={16}/>:<Check size={17}/>}</button><button className="action-btn muted-action" title={tr('ui.delete')} onClick={()=>deleteRow('bills',b.id)}><Trash2 size={16}/></button></div></td></tr>)}</tbody></table>{filteredBills.length>visibleBills.length&&<div className="bills-more"><button type="button" className="btn btn-soft" onClick={()=>setBillRows(n=>n+BILL_PAGE)}>{tr('bills.showMore',{count:Math.min(BILL_PAGE,filteredBills.length-visibleBills.length)})}</button><small className="muted">{tr('bills.shownOf',{shown:visibleBills.length,total:filteredBills.length})}</small></div>}</div>:<Empty icon={Filter} title={tr('bills.empty.title')} body={tr('bills.empty.help')} action={()=>openModal('bill')} button={tr('form.addBill')}/>}</section>
         </>}
         {tab==='utilities'&&<><div className="page-heading"><div><div className="eyebrow">{tr('utilities.eyebrow')}</div><h1>{tr('utilities.heading')}</h1><p>{tr('utilities.help')}</p></div><button className="btn btn-primary" onClick={()=>openModal('utility')}><Plus size={18}/> {tr('utilities.new')}</button></div>
           <section className="panel supplier-panel"><div className="panel-header"><div><h2>{tr('utilities.supplierHeading')}</h2><p>{tr('utilities.supplierHelp')}</p></div></div>

@@ -97,7 +97,8 @@ export default function PersonalizedHome({
   bills,tasks,assets:extras.assets,contracts:extras.contracts,
   decisions:extras.decisions,inventory:extras.inventory,today:todayRome(),
   // Senza i testi della lingua scelta il riquadro usava quelli italiani di riserva.
-  copy:textGroup(tr,'briefing.')
+  copy:textGroup(tr,'briefing.'),
+  paymentDue:days=>tr(days===0?'briefing.briefingPaymentToday':'briefing.briefingPaymentDue',{days})
  }),[bills,tasks,extras,tr]);
  const limit=expanded?5:3;
  const dueAmount=openBills.reduce((sum,b)=>sum+(Number(b.amount)||0),0);
