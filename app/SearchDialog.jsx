@@ -2,12 +2,17 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {Search,X} from 'lucide-react';
 import {useLanguage} from './LanguageProvider';
-import {searchEverything,searchLocal,searchWords} from '../lib/search.mjs';
+import {searchEverything,searchLocal,searchFuzzy,searchWords} from '../lib/search.mjs';
+import {BILL_CATEGORIES} from '../lib/bill-categories.mjs';
 
 // Finestra della ricerca universale (Fase 2). Cerca solo nello spazio attivo; scegliere un
 // risultato apre la sezione che lo contiene.
-export default function SearchDialog({client,userId,homeId,spaceName,demoData,onOpen,onClose}){
- const {t,date}=useLanguage();
+export default function SearchDialog({client,userId,homeId,spaceName,demoData,localData,onOpen,onClose}){
+ const {t,date,language}=useLanguage();
+ // Categorie scritte nella lingua dell'app («Electricity», «Strom») → codice salvato («Luce»).
+ const categories=useMemo(()=>Object.fromEntries(BILL_CATEGORIES.flatMap(code=>[[t('billCategory.'+code),code],[code,code]])),[t,language]);
+ // Bollette, attività e utenze già caricate: per i suggerimenti con un errore di battitura.
+ const localRef=useRef(localData);localRef.current=localData;
  const [text,setText]=useState(''),[state,setState]=useState({results:[],failed:0,busy:false});
  const input=useRef(null),sequence=useRef(0);
  // I dati della prova cambiano oggetto a ogni disegno della pagina: si leggono dal ref.
@@ -19,14 +24,16 @@ export default function SearchDialog({client,userId,homeId,spaceName,demoData,on
  useEffect(()=>{
   const ticket=++sequence.current;
   if(!searchWords(text).length){setState({results:[],failed:0,busy:false});return;}
-  if(isDemo){setState({...searchLocal(demoRef.current,text),busy:false});return;}
+  // Nessun risultato: si riprova con gli errori di battitura sui dati già caricati.
+  const orFuzzy=(found,data)=>found.results.length||found.failed?found:{...found,...searchFuzzy(data,text)};
+  if(isDemo){setState({...orFuzzy(searchLocal(demoRef.current,text,5,categories),demoRef.current),busy:false});return;}
   setState(old=>({...old,busy:true}));
   const timer=setTimeout(()=>{
-   searchEverything(client,{text,userId,homeId}).then(found=>{if(ticket===sequence.current)setState({...found,busy:false});})
+   searchEverything(client,{text,userId,homeId,categories}).then(found=>{if(ticket===sequence.current)setState({...orFuzzy(found,localRef.current),busy:false});})
     .catch(()=>{if(ticket===sequence.current)setState({results:[],failed:1,busy:false});});
   },250);
   return()=>clearTimeout(timer);
- },[text,client,userId,homeId,isDemo]);
+ },[text,client,userId,homeId,isDemo,categories]);
  const groups=useMemo(()=>{
   const out=new Map();
   for(const item of state.results){if(!out.has(item.tab))out.set(item.tab,[]);out.get(item.tab).push(item);}
@@ -43,6 +50,7 @@ export default function SearchDialog({client,userId,homeId,spaceName,demoData,on
      {!hasWords&&<p className="muted">{t('search.hint')}</p>}
      {hasWords&&state.busy&&<p className="muted">{t('search.loading')}</p>}
      {hasWords&&!state.busy&&!state.results.length&&<p className="muted">{t('search.empty')}</p>}
+     {hasWords&&!state.busy&&state.fuzzy&&state.results.length>0&&<p className="muted">{t('search.fuzzy')}</p>}
      {groups.map(([tab,items])=><section key={tab}><h3>{t('nav.'+tab)}</h3>{items.map(item=><button type="button" key={item.type+item.id} className="search-result" onClick={()=>choose(item)}>
       <b>{item.title||'—'}</b><small>{[item.detail,item.date&&date(item.date)].filter(Boolean).join(' · ')}</small></button>)}</section>)}
      {state.failed>0&&!state.busy&&<p className="muted">{t('search.partial')}</p>}

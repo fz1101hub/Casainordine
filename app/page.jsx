@@ -13,6 +13,7 @@ import { BILL_CATEGORIES } from '../lib/bill-categories.mjs';
 // Lettura di CSV, piani rate e documenti: moduli scaricati solo quando servono (import()).
 import { billTitle } from '../lib/bill-title.mjs';
 import { selectAll } from '../lib/select-all.mjs';
+import { textMatches } from '../lib/search-text.mjs';
 import { downloadCalendar } from '../lib/calendar-download.js';
 import { ForgotPasswordButton, PasswordRecoveryDialog, DeleteAccountPanel } from './AccountSecurity';
 import { MIN_PASSWORD_LENGTH, passwordTooShort, markPasswordUpgrade, clearPasswordUpgrade, needsPasswordUpgrade } from '../lib/password-policy.mjs';
@@ -647,16 +648,16 @@ export default function Page() {
   // recente; 100 righe alla volta; filtro ricalcolato solo quando servono; ricerca «differita».
   const deferredSearch=useDeferredValue(search);
   const filteredBills=useMemo(()=>{
-    const q=deferredSearch.trim().toLowerCase();
+    const q=deferredSearch.trim();
     return bills.filter(b=>{
-      if(q&&!`${b.title} ${b.supplier} ${b.category}`.toLowerCase().includes(q))return false;
+      if(q&&!textMatches(`${b.title} ${b.supplier} ${b.category} ${tr('billCategory.'+b.category)}`,q))return false;
       if(billFilter==='unpaid'&&b.paid_at)return false;
       if(billFilter==='paid'&&!b.paid_at)return false;
       if(billFilter==='soon'&&!!b.paid_at)return false;
       if(billFilter==='soon'&&b.due_date>soon)return false;
       return true;
     }).sort((a,b)=>Boolean(a.paid_at)-Boolean(b.paid_at)||(a.paid_at?b.due_date.localeCompare(a.due_date):a.due_date.localeCompare(b.due_date)));
-  },[bills,deferredSearch,billFilter,soon]);
+  },[bills,deferredSearch,billFilter,soon,tr]);
   const [billRows,setBillRows]=useState(BILL_PAGE);
   useEffect(()=>{setBillRows(BILL_PAGE);},[deferredSearch,billFilter,activeHomeId]);
   const visibleBills=filteredBills.slice(0,billRows);
@@ -710,7 +711,7 @@ export default function Page() {
     </aside>
     <main className="main">
       <header className="topbar"><button className="icon-button burger" onClick={()=>setMobile(true)} aria-label={tr('ui.openMenu')}><Menu size={23}/></button><div className="crumb"><span>{activeHomeId?homeMembership?.homes?.name||tr('v32.overview.sharedHome'):tr('v32.overview.personalSpace')}</span><ChevronRight size={15}/><b>{tr('nav.'+tab)}</b></div>
-        <div className="topbar-right"><UniversalSearch client={client} userId={user?.id} homeId={activeHomeId} spaceName={activeHomeId?homeMembership?.homes?.name||tr('general.house'):tr('v32.overview.personalSpace')} demoData={demo?{bills:shown.bills,tasks:shown.tasks,utilities:shown.utilities}:null} onOpen={changePage}/><LanguageSelector id="topbar-language" className="topbar-language" label={false}/><select className="house-switch" aria-label={tr('ui.selectSpace')} value={activeHomeId||''} onChange={e=>switchHome(e.target.value||null)}><option value="">{tr('general.private')}</option>{homes.map(h=><option key={h.home_id} value={h.home_id}>{h.homes?.name||tr('general.house')}</option>)}</select><span className="today-label"><CalendarDays size={16}/> <DateText iso={today}/></span><div className="bell-parent"><button className="icon-button bell-button" onClick={()=>setBellOpen(!bellOpen)} aria-label={tr('ui.reminders')}><Bell size={20}/>{data.reminders.length>0&&<span className="notification-dot"/>}</button>{bellOpen&&<div className="bell-popover"><b>{tr('v32.notifications.reminderHeading')}</b>{shown.reminders.length?shown.reminders.slice(0,6).map(r=><div className="bell-entry" key={r.id}><p><Bell size={14}/> <span><strong>{tr('v32.notifications.reminderQuestion')}</strong><span>{r.bills?.title||tr('v32.notifications.billFallback')} · {tr('v32.notifications.dueOn')} <DateText iso={r.bills?.due_date||r.reminder_date}/></span></span></p>{r.bills&&!r.bills.paid_at&&<button className="text-link" onClick={()=>{const b=bills.find(x=>x.id===r.bills.id);if(b)pay(b);setBellOpen(false);}}>{tr('v32.notifications.markPaid')} <Check size={13}/></button>}</div>):<p>{tr('v32.notifications.noReminders')}</p>}</div>}</div><span className="top-avatar"><UserRound size={18}/></span></div>
+        <div className="topbar-right"><UniversalSearch client={client} userId={user?.id} homeId={activeHomeId} spaceName={activeHomeId?homeMembership?.homes?.name||tr('general.house'):tr('v32.overview.personalSpace')} demoData={demo?{bills:shown.bills,tasks:shown.tasks,utilities:shown.utilities}:null} localData={{bills:shown.bills,tasks:shown.tasks,utilities:shown.utilities}} onOpen={changePage}/><LanguageSelector id="topbar-language" className="topbar-language" label={false}/><select className="house-switch" aria-label={tr('ui.selectSpace')} value={activeHomeId||''} onChange={e=>switchHome(e.target.value||null)}><option value="">{tr('general.private')}</option>{homes.map(h=><option key={h.home_id} value={h.home_id}>{h.homes?.name||tr('general.house')}</option>)}</select><span className="today-label"><CalendarDays size={16}/> <DateText iso={today}/></span><div className="bell-parent"><button className="icon-button bell-button" onClick={()=>setBellOpen(!bellOpen)} aria-label={tr('ui.reminders')}><Bell size={20}/>{data.reminders.length>0&&<span className="notification-dot"/>}</button>{bellOpen&&<div className="bell-popover"><b>{tr('v32.notifications.reminderHeading')}</b>{shown.reminders.length?shown.reminders.slice(0,6).map(r=><div className="bell-entry" key={r.id}><p><Bell size={14}/> <span><strong>{tr('v32.notifications.reminderQuestion')}</strong><span>{r.bills?.title||tr('v32.notifications.billFallback')} · {tr('v32.notifications.dueOn')} <DateText iso={r.bills?.due_date||r.reminder_date}/></span></span></p>{r.bills&&!r.bills.paid_at&&<button className="text-link" onClick={()=>{const b=bills.find(x=>x.id===r.bills.id);if(b)pay(b);setBellOpen(false);}}>{tr('v32.notifications.markPaid')} <Check size={13}/></button>}</div>):<p>{tr('v32.notifications.noReminders')}</p>}</div>}</div><span className="top-avatar"><UserRound size={18}/></span></div>
       </header>
       <div className="content" id="contenuto" tabIndex={-1}>
         {activeHomeId&&!canWrite&&<div className="informative"><ShieldCheck size={17}/><p>{tr('v32.shell.readOnly')}</p></div>}

@@ -71,6 +71,15 @@ try {
   check(typeLong < 400, `scrivere nella ricerca non blocca (${typeLong} ms per lettera al massimo)`);
   check(await page.locator('.bills-table tbody tr').count() > 0 && /FibraVeloce/.test(await page.locator('.bills-table tbody').innerText()), 'la ricerca trova le bollette di FibraVeloce');
 
+  // Ricerca universale (24 novembre 2026): un errore di battitura propone comunque le bollette giuste.
+  await page.locator('.search-button').first().click();
+  const searchBox = page.locator('.search-dialog input[type=search]');
+  await searchBox.fill('fibravelcoe');
+  await page.waitForTimeout(2500);
+  const found = await page.locator('.search-dialog').innerText().catch(() => '');
+  check(/forse cercavi/.test(found) && /Internet|FibraVeloce/.test(found), 'ricerca con un errore di battitura: «forse cercavi» e le bollette di FibraVeloce');
+  await page.keyboard.press('Escape');
+
   // Backup JSON: tutte le bollette.
   await ui.go('Notifiche e backup');
   const [download] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }).catch(() => null), page.getByRole('button', { name: /^Backup JSON/ }).first().click()]);

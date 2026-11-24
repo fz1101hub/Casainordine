@@ -67,7 +67,8 @@ function matches(row, col, expr) {
     case 'lte': return value !== null && value !== undefined && String(value) <= raw;
     case 'lt': return value !== null && value !== undefined && String(value) < raw;
     case 'ilike': case 'like': {
-      const pattern = new RegExp(`^${raw.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/[*%]/g, '.*')}$`, op === 'ilike' ? 'is' : 's');
+      // * e % qualsiasi testo, _ una lettera qualsiasi (come in PostgreSQL).
+      const pattern = new RegExp(`^${raw.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/[*%]/g, '.*').replace(/_/g, '.')}$`, op === 'ilike' ? 'is' : 's');
       return value !== null && value !== undefined && pattern.test(String(value));
     }
     default: throw new Error(`filtro non gestito: ${col}=${expr}`);
