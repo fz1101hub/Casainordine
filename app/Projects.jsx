@@ -9,6 +9,7 @@ import { askConfirm } from './ConfirmDialog';
 import { friendlyError } from '../lib/friendly-error.mjs';
 import { todayRome } from '../lib/dates.mjs';
 import { uploadHouseDocument, IMAGE_MIME_TYPES } from '../lib/document-upload.mjs';
+import { preparePhoto } from '../lib/image-prepare.js';
 import { PROJECT_STATUSES, QUOTE_STATUSES, PHOTO_KINDS, PROJECT_LIMITS, normalizeProject, normalizePhase, normalizeQuote, normalizeExpense, projectSummary, sortPhases, photosByKind } from '../lib/projects.mjs';
 import DecimalInput from './DecimalInput';
 
@@ -170,10 +171,13 @@ function ProjectsSection({ client, demo, user, homeId, canWrite, onNotify = () =
     if (await insertItem('expenses', { ...result.value, project_id: project.id })) { setExpense({ description: '', amount: '', paid_on: today, quote_id: '' }); onNotify(tr('project.expenseSaved')); }
   }
 
-  async function addPhoto(file) {
-    if (!file) return;
-    if (!IMAGE_MIME_TYPES.includes(file.type)) { onNotify(tr('project.error.photo')); return; }
+  async function addPhoto(picked) {
+    if (!picked) return;
     setBusy('photo');
+    // Foto HEIC dell'iPhone o molto pesanti: JPEG leggero prima del controllo.
+    let file;
+    try { file = (await preparePhoto(picked)).file; } catch (error) { setBusy(''); onNotify(friendlyError(error, tr)); return; }
+    if (!IMAGE_MIME_TYPES.includes(file.type)) { setBusy(''); onNotify(tr('project.error.photo')); return; }
     const document_id = await upload(file, 'foto', IMAGE_MIME_TYPES);
     if (document_id && !own.photos.some(p => p.document_id === document_id)) await insertItem('photos', { project_id: project.id, document_id, kind: photoKind });
     setBusy('');
@@ -278,7 +282,7 @@ function ProjectsSection({ client, demo, user, homeId, canWrite, onNotify = () =
             <Field label={tr('project.amount')}><DecimalInput required min="0" value={quote.amount} onChange={e => set(setQuote)({ amount: e.target.value })} /></Field>
             <Field label={tr('project.received')}><input type="date" value={quote.received_on} onChange={e => set(setQuote)({ received_on: e.target.value })} /></Field>
           </div>
-          <Field label={tr('project.quoteFile')}><input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" onChange={e => set(setQuote)({ file: e.target.files?.[0] || null })} /></Field>
+          <Field label={tr('project.quoteFile')}><input type="file" accept="application/pdf,image/jpeg,image/png,image/webp,.heic,.heif,image/heic,image/heif" onChange={e => set(setQuote)({ file: e.target.files?.[0] || null })} /></Field>
           <button className="btn btn-soft" disabled={busy === 'quote'}><Plus size={15} /> {tr('project.addQuote')}</button>
         </form>}
 
@@ -308,7 +312,7 @@ function ProjectsSection({ client, demo, user, homeId, canWrite, onNotify = () =
         </div>)}</div>; })()}
         {writable && <div className="project-inline">
           <select aria-label={tr('project.photoKind')} value={photoKind} onChange={e => setPhotoKind(e.target.value)}>{PHOTO_KINDS.map(kind => <option key={kind} value={kind}>{tr('project.photo.' + kind)}</option>)}</select>
-          <label className="btn btn-soft"><Camera size={15} /> {busy === 'photo' ? tr('general.loading') : tr('project.addPhoto')}<input type="file" accept="image/jpeg,image/png,image/webp" hidden disabled={busy === 'photo'} onChange={e => { addPhoto(e.target.files?.[0]); e.target.value = ''; }} /></label>
+          <label className="btn btn-soft"><Camera size={15} /> {busy === 'photo' ? tr('general.loading') : tr('project.addPhoto')}<input type="file" accept="image/jpeg,image/png,image/webp,.heic,.heif,image/heic,image/heif" hidden disabled={busy === 'photo'} onChange={e => { addPhoto(e.target.files?.[0]); e.target.value = ''; }} /></label>
         </div>}
         {summary.phasesTotal > 0 && summary.phasesDone === summary.phasesTotal && project.status !== 'done' && writable &&
           <p className="project-done-hint"><Check size={15} /> {tr('project.allPhasesDone')} <button className="btn btn-soft" onClick={() => setStatus('done')}>{tr('project.markDone')}</button></p>}

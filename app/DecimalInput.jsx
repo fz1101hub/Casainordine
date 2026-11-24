@@ -10,9 +10,14 @@ import { formatNumberInput, parseNumberInput, sameNumber } from '../lib/number-i
 export default function DecimalInput({ value, onChange, decimals = 2, min, max, step, type, inputMode, ...rest }) {
   const { language, t } = useLanguage();
   const ref = useRef(null);
-  const [text, setText] = useState(() => formatNumberInput(value, language, decimals));
-  const emitted = useRef(value);
-  const lastLanguage = useRef(language);
+  // text: ciò che si vede; value: il numero che quel testo vale (o l'ultimo arrivato dal genitore).
+  const [shown, setShown] = useState(() => ({ text: formatNumberInput(value, language, decimals), value, language }));
+  // Un valore nuovo dal genitore (modulo svuotato, lettura della foto, rata scelta) o un'altra lingua:
+  // il testo si riscrive subito, nello stesso aggiornamento (stato derivato, senza effetti).
+  if (shown.language !== language || !sameNumber(value, shown.value)) {
+    setShown({ text: formatNumberInput(value, language, decimals), value, language });
+  }
+  const text = shown.text;
 
   function message(result) {
     if (!result.error) return '';
@@ -22,16 +27,6 @@ export default function DecimalInput({ value, onChange, decimals = 2, min, max, 
     return t('number.invalid', { example: formatNumberInput(decimals === 2 ? 12.5 : 1.5, language, decimals) });
   }
 
-  // Un valore nuovo dal genitore (modulo svuotato, lettura della foto, modifica di una voce)
-  // o una lingua diversa: si riscrive il testo.
-  useEffect(() => {
-    const languageChanged = lastLanguage.current !== language;
-    lastLanguage.current = language;
-    if (!languageChanged && sameNumber(value, emitted.current)) return;
-    emitted.current = value;
-    setText(formatNumberInput(value, language, decimals));
-  }, [value, language, decimals]);
-
   useEffect(() => {
     const result = parseNumberInput(text, { lang: language, decimals, min, max });
     ref.current?.setCustomValidity(message(result));
@@ -39,17 +34,16 @@ export default function DecimalInput({ value, onChange, decimals = 2, min, max, 
 
   function handleChange(event) {
     const raw = event.target.value;
-    setText(raw);
     const result = parseNumberInput(raw, { lang: language, decimals, min, max });
     event.target.setCustomValidity(message(result));
     const out = result.value === null ? '' : result.value;
-    emitted.current = out;
+    setShown({ text: raw, value: out, language });
     onChange?.({ target: { value: out, name: rest.name }, currentTarget: { value: out, name: rest.name } });
   }
 
   function handleBlur(event) {
     const result = parseNumberInput(text, { lang: language, decimals, min, max });
-    if (result.value && result.error !== 'invalid' && result.error !== 'decimals') setText(formatNumberInput(result.value, language, decimals));
+    if (result.value && result.error !== 'invalid' && result.error !== 'decimals') setShown(old => ({ ...old, text: formatNumberInput(result.value, language, decimals) }));
     rest.onBlur?.(event);
   }
 

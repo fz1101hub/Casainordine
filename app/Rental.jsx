@@ -9,6 +9,7 @@ import { askConfirm } from './ConfirmDialog';
 import { friendlyError } from '../lib/friendly-error.mjs';
 import { todayRome } from '../lib/dates.mjs';
 import { validDocument, IMAGE_MIME_TYPES } from '../lib/document-upload.mjs';
+import { preparePhoto } from '../lib/image-prepare.js';
 import { REPORT_KINDS, ROOM_STATES, RENTAL_LIMITS, normalizeLease, normalizeRooms, normalizeReadings, reportState, compareReports, leasePhotoPath } from '../lib/rental.mjs';
 import DecimalInput from './DecimalInput';
 
@@ -158,8 +159,11 @@ function RentalSection({ client, demo, user, homeId, canWrite, onNotify = () => 
     onNotify(tr('rental.signed'));
   }
 
-  async function addPhoto(report, file) {
-    if (!file) return;
+  async function addPhoto(report, picked) {
+    if (!picked) return;
+    // Foto HEIC dell'iPhone o molto pesanti: JPEG leggero prima del controllo.
+    let file;
+    try { file = (await preparePhoto(picked)).file; } catch (error) { onNotify(friendlyError(error, tr)); return; }
     if (!validDocument(file, IMAGE_MIME_TYPES)) { onNotify(tr('rental.error.photo')); return; }
     if (demo) { const id = uid(); setUrls(all => ({ ...all, [id]: URL.createObjectURL(file) })); setPhotos(list => [...list, { id, report_id: report.id, storage_path: id }]); return; }
     setBusy('photo');
@@ -222,7 +226,7 @@ function RentalSection({ client, demo, user, homeId, canWrite, onNotify = () => 
         {editable && <button className="icon-button danger" aria-label={tr('rental.deletePhoto')} title={tr('rental.deletePhoto')} onClick={() => removePhoto(photo)}><Trash2 size={13} /></button>}
       </figure>)}{!photos.some(p => p.report_id === report.id) && <span className="muted">—</span>}</div>
       {editable && <div className="extra-buttons rental-actions">
-        <label className="btn btn-soft"><Camera size={15} /> {busy === 'photo' ? tr('general.loading') : tr('rental.addPhoto')}<input type="file" accept="image/jpeg,image/png,image/webp" hidden disabled={busy === 'photo'} onChange={e => { addPhoto(report, e.target.files?.[0]); e.target.value = ''; }} /></label>
+        <label className="btn btn-soft"><Camera size={15} /> {busy === 'photo' ? tr('general.loading') : tr('rental.addPhoto')}<input type="file" accept="image/jpeg,image/png,image/webp,.heic,.heif,image/heic,image/heif" hidden disabled={busy === 'photo'} onChange={e => { addPhoto(report, e.target.files?.[0]); e.target.value = ''; }} /></label>
         {drafts[report.id] && <button className="btn btn-primary" disabled={busy === 'report'} onClick={() => saveReport(report)}>{tr('rental.saveReport')}</button>}
         {!report[mySide] && <button className="btn btn-soft" onClick={() => sign(report)}><PenLine size={15} /> {tr('rental.sign')}</button>}
       </div>}
