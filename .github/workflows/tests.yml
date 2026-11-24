@@ -125,6 +125,9 @@ jobs:
       - name: Primo utilizzo sul telefono, nelle sei lingue
         timeout-minutes: 8
         run: node scripts/prove-primo-utilizzo.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
+      - name: File originali, foto HEIC e foto grandi
+        timeout-minutes: 6
+        run: node scripts/prove-file-originali.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
 
   database:
     # Migrazioni e prove del database su PostgreSQL 17 (la versione di Supabase), con un

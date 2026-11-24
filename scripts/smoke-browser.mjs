@@ -43,11 +43,11 @@ try {
   if (await capture.count()) {
     check(/Bolletta/.test(await capture.locator('.capture-option.selected').innerText()), 'per una bolletta propone la bolletta');
     await capture.locator('.btn-primary').click();
-    check(await page.locator('.modal input[type=number]').first().inputValue().then(value => Number(value) === 84.5, () => false), 'il modulo della bolletta arriva con l’importo letto');
+    check(await page.locator('.modal input[inputmode=decimal]').first().inputValue().then(value => Number(value.replace(',', '.')) === 84.5, () => false), 'il modulo della bolletta arriva con l’importo letto');
     // Periodo, consumo e codice della fornitura letti dal PDF, modificabili prima di salvare.
     const dates = await page.locator('.modal input[type=date]').evaluateAll(list => list.map(x => x.value));
     check(dates.includes('2026-09-01') && dates.includes('2026-10-31'), `il periodo letto è nel modulo (${dates.join(', ')})`);
-    check(await page.locator('.modal input[type=number]').nth(1).inputValue().then(v => Number(v) === 305, () => false) &&
+    check(await page.locator('.modal input[inputmode=decimal]').nth(1).inputValue().then(v => Number(v.replace(',', '.')) === 305, () => false) &&
       await page.locator('.modal select').last().inputValue() === 'kWh', 'il consumo letto è nel modulo (305 kWh)');
     check(/IT001E12345678/.test(await page.locator('.modal').innerText()), 'il codice POD letto si vede da controllare');
     await page.locator('.modal form.modal-form button[type=submit]').click();

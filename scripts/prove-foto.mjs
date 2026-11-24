@@ -61,7 +61,7 @@ try {
     const capture = page.locator('.capture-modal');
     if (!(await capture.waitFor({ timeout: 90000 }).then(() => true, () => false))) { check(false, `${label}: la foto non è stata letta`); continue; }
     await capture.locator('.btn-primary').click();
-    const amount = await page.locator('.modal input[type=number]').first().inputValue().catch(() => '');
+    const amount = (await page.locator('.modal input[inputmode=decimal]').first().inputValue().catch(() => '')).replace(',', '.');
     const due = await page.locator('.modal input[type=date]').first().inputValue().catch(() => '');
     const warned = /Lettura OCR poco chiara/.test(await page.locator('.modal').innerText().catch(() => ''));
     const right = Number(amount) === bill.amount && due === bill.due;
@@ -72,6 +72,46 @@ try {
     await page.locator('.modal .modal-head button[aria-label]').first().click();
     await page.locator('.modal').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
   }
+  // Foto dell'iPhone e file grandi (scelta dell'utente, 25 novembre 2026).
+  const readPicked = async (label, file, expect) => {
+    const closed = page.locator('nav .nav-group-head[aria-expanded="false"]');
+    for (let n = 0; n < 8 && await closed.count(); n++) await closed.first().click();
+    await page.getByRole('button', { name: 'Importa e collega', exact: true }).first().click();
+    const t0 = Date.now();
+    await page.locator('input[type=file][accept*="image/jpeg"]').first().setInputFiles(file);
+    const capture = page.locator('.capture-modal');
+    if (!(await capture.waitFor({ timeout: 120000 }).then(() => true, () => false))) {
+      const toast = await page.locator('.toast, [role=status]').allInnerTexts().catch(() => []);
+      check(false, `${label}: la foto non è stata letta (${toast.join(' | ').slice(0, 160)})`); return;
+    }
+    await capture.locator('.btn-primary').click();
+    const amount = (await page.locator('.modal input[inputmode=decimal]').first().inputValue().catch(() => '')).replace(',', '.');
+    const due = await page.locator('.modal input[type=date]').first().inputValue().catch(() => '');
+    check(Number(amount) === expect.amount && due === expect.due, `${label}: importo ${amount || '—'} e scadenza ${due || '—'} (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
+    await page.locator('.modal .modal-head button[aria-label]').first().click();
+    await page.locator('.modal').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
+  };
+  const { readFileSync } = await import('node:fs');
+  const heic = readFileSync(new URL('../tests/fixtures/bolletta-iphone.heic', import.meta.url));
+  await readPicked('foto HEIC dell\'iPhone', { name: 'IMG_4821.HEIC', mimeType: 'image/heic', buffer: heic }, { amount: 156.2, due: '2026-12-18' });
+  // Alcuni sistemi non danno il tipo: basta l'estensione.
+  await readPicked('foto HEIC senza tipo', { name: 'IMG_4822.heic', mimeType: '', buffer: heic }, { amount: 156.2, due: '2026-12-18' });
+  // Foto da 17 MB (5200 × 6900): prima «Il documento deve essere più piccolo di 15 MB», ora si riduce e si legge.
+  const big = await page.evaluate(async () => {
+    const W = 5200, H = 6900, c = document.createElement('canvas'); c.width = W; c.height = H;
+    const s = c.getContext('2d'), img = s.createImageData(W, H), d = img.data;
+    let x = 12345;
+    for (let i = 0; i < d.length; i += 4) { x = (x * 1103515245 + 12345) & 0x7fffffff; const v = 235 - (x % 30); d[i] = v; d[i + 1] = v - 3; d[i + 2] = v - 8; d[i + 3] = 255; }
+    s.putImageData(img, 0, 0); s.fillStyle = '#19191e';
+    ['GasNord Energia S.r.l.', 'Fornitura gas naturale', 'TOTALE DA PAGARE € 112,50', 'Da pagare entro il 15/12/2026'].forEach((l, i) => { s.font = `${i ? '' : 'bold '}130px sans-serif`; s.fillText(l, 300, 700 + i * 280); });
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.96));
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  });
+  const bigBuffer = Buffer.from(big, 'base64');
+  check(bigBuffer.length > 15 * 1024 * 1024, `la foto grande pesa ${(bigBuffer.length / 1048576).toFixed(1)} MB`);
+  await readPicked('foto da 17 MB', { name: 'IMG_20261124_101500.jpg', mimeType: 'image/jpeg', buffer: bigBuffer }, { amount: 112.5, due: '2026-12-15' });
   check(!errors.length, `nessun errore nella pagina ${errors.join(' | ')}`);
 } finally { await browser.close(); }
 if (failures.length) { console.error(`\nFoto delle bollette: ${failures.length} non superate.`); process.exit(1); }

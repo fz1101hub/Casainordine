@@ -31,7 +31,8 @@
     "test:many-data": "node scripts/prove-molti-dati.mjs",
     "test:big-backup": "node scripts/prove-backup-grande.mjs",
     "test:two-people": "node scripts/prove-due-persone.mjs",
-    "test:first-use": "node scripts/prove-primo-utilizzo.mjs"
+    "test:first-use": "node scripts/prove-primo-utilizzo.mjs",
+    "test:original-files": "node scripts/prove-file-originali.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "5.3.0",
@@ -40,6 +41,7 @@
     "@tesseract.js-data/eng": "1.0.0",
     "@tesseract.js-data/ita": "1.0.0",
     "fflate": "0.8.3",
+    "heic-to": "1.6.7",
     "imapflow": "^2.12.2",
     "lucide-react": "^1.77.0",
     "mailparser": "^3.15.0",

@@ -9,7 +9,9 @@ import { askConfirm } from './ConfirmDialog';
 import { friendlyError } from '../lib/friendly-error.mjs';
 import { todayRome } from '../lib/dates.mjs';
 import { validDocument, IMAGE_MIME_TYPES } from '../lib/document-upload.mjs';
+import { preparePhoto } from '../lib/image-prepare.js';
 import { REPORT_KINDS, ROOM_STATES, RENTAL_LIMITS, normalizeLease, normalizeRooms, normalizeReadings, reportState, compareReports, leasePhotoPath } from '../lib/rental.mjs';
+import DecimalInput from './DecimalInput';
 
 const MISSING_TABLE = new Set(['42P01', 'PGRST205']);
 const BUCKET = 'lease-files';
@@ -157,8 +159,11 @@ function RentalSection({ client, demo, user, homeId, canWrite, onNotify = () => 
     onNotify(tr('rental.signed'));
   }
 
-  async function addPhoto(report, file) {
-    if (!file) return;
+  async function addPhoto(report, picked) {
+    if (!picked) return;
+    // Foto HEIC dell'iPhone o molto pesanti: JPEG leggero prima del controllo.
+    let file;
+    try { file = (await preparePhoto(picked)).file; } catch (error) { onNotify(friendlyError(error, tr)); return; }
     if (!validDocument(file, IMAGE_MIME_TYPES)) { onNotify(tr('rental.error.photo')); return; }
     if (demo) { const id = uid(); setUrls(all => ({ ...all, [id]: URL.createObjectURL(file) })); setPhotos(list => [...list, { id, report_id: report.id, storage_path: id }]); return; }
     setBusy('photo');
@@ -209,7 +214,7 @@ function RentalSection({ client, demo, user, homeId, canWrite, onNotify = () => 
       <h4>{tr('rental.readings')}</h4>
       {draft.readings.map((reading, index) => <div key={index} className="rental-room">
         <input aria-label={tr('rental.meter')} placeholder={tr('rental.meterPlaceholder')} maxLength={RENTAL_LIMITS.meter} disabled={!editable} value={reading.meter || ''} onChange={e => setDraft(report, { readings: draft.readings.map((r, i) => (i === index ? { ...r, meter: e.target.value } : r)) })} />
-        <input aria-label={tr('rental.value')} type="number" inputMode="decimal" min="0" step="any" disabled={!editable} value={reading.value ?? ''} onChange={e => setDraft(report, { readings: draft.readings.map((r, i) => (i === index ? { ...r, value: e.target.value } : r)) })} />
+        <DecimalInput decimals={3} aria-label={tr('rental.value')} min="0" disabled={!editable} value={reading.value ?? ''} onChange={e => setDraft(report, { readings: draft.readings.map((r, i) => (i === index ? { ...r, value: e.target.value } : r)) })} />
         <input aria-label={tr('rental.unit')} placeholder={tr('rental.unitPlaceholder')} maxLength={RENTAL_LIMITS.unit} disabled={!editable} value={reading.unit || ''} onChange={e => setDraft(report, { readings: draft.readings.map((r, i) => (i === index ? { ...r, unit: e.target.value } : r)) })} />
         {editable && <button className="icon-button danger" aria-label={tr('rental.removeRow')} title={tr('rental.removeRow')} onClick={() => setDraft(report, { readings: draft.readings.filter((_, i) => i !== index) })}><Trash2 size={14} /></button>}
       </div>)}
@@ -221,7 +226,7 @@ function RentalSection({ client, demo, user, homeId, canWrite, onNotify = () => 
         {editable && <button className="icon-button danger" aria-label={tr('rental.deletePhoto')} title={tr('rental.deletePhoto')} onClick={() => removePhoto(photo)}><Trash2 size={13} /></button>}
       </figure>)}{!photos.some(p => p.report_id === report.id) && <span className="muted">—</span>}</div>
       {editable && <div className="extra-buttons rental-actions">
-        <label className="btn btn-soft"><Camera size={15} /> {busy === 'photo' ? tr('general.loading') : tr('rental.addPhoto')}<input type="file" accept="image/jpeg,image/png,image/webp" hidden disabled={busy === 'photo'} onChange={e => { addPhoto(report, e.target.files?.[0]); e.target.value = ''; }} /></label>
+        <label className="btn btn-soft"><Camera size={15} /> {busy === 'photo' ? tr('general.loading') : tr('rental.addPhoto')}<input type="file" accept="image/jpeg,image/png,image/webp,.heic,.heif,image/heic,image/heif" hidden disabled={busy === 'photo'} onChange={e => { addPhoto(report, e.target.files?.[0]); e.target.value = ''; }} /></label>
         {drafts[report.id] && <button className="btn btn-primary" disabled={busy === 'report'} onClick={() => saveReport(report)}>{tr('rental.saveReport')}</button>}
         {!report[mySide] && <button className="btn btn-soft" onClick={() => sign(report)}><PenLine size={15} /> {tr('rental.sign')}</button>}
       </div>}
@@ -255,8 +260,8 @@ function RentalSection({ client, demo, user, homeId, canWrite, onNotify = () => 
             <Field label={tr('rental.end')}><input type="date" value={form.end_on} onChange={e => setForm(f => ({ ...f, end_on: e.target.value }))} /></Field>
           </div>
           <div className="extra-row">
-            <Field label={tr('rental.rent')}><input type="number" inputMode="decimal" min="0" step="0.01" value={form.rent} onChange={e => setForm(f => ({ ...f, rent: e.target.value }))} /></Field>
-            <Field label={tr('rental.deposit')}><input type="number" inputMode="decimal" min="0" step="0.01" value={form.deposit} onChange={e => setForm(f => ({ ...f, deposit: e.target.value }))} /></Field>
+            <Field label={tr('rental.rent')}><DecimalInput min="0" value={form.rent} onChange={e => setForm(f => ({ ...f, rent: e.target.value }))} /></Field>
+            <Field label={tr('rental.deposit')}><DecimalInput min="0" value={form.deposit} onChange={e => setForm(f => ({ ...f, deposit: e.target.value }))} /></Field>
           </div>
           <p className="muted">{tr('rental.inviteHelp')}</p>
           <div className="extra-buttons"><button className="btn btn-primary" disabled={busy === 'lease'}>{tr('rental.create')}</button><button type="button" className="btn btn-soft" onClick={() => { setForm(blankLease()); setShowForm(false); }}>{tr('rental.cancel')}</button></div>

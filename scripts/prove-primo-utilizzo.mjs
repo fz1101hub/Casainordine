@@ -7,6 +7,8 @@
 //   node scripts/prove-primo-utilizzo.mjs [http://localhost:3000]
 import { BASE, checker, startScenario, openPage, launch } from './accesso-comune.mjs';
 import { translate } from '../lib/i18n.mjs';
+import { localeFor } from '../lib/i18n-core.mjs';
+import { formatNumberInput } from '../lib/number-input.mjs';
 
 const { check, finish } = checker('Primo utilizzo');
 const LANGS = ['it', 'en', 'es', 'fr', 'de', 'pt'];
@@ -64,10 +66,24 @@ async function walk(browser, lang) {
     await page.locator('.modal').waitFor({ timeout: 5000 });
     await look('nuova bolletta');
     await page.getByLabel(tr('form.description')).fill('Luce di prova');
-    await page.getByLabel(tr('form.amount')).fill('42.5');
+    // Importo scritto come lo scrive chi usa la lingua (Chrome leggeva «12,50» come 1250).
+    const amount = page.getByLabel(tr('form.amount'));
+    await amount.pressSequentially('12,3,4');
+    await page.locator('.modal .modal-actions .btn-primary').click();
+    await page.waitForTimeout(400);
+    const why = await amount.evaluate(el => el.validationMessage).catch(() => '');
+    check(why === tr('number.invalid', { example: formatNumberInput(12.5, lang) }) && !fake.rows('bills').length,
+      `${lang}: un importo non valido ferma il modulo con «${why}»`);
+    const typed = new Intl.NumberFormat(localeFor(lang)).format(1234.56);
+    await amount.fill('');
+    await amount.pressSequentially(typed);
+    await page.getByLabel(tr('form.description')).focus();
+    const shown = await amount.inputValue();
+    check(shown === formatNumberInput(1234.56, lang), `${lang}: «${typed}» si legge ${shown}`);
     await page.locator('.modal .modal-actions .btn-primary').click();
     await page.waitForTimeout(1500);
-    check(fake.rows('bills').some(b => b.title === 'Luce di prova'), `${lang}: la prima bolletta si salva`);
+    const first = fake.rows('bills').find(b => b.title === 'Luce di prova');
+    check(first && Number(first.amount) === 1234.56, `${lang}: la prima bolletta si salva con l'importo giusto (${first?.amount})`);
     await look('prima bolletta');
     await ui.go(tr('nav.dashboard'));
     check(await page.locator('.home3-start').count() === 0, `${lang}: dopo la prima bolletta «${tr('home.start.title')}» non c'è più`);

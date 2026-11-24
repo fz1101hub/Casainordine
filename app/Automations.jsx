@@ -10,6 +10,7 @@ import { friendlyError } from '../lib/friendly-error.mjs';
 import { todayRome } from '../lib/dates.mjs';
 import { BILL_CATEGORIES } from '../lib/bill-categories.mjs';
 import { AUTOMATION_KINDS, AUTOMATION_LIMITS, normalizeAutomation, simulateAutomation, nextOccurrence } from '../lib/automations.mjs';
+import DecimalInput from './DecimalInput';
 
 const MISSING_TABLE = new Set(['42P01', 'PGRST205']);
 const SHOWN = 8;
@@ -151,7 +152,7 @@ function AutomationsSection({ client, demo, user, homeId, canWrite, bills = [], 
           <Field label={tr('automation.name')}><input required maxLength={80} value={form.name} placeholder={tr('automation.placeholder.' + kind)} onChange={e => set({ name: e.target.value })} /></Field>
           {kind === 'bill_amount' && <>
             <div className="extra-row">
-              <Field label={tr('automation.threshold')}><input required type="number" inputMode="decimal" min="0.01" max={AUTOMATION_LIMITS.maxAmount} step="0.01" value={form.amount_threshold} onChange={e => set({ amount_threshold: e.target.value })} /></Field>
+              <Field label={tr('automation.threshold')}><DecimalInput required min="0.01" max={AUTOMATION_LIMITS.maxAmount} value={form.amount_threshold} onChange={e => set({ amount_threshold: e.target.value })} /></Field>
               <Field label={tr('automation.category')}><select value={form.category} onChange={e => set({ category: e.target.value })}>
                 <option value="">{tr('automation.anyCategory')}</option>
                 {BILL_CATEGORIES.map(c => <option key={c} value={c}>{tr('billCategory.' + c)}</option>)}
