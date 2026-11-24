@@ -1,6 +1,7 @@
 'use client';
 // Fondo sostituzioni (Fase 2, 3.3): per gli oggetti delle Manutenzioni, vita utile indicativa,
 // costo stimato e quota da mettere da parte ogni mese. Sono stime, e la pagina lo dice sempre.
+import { selectIn } from '../lib/select-all.mjs';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PiggyBank, Info, TriangleAlert } from 'lucide-react';
 import { useLanguage, useSection } from './LanguageProvider';
@@ -33,7 +34,8 @@ function ReplacementSection({ client, demo, user, homeId, canWrite, onNotify = (
     const list = await (homeId ? query.eq('home_id', homeId) : query.eq('user_id', user.id).is('home_id', null)).order('name').limit(600);
     if (list.error) { setLoading(false); onNotify(friendlyError(list.error, tr)); return; }
     const ids = (list.data || []).map(a => a.id);
-    const saved = ids.length ? await client.from('home_replacement_plans').select('*').in('asset_id', ids) : { data: [] };
+    // A gruppi di 100 id: fino a 600 oggetti nell'indirizzo superavano il limite di Supabase (16 KB).
+    const saved = ids.length ? await selectIn((part, count) => client.from('home_replacement_plans').select('*', count ? { count: 'exact' } : undefined).in('asset_id', part).order('asset_id'), ids) : { data: [] };
     setLoading(false);
     setAssets(list.data || []);
     if (saved.error) { if (MISSING_TABLE.has(saved.error.code)) setMissing(true); else onNotify(friendlyError(saved.error, tr)); setPlans({}); return; }

@@ -1,4 +1,5 @@
 'use client';
+import { selectIn } from '../lib/select-all.mjs';
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {QrCode,Siren,ScanSearch,Calculator,FileCheck2,Plane,Camera,Vote,ClipboardCheck,Plus,Trash2,Download,Share2,KeyRound} from 'lucide-react';
 import {todayRome} from '../lib/dates.mjs';
@@ -73,9 +74,11 @@ export default function V21Hub({client,user,homeId,homeName='',canWrite,demo,bil
   const newRows={...initial};keys.forEach((k,i)=>newRows[k]=results[i].data||[]);
   const errors=results.filter(r=>r.error);
   const decisionIds=newRows.decisions.map(x=>x.id),planIds=newRows.vacations.map(x=>x.id);
-  if(decisionIds.length){const v=await Promise.resolve(client.from('home_decision_votes').select('decision_id,user_id,choice,created_at').in('decision_id',decisionIds.slice(0,500)).limit(2000)).catch(()=>({data:[],error:true}));newRows.votes=v.data||[];if(v.error)errors.push(v);}
+  if(decisionIds.length){const v=await selectIn((part,count)=>client.from('home_decision_votes').select('decision_id,user_id,choice,created_at',count?{count:'exact'}:undefined).in('decision_id',part).order('decision_id').order('user_id'),decisionIds).catch(()=>({data:[],error:true}));newRows.votes=v.data||[];if(v.error)errors.push(v);}
   if(seq!==loadSeq.current)return;
-  if(planIds.length){const s=await Promise.resolve(client.from('home_vacation_shares').select('id,plan_id,expires_at,revoked_at,created_at').in('plan_id',planIds.slice(0,500)).order('created_at',{ascending:false}).limit(100)).catch(()=>({data:[],error:true}));newRows.shares=s.data||[];if(s.error)errors.push(s);}
+  if(planIds.length){const s=await selectIn((part,count)=>client.from('home_vacation_shares').select('id,plan_id,expires_at,revoked_at,created_at',count?{count:'exact'}:undefined).in('plan_id',part).order('created_at',{ascending:false}).order('id'),planIds).catch(()=>({data:[],error:true}));
+   // Le condivisioni più recenti per prime, come prima (al massimo 100 mostrate).
+   if(s.data)s.data=s.data.sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,100);newRows.shares=s.data||[];if(s.error)errors.push(s);}
   // Cambiando casa in fretta può arrivare per ultima la risposta della casa precedente: si scarta.
   if(seq!==loadSeq.current)return;
   setRows(newRows);setLoading(false);

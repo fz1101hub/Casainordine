@@ -28,7 +28,10 @@
     "test:night": "node scripts/prove-notte.mjs",
     "test:slow-phone": "node scripts/prove-telefono-lento.mjs",
     "test:photos": "node scripts/prove-foto.mjs",
-    "test:many-data": "node scripts/prove-molti-dati.mjs"
+    "test:many-data": "node scripts/prove-molti-dati.mjs",
+    "test:big-backup": "node scripts/prove-backup-grande.mjs",
+    "test:two-people": "node scripts/prove-due-persone.mjs",
+    "test:first-use": "node scripts/prove-primo-utilizzo.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "5.3.0",

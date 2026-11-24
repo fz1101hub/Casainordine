@@ -97,7 +97,8 @@ const EMBED = { homes: 'home_id', bills: 'bill_id' };
 // latency: millisecondi di attesa per ogni richiesta (per le prove con molti dati: rete simulata).
 // maxRows: come l'impostazione «Max rows» di Supabase (1000 sul progetto vero), nessuna risposta
 // supera quel numero di righe, qualunque sia limit o range.
-export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = false, latency = 0, maxRows = Infinity } = {}) {
+// maxUrl: lunghezza massima dell'indirizzo (Supabase: 16 KB fra indirizzo e intestazioni, poi errore 520).
+export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = false, latency = 0, maxRows = Infinity, maxUrl = Infinity } = {}) {
   const state = { tables: {}, tokens: new Map(), users: new Map(), passwords: new Map(), rpc: {}, removed: [], files: {}, uploads: [], requests: [], deletedUsers: [], rejectKeys: new Set() };
   const table = name => (state.tables[name] ||= []);
   const isOwner = (user, homeId) => table('homes').some(h => h.id === homeId && h.owner_id === user.id);
@@ -265,6 +266,7 @@ export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = fa
       if (!fn) return send(404, { code: 'PGRST202', message: `function ${rpc[1]} not found` });
       try { return send(200, await fn(body || {}, state, caller)); } catch (e) { return send(400, { code: e.code || 'P0001', message: e.message }); }
     }
+    if (String(req.url).length > maxUrl) return send(520, { message: 'Indirizzo troppo lungo' });
     const rest = path.match(/^\/rest\/v1\/([^/]+)$/);
     if (!rest) return send(404, { message: `percorso non gestito: ${path}` });
     // Chiave rifiutata (per esempio di un altro progetto).

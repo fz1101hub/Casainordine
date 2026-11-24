@@ -31,7 +31,8 @@ test('Cambio casa: con un errore restano i dati della stessa casa, mai quelli di
 });
 test('Spese condivise: solo le quote delle spese della casa aperta',()=>{
   const s=source('app/HouseholdHub.jsx');
-  assert.match(s,/from\('home_expense_shares'\)\.select\('expense_id,user_id,amount'\)\.in\('expense_id',expenseIds\)/);
+  // Solo le spese di questa casa, a gruppi di 100 id (selectIn: indirizzo sotto il limite di Supabase).
+  assert.match(s,/selectIn\(\(part,count\)=>client\.from\('home_expense_shares'\)\.select\('expense_id,user_id,amount'[^)]*\)\.in\('expense_id',part\)[^;]*,expenseIds\)/);
   assert.doesNotMatch(s,/from\('home_expense_shares'\)\.select\('expense_id,user_id,amount'\)\.limit\(1000\)/);
 });
 
