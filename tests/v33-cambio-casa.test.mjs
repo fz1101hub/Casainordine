@@ -20,7 +20,8 @@ test('Cambio casa: ogni caricamento scarta le risposte superate',()=>{
 test('Cambio casa: la sottoscrizione all’autenticazione non si rifà a ogni cambio e i dati non si caricano due volte',()=>{
   const page=source('app/page.jsx');
   assert.match(page,/return \(\)=>subscription\.unsubscribe\(\);\n  \},\[demo,client\]\);/);
-  assert.match(page,/if\(event!=='TOKEN_REFRESHED'\)setTimeout/);
+  // Né il rinnovo del token né INITIAL_SESSION (getSession() ha già caricato i dati all'apertura).
+  assert.match(page,/if\(event!=='TOKEN_REFRESHED'&&event!=='INITIAL_SESSION'\)setTimeout/);
   assert.ok(page.indexOf('const reloadRef=useRef(reload)')<page.indexOf('client.auth.onAuthStateChange'));
 });
 test('Cambio casa: con un errore restano i dati della stessa casa, mai quelli di un’altra',()=>{

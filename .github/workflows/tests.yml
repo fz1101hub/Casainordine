@@ -107,6 +107,9 @@ jobs:
       - name: Lavoro notturno con molti dati (400 persone, 4000 bollette)
         timeout-minutes: 4
         run: node scripts/prove-notte.mjs http://localhost:3000
+      - name: Telefono lento (3G e processore lento; dati scaricati una volta sola)
+        timeout-minutes: 6
+        run: node scripts/prove-telefono-lento.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
 
   database:
     # Migrazioni e prove del database su PostgreSQL 17 (la versione di Supabase), con un

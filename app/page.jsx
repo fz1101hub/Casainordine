@@ -274,8 +274,10 @@ export default function Page() {
       // Accesso con una password più corta della regola attuale: si chiede di sceglierne una nuova.
       else if(session&&needsPasswordUpgrade(sessionStorage,session.user?.email))setRecovery('upgrade');
       setUser(session?.user||null);
-      // Il rinnovo del token (circa ogni ora) non richiede di ricaricare tutto.
-      if(session) {if(event!=='TOKEN_REFRESHED')setTimeout(()=>{reloadRef.current();reloadHomesRef.current();},0);} else {setHomes([]);setActiveHomeId(null);setData({bills:[],utilities:[],tasks:[],suppliers:[],summaries:[],profile:null,reminders:[]});}
+      // Il rinnovo del token (circa ogni ora) non richiede di ricaricare tutto. INITIAL_SESSION arriva
+      // all'apertura con la stessa sessione di getSession() qui sopra, che ha già caricato i dati:
+      // prima a ogni apertura tutto si scaricava due volte (scripts/prove-telefono-lento.mjs).
+      if(session) {if(event!=='TOKEN_REFRESHED'&&event!=='INITIAL_SESSION')setTimeout(()=>{reloadRef.current();reloadHomesRef.current();},0);} else {setHomes([]);setActiveHomeId(null);setData({bills:[],utilities:[],tasks:[],suppliers:[],summaries:[],profile:null,reminders:[]});}
     });
     return ()=>subscription.unsubscribe();
   },[demo,client]);

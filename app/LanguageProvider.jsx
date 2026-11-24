@@ -76,7 +76,10 @@ export function LanguageProvider({children}){
    else setLanguageState(accountLanguage(user.id));
   };
   client.auth.getSession().then(({data})=>load(data?.session?.user||null)).catch(()=>{});
-  const {data:{subscription}}=client.auth.onAuthStateChange((_event,session)=>{
+  const {data:{subscription}}=client.auth.onAuthStateChange((event,session)=>{
+   // INITIAL_SESSION carries the same session getSession() above already loaded, and a token
+   // refresh keeps the same person: reading the preference again only cost a slow round trip.
+   if(event==='INITIAL_SESSION'||event==='TOKEN_REFRESHED')return;
    // Defer Supabase calls outside the auth-state callback to avoid locking the Auth client.
    setTimeout(()=>{if(active)load(session?.user||null);},0);
   });
