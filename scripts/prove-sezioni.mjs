@@ -173,7 +173,7 @@ try {
     await dialog.waitFor({ timeout: 5000 });
     const message = await dialog.innerText();
     // Nella demo non ci sono bollette aperte uguali: i cinque pagamenti di bollette si aggiungono.
-    check(/Estratto conto/.test(message) && /5 sono bollette da aggiungere/.test(message) && /SMAT/.test(message) && /Enel/.test(message) && !/CONAD|PRELIEVO|STATION/i.test(message), 'Estratto conto: la conferma elenca i pagamenti delle bollette, non la spesa');
+    check(/Estratto conto/.test(message) && /da aggiungere come già pagate: 5/.test(message) && /SMAT/.test(message) && /Enel/.test(message) && !/CONAD|PRELIEVO|STATION/i.test(message), 'Estratto conto: la conferma elenca i pagamenti delle bollette, non la spesa');
     await dialog.locator('button').last().click(); await settle(800);
     check(/Estratto conto importato/.test(await toast()), 'Estratto conto: importato');
     const bank = await page.evaluate(() => (JSON.parse(localStorage.getItem('casainordine-demo-v1') || '{}').bills || []).filter(b => String(b.external_id || '').startsWith('bank:')));
