@@ -2,7 +2,7 @@
 // la demo; qui la stessa ricerca di testi non tradotti gira sulle schermate con accesso, contro il
 // Supabase finto (vedi scripts/prove-con-accesso.mjs): spazio personale e casa condivisa, tutte le
 // voci del menu con il loro modulo, famiglia e inviti, anteprima del ripristino, stato della
-// configurazione. Segnala i testi uguali in italiano e in inglese e le chiavi mostrate al posto del testo.
+// configurazione. Segnala i testi uguali all'italiano nelle altre cinque lingue e le chiavi mostrate al posto del testo.
 // Uso: node scripts/prove-lingue-accesso.mjs [indirizzo dell'app]
 import { BASE, startScenario, openPage, launch } from './accesso-comune.mjs';
 import { TRANSLATIONS } from '../lib/i18n.mjs';
@@ -105,28 +105,35 @@ async function crawl(browser, lang) {
   }
 }
 
+const LANGUAGES = ['it', 'en', 'es', 'fr', 'de', 'pt'];
 const browser = await launch();
-let italian, english;
+const runs = new Map();
+let failed = false;
 try {
-  italian = await crawl(browser, 'it');
-  english = await crawl(browser, 'en');
+  for (const lang of LANGUAGES) {
+    try { runs.set(lang, await crawl(browser, lang)); }
+    catch (error) { failed = true; console.error(`Scenario fallito (${lang}): ${error.message}`); }
+  }
 } finally { await browser.close(); }
 
-let failed = false;
-// La prova vale solo se ha raggiunto le schermate con accesso: questi testi devono esserci, in tutte e due le lingue.
 const REACHED = ['config.title', 'config.item.database', 'extra.restore.title', 'extra.restore.reason.otherPeople', 'family.generateInvite', 'family.deleteAction', 'family.owner', 'family.revoke', 'settings.signout'];
-for (const [lang, run] of [['it', italian], ['en', english]]) {
-  const missing = REACHED.filter(key => ![...run.seen.keys()].some(text => text.includes(TRANSLATIONS[lang][key].replace(/\{[^}]+\}.*$/, '').trim())));
+const italian = runs.get('it');
+const legitimate = { pt: new Set(['SOS Casa', 'Data prevista']) };
+for (const [lang, run] of runs) {
+  const missing = REACHED.filter(key => {
+    const expected = TRANSLATIONS[lang][key]?.replace(/\{[^}]+\}.*$/, '').trim();
+    return !expected || ![...run.seen.keys()].some(text => text.includes(expected));
+  });
   if (missing.length) { failed = true; console.error(`Schermate non raggiunte (${lang}): ${missing.join(', ')}`); }
+  const rawKeys = [...run.seen].filter(([text]) => KEY.test(text) && !/\.(?:com|org|it|pdf|csv|json|html|zip)$/.test(text));
+  const untranslated = lang === 'it' || !italian ? [] : [...run.seen].filter(([text]) => italian.seen.has(text) && !DATA.has(text)
+    && !legitimate[lang]?.has(text)
+    && text.split(' ').filter(word => /[a-zà-ÿ]{3}/i.test(word)).length >= 2
+    && !SAME.some(pattern => pattern.test(text)) && ![...DATA].some(d => text.includes(d)));
+  console.log(`Testi con accesso (${lang}): ${run.seen.size}; chiavi: ${rawKeys.length}; possibili residui: ${untranslated.length}.`);
+  for (const [t, s] of [...rawKeys, ...untranslated]) console.error(`  [${lang}: ${s}] ${t.slice(0, 160)}`);
+  if (rawKeys.length || untranslated.length || run.errors.length) failed = true;
+  if (run.errors.length) console.error(`Errori JavaScript (${lang}): ${run.errors.slice(0, 3).join(' | ')}`);
 }
-const rawKeys = [...italian.seen, ...english.seen].filter(([text]) => KEY.test(text) && !/\.(?:com|org|it|pdf|csv|json|html|zip)$/.test(text));
-if (rawKeys.length) { failed = true; console.error(`${rawKeys.length} chiavi del dizionario mostrate al posto del testo:`); for (const [t, s] of rawKeys) console.error(`  [${s}] ${t}`); }
-const untranslated = [...english.seen].filter(([text]) => italian.seen.has(text) && !DATA.has(text)
-  && text.split(' ').filter(word => /[a-zà-ÿ]{3}/i.test(word)).length >= 2
-  && !SAME.some(pattern => pattern.test(text)) && ![...DATA].some(d => text.includes(d)));
-console.log(`Testi visti con accesso: ${italian.seen.size} in italiano, ${english.seen.size} in inglese.`);
-if (untranslated.length) { failed = true; console.error(`\n${untranslated.length} testi uguali in italiano e in inglese (non tradotti?):`); for (const [t, s] of untranslated) console.error(`  [${s}] ${t.slice(0, 160)}`); }
-const errors = [...italian.errors, ...english.errors];
-if (errors.length) { failed = true; console.error(`\nErrori JavaScript: ${errors.slice(0, 3).join(' | ')}`); }
-if (failed) process.exit(1);
-console.log('Lingue con accesso: nessun testo rimasto in italiano nella versione inglese e nessuna chiave al posto del testo.');
+if (failed || runs.size !== LANGUAGES.length) process.exit(1);
+console.log('Lingue con accesso: controllo euristico superato in tutte le sei lingue (Supabase simulato).');
