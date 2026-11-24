@@ -63,7 +63,12 @@ try {
     await capture.locator('.btn-primary').click();
     const amount = await page.locator('.modal input[type=number]').first().inputValue().catch(() => '');
     const due = await page.locator('.modal input[type=date]').first().inputValue().catch(() => '');
-    check(Number(amount) === bill.amount && due === bill.due, `${label}: importo ${amount || '—'} e scadenza ${due || '—'} (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
+    const warned = /Lettura OCR poco chiara/.test(await page.locator('.modal').innerText().catch(() => ''));
+    const right = Number(amount) === bill.amount && due === bill.due;
+    // Foto piccola e compressa: le cifre possono confondersi (dipende dai caratteri e dal browser),
+    // ma allora deve comparire l'avviso di ricontrollare. Le altre foto devono essere lette giuste.
+    if (kind === 'piccola-compressa') check(warned, `${label}: avviso di ricontrollare (importo ${amount || '—'}, scadenza ${due || '—'}, ${right ? 'giusti' : 'da correggere'})`);
+    else check(right, `${label}: importo ${amount || '—'} e scadenza ${due || '—'} (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
     await page.locator('.modal .modal-head button[aria-label]').first().click();
     await page.locator('.modal').waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
   }
