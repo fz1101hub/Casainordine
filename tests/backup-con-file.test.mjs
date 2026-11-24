@@ -208,3 +208,18 @@ test('pannelli e testi: pulsante .zip, lettura .zip nel ripristino, 6 lingue', (
   }
   assert.doesNotMatch(TRANSLATIONS.it['extra.backup.caution'], /non contiene i file/);
 });
+
+
+test('ZIP con espansione eccessiva o dimensione ZIP64 non attendibile: rifiutato prima di allocare', () => {
+  const oversized = zipSync({ 'files/grande.pdf': [new Uint8Array(21 * 1024 * 1024), { level: 9 }] });
+  assert.ok(oversized.length < 100_000, 'la ZIP bomb è molto compressa');
+  assert.throws(() => readBackupBytes(oversized), e => e instanceof RestoreFileError && e.message === 'badZip');
+  const normal = zipSync({ [ZIP_JSON]: strToU8(JSON.stringify(bundle())) });
+  const forged = new Uint8Array(normal);
+  let central = -1;
+  for (let i = 0; i < forged.length - 46; i++)
+    if (forged[i] === 0x50 && forged[i + 1] === 0x4b && forged[i + 2] === 0x01 && forged[i + 3] === 0x02) { central = i; break; }
+  assert.ok(central >= 0);
+  forged.fill(0xff, central + 24, central + 28); // taglia dichiarata: 4 GiB
+  assert.throws(() => readBackupBytes(forged), e => e instanceof RestoreFileError && e.message === 'badZip');
+});

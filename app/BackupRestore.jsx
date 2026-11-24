@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { useLanguage } from './LanguageProvider';
 import { friendlyError } from '../lib/friendly-error.mjs';
-import { readBackup, restorePlan, existingCounts, existingDocumentIds, previewBySection, runRestore, restoreTotals, RestoreFileError, SKIP_REASONS } from '../lib/backup-restore.mjs';
+import { readBackup, restorePlan, stableCopyIds, isCopy, existingCounts, existingDocumentIds, previewBySection, runRestore, restoreTotals, RestoreFileError, SKIP_REASONS } from '../lib/backup-restore.mjs';
 
 const MAX_BYTES = 20 * 1024 * 1024;
 // Backup .zip con i file (lib/backup-files.mjs, caricato solo quando serve): si legge tutto in memoria.
@@ -36,7 +36,8 @@ export default function BackupRestore({ client, user, homeId, canWrite, onNotify
       // Spese divise: solo se chi ha pagato e chi divide sono ancora nella casa.
       let members = null;
       if (homeId) { const { data, error } = await client.from('home_members').select('user_id').eq('home_id', homeId); if (error) throw error; members = (data || []).map(m => m.user_id); }
-      const plan = restorePlan(backup, target, { existingDocuments: await existingDocumentIds(client, backup, target), members });
+      const copyIds = isCopy(backup, target) ? await stableCopyIds(backup, target) : null;
+      const plan = restorePlan(backup, target, { copyIds, existingDocuments: await existingDocumentIds(client, backup, target), members });
       if (!plan.steps.length) { setState({ stage: 'idle' }); onNotify(tr('extra.restore.nothing')); return; }
       const existing = await existingCounts(client, plan);
       setState({ stage: 'preview', backup, plan, rows: previewBySection(plan, existing), otherSpace: plan.copy });
@@ -55,7 +56,9 @@ export default function BackupRestore({ client, user, homeId, canWrite, onNotify
         needsUpdate: Object.values(result).some(c => c.needsUpdate) }));
       onRefresh();
     } catch (e) {
-      setState(s => ({ ...s, stage: 'preview' }));
+      // Alcuni passi (o persino alcune righe del passo corrente) possono essere già persistiti.
+      // Non cancellare il piano: riprovando vengono riusati gli stessi identificativi.
+      setState(s => ({ ...s, stage: 'preview', interrupted: true }));
       onNotify(tr('extra.restore.failed', { error: friendlyError(e, tr) }));
     }
   }
@@ -73,6 +76,7 @@ export default function BackupRestore({ client, user, homeId, canWrite, onNotify
       {state.backup?.exportedAt && <p>{tr('extra.restore.from', { date: localDate(state.backup.exportedAt.slice(0, 10)) })}</p>}
       <p><b>{tr('extra.restore.target', { space })}</b> {tr('extra.restore.intro')}</p>
       {state.otherSpace && <p className="extra-alert">{tr('extra.restore.otherSpace')}</p>}
+      {state.interrupted && <p className="extra-alert" role="alert">{tr('extra.restore.interrupted')}</p>}
       <ul>{state.rows.map(r => <li key={r.section}><b>{tr('nav.' + r.section)}</b>: {tr('extra.restore.row', { total: r.total, present: r.present })}</li>)}</ul>
       {skipped.length > 0 && <p><small>{tr('extra.restore.skipped', { list: skipped.join(' · ') })}</small></p>}
       {state.stage === 'preview' && <div className="extra-buttons">

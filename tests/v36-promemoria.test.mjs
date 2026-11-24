@@ -39,7 +39,9 @@ test('Cron: finestra, un solo promemoria per bolletta e persona, niente stime pa
   assert.match(s,/\.gte\('due_date',reminderRange\.from\)\.lte\('due_date',reminderRange\.to\)\.is\('paid_at',null\)/);
   assert.doesNotMatch(s,/\.eq\('due_date',target\)/);
   assert.match(s,/readIn\(admin,'reminders','bill_id','bill_id',\(bills\|\|\[\]\)\.map\(b=>b\.id\),q=>q\.neq\('reminder_date',today\)\)/);
-  assert.match(s,/\(bills\|\|\[\]\)\.filter\(b=>!alreadyReminded\.has\(b\.id\)\)/);
+  // I registri esterni vedono anche le bollette già ricordate, per recuperare email e push non arrivate.
+  assert.match(s,/processBillReminders\(admin,bills\|\|\[\],\{today,appUrl,counts,alreadyReminded/);
+  assert.match(source('lib/reminder-run.mjs'),/!alreadyReminded\.has\(bill\.id\) && profiles\.get\(bill\.user_id\)/);
   // Una sola push riuscita per bolletta e persona (lib/reminder-run.mjs, provato in promemoria-a-blocchi).
   assert.match(source('lib/reminder-run.mjs'),/log\.filter\(r => r\.sent_at && r\.reminder_date !== today\)/);
   assert.match(s,/days:daysUntil\(today,bill\.due_date\)/);

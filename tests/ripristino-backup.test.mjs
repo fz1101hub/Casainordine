@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { RESTORE_ORDER, RESTORE_SKIPPED, RESTORE_WITH, SKIP_REASONS, RESTORE_SECTIONS, LINKS, readBackup, prepareRows, restorePlan, existingCounts, runRestore, previewBySection, restoreTotals, RestoreFileError } from '../lib/backup-restore.mjs';
+import { RESTORE_ORDER, RESTORE_SKIPPED, RESTORE_WITH, SKIP_REASONS, RESTORE_SECTIONS, LINKS, readBackup, prepareRows, restorePlan, stableCopyIds, existingCounts, runRestore, previewBySection, restoreTotals, RestoreFileError } from '../lib/backup-restore.mjs';
 import { BACKUP_MAIN, BACKUP_TABLES } from '../lib/backup-tables.mjs';
 import { TRANSLATIONS } from '../lib/i18n.mjs';
 
@@ -129,8 +129,36 @@ test('pannello nella sezione backup, testi nelle 6 lingue', () => {
   assert.match(panel, /disabled=\{!canWrite \|\| busy\}/);
   assert.match(panel, /MAX_BYTES = 20 \* 1024 \* 1024/);
   for (const [lang, d] of Object.entries(TRANSLATIONS)) {
-    for (const key of ['button', 'title', 'intro', 'otherSpace', 'row', 'confirm', 'done', 'nothing', 'error.notJson', 'error.notBackup', 'error.tooBig', 'failed', 'readOnly'])
+    for (const key of ['button', 'title', 'intro', 'otherSpace', 'interrupted', 'row', 'confirm', 'done', 'nothing', 'error.notJson', 'error.notBackup', 'error.tooBig', 'failed', 'readOnly'])
       assert.ok(d['extra.restore.' + key], `extra.restore.${key} in ${lang}`);
   }
   assert.doesNotMatch(TRANSLATIONS.it['extra.backup.caution'], /non sono ancora disponibili/);
+  assert.match(panel, /interrupted: true/);
+  assert.match(panel, /tr\('extra\.restore\.interrupted'\)/);
+  assert.doesNotMatch(TRANSLATIONS.it['extra.restore.otherSpace'], /si copierebbero di nuovo/);
+});
+
+
+// In una copia le chiavi devono sopravvivere alla chiusura del browser: altrimenti un
+// ripristino interrotto e caricato di nuovo duplicherebbe tutte le voci già importate.
+test('copia ripetuta dello stesso backup: identificativi UUID stabili e nessun duplicato', async () => {
+  const original = readBackup(JSON.stringify(backup()));
+  const target = { homeId: H2, userId: ME };
+  const firstIds = await stableCopyIds(original, target);
+  const secondIds = await stableCopyIds(original, target);
+  assert.deepEqual(firstIds, secondIds);
+  const first = restorePlan(original, target, { copyIds: firstIds });
+  const repeat = restorePlan(original, target, { copyIds: secondIds });
+  const firstRows = first.steps.find(s => s.table === 'bills').rows;
+  const repeatedRows = repeat.steps.find(s => s.table === 'bills').rows;
+  assert.deepEqual(firstRows, repeatedRows);
+  assert.match(firstRows[0].id, /^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  const property = first.steps.find(s => s.table === 'home_properties').rows[0];
+  assert.equal(firstRows[0].property_id, property.id, 'i riferimenti sono rimappati');
+  const otherUser = await stableCopyIds(original, { ...target, userId: 'altra-persona' });
+  assert.notEqual(otherUser.bills.b1, firstIds.bills.b1);
+  const existing = { bills: [firstRows[0].id] };
+  const client = fakeClient({ existing });
+  const result = await runRestore(client, { steps: [repeat.steps.find(s => s.table === 'bills')] });
+  assert.deepEqual(result.bills, { added: 0, present: 1, failed: 0 });
 });
