@@ -1,5 +1,5 @@
 import { authenticatedUser, getAdmin, json } from '../../../../lib/server.mjs';
-import { sharedOwnedHomes, sharedDocumentPaths, removeUserFiles, revokeGoogleAccess } from '../../../../lib/account-deletion.mjs';
+import { sharedOwnedHomes, sharedTenantLeases, sharedDocumentPaths, ownedLeasePhotoPaths, queueAccountCleanup, discardAccountCleanup, finishAccountCleanup, revokeGoogleAccess } from '../../../../lib/account-deletion.mjs';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
@@ -18,12 +18,30 @@ export async function POST(request) {
   try {
     const shared = await sharedOwnedHomes(admin, user.id);
     if (shared.length) return json({ error: 'accountOwner', homes: shared.map(h => h.name) }, 409);
-    await revokeGoogleAccess(admin, user.id);
+    // Un contratto con inquilino accettato non può sparire per un semplice delete account.
+    const leases = await sharedTenantLeases(admin, user.id);
+    if (leases.length) return json({ error: 'accountLease', leases: leases.map(l => l.property_label) }, 409);
     const keep = await sharedDocumentPaths(admin, user.id);
-    await removeUserFiles(admin, user.id, keep);
+    const leasePaths = await ownedLeasePhotoPaths(admin, user.id);
+    // Se questa scrittura fallisce, l'account resta intatto e nessun file viene cancellato.
+    await queueAccountCleanup(admin, user.id, keep, leasePaths);
+    await revokeGoogleAccess(admin, user.id);
     const { error } = await admin.auth.admin.deleteUser(user.id);
-    if (error) throw error;
-    return json({ ok: true });
+    if (error) {
+      try { await discardAccountCleanup(admin, user.id); } catch (cleanupError) {
+        console.error('[account/delete] Pending cleanup record after failed Auth delete', cleanupError?.message);
+      }
+      throw error;
+    }
+    // Auth ha eliminato l'account e le righe personali. Solo ora si possono togliere i file.
+    // Se Storage non risponde, il cron riprenderà dalla coda, senza perdere l'account prima.
+    try {
+      const cleaned = await finishAccountCleanup(admin, user.id);
+      return json(cleaned ? { ok: true } : { ok: true, cleanup_pending: true });
+    } catch (cleanupError) {
+      console.error('[account/delete] Storage cleanup queued', cleanupError?.message);
+      return json({ ok: true, cleanup_pending: true });
+    }
   } catch {
     return json({ error: 'accountDeleteFailed' }, 500);
   }

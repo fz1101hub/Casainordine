@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { sharedOwnedHomes, removeUserFiles, revokeGoogleAccess } from '../lib/account-deletion.mjs';
+import { sharedOwnedHomes, sharedTenantLeases, removeUserFiles, revokeGoogleAccess } from '../lib/account-deletion.mjs';
 import { LANGUAGES, translate } from '../lib/i18n.mjs';
 const source=path=>readFileSync(new URL(`../${path}`,import.meta.url),'utf8');
 
@@ -31,10 +31,10 @@ test('Eliminazione account: revoca dell’accesso Gmail senza bloccare se fallis
   const {admin}=adminMock({connections:[{refresh_token_enc:'non-valido'}]});
   assert.equal(await revokeGoogleAccess(admin,'u1',async()=>({ok:true})),0,'token illeggibile: si prosegue');
 });
-test('Eliminazione account: conferma con l’email, controllo delle case, poi file e utente',()=>{
+test('Eliminazione account: conferma con email, coda prima di Auth e Storage solo dopo',()=>{
   const route=source('app/api/account/delete/route.js');
   assert.match(route,/String\(confirm_email \|\| ''\)\.trim\(\)\.toLowerCase\(\) !== String\(user\.email \|\| ''\)\.trim\(\)\.toLowerCase\(\)/);
-  const order=['sharedOwnedHomes(admin, user.id)','revokeGoogleAccess(admin, user.id)','removeUserFiles(admin, user.id, keep)','admin.auth.admin.deleteUser(user.id)'].map(x=>route.indexOf(x));
+  const order=['sharedOwnedHomes(admin, user.id)','queueAccountCleanup(admin, user.id, keep, leasePaths)','admin.auth.admin.deleteUser(user.id)','finishAccountCleanup(admin, user.id)'].map(x=>route.indexOf(x));
   assert.ok(order.every((v,i)=>v>0&&(i===0||v>order[i-1])),order.join(','));
   const sql=source('supabase/migrate_v37_account.sql');
   assert.match(sql,/on delete set null/);
@@ -60,4 +60,29 @@ test('le spese di chi ha cancellato l account mostrano «ex membro» nella lingu
   assert.match(hub,/nameOf=userId=>memberName\(userId,\{members:rows\.members,former:rows\.former,formerLabel:tr\('family\.formerMember'\)\}\)/);
   assert.equal(translate('it','family.formerMember'),'ex membro');
   for(const {code} of LANGUAGES){const v=translate(code,'family.formerMember');assert.ok(v&&v!=='family.formerMember',code);}
+});
+
+test('un locatore con inquilino accettato non può cancellare inavvertitamente i verbali del contratto',async()=>{
+  const calls=[];
+  const leases=[
+    {id:'l1',property_label:'Appartamento Roma',user_id:'u1',tenant_id:'u2'},
+    {id:'l2',property_label:'Solo invito',user_id:'u1',tenant_id:null},
+    {id:'l3',property_label:'Di altri',user_id:'u3',tenant_id:'u4'}
+  ];
+  const admin={from:table=>{
+    assert.equal(table,'home_leases');
+    const filters=[];
+    const q={select(){return q;},eq(col,v){filters.push(r=>r[col]===v);return q;},
+      not(col,op,v){assert.equal(op,'is');assert.equal(v,null);filters.push(r=>r[col]!=null);return q;},
+      async limit(n){calls.push(n);return {data:leases.filter(r=>filters.every(f=>f(r))),error:null};}};
+    return q;
+  }};
+  assert.deepEqual((await sharedTenantLeases(admin,'u1')).map(x=>x.id),['l1']);
+  assert.deepEqual(await sharedTenantLeases(admin,'u3'),[{id:'l3',property_label:'Di altri',user_id:'u3',tenant_id:'u4'}]);
+  assert.deepEqual(calls,[101,101]);
+  const route=source('app/api/account/delete/route.js');
+  assert.ok(route.indexOf('sharedTenantLeases(admin, user.id)') < route.indexOf('queueAccountCleanup(admin, user.id, keep, leasePaths)'));
+  assert.match(route,/error: 'accountLease'/);
+  assert.match(source('app/AccountSecurity.jsx'),/body\.error === 'accountLease'/);
+  for(const {code} of LANGUAGES)assert.notEqual(translate(code,'account.deleteLease'),'account.deleteLease');
 });
