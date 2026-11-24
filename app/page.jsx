@@ -98,6 +98,12 @@ const menu = [
 ];
 const menuIcons = Object.fromEntries(menu.map(({id,icon})=>[id,icon]));
 const BILL_PAGE = 100;
+const NOT_NAMES = new Set(['info','admin','contact','contatti','mail','email','posta','casa','home','test','user','utente','noreply','famiglia','family','office','ufficio','amministrazione','account','hello','ciao','support']);
+function nameFromEmail(email){
+  const first=String(email||'').split('@')[0].split(/[._+\-]/)[0]||'';
+  if(!/^[a-zàèéìòù]{2,20}$/i.test(first)||NOT_NAMES.has(first.toLowerCase()))return '';
+  return first[0].toUpperCase()+first.slice(1).toLowerCase();
+}
 const billDefault = {title:'',supplier:'',category:'Luce',amount:'',due_date:addDaysISO(todayRome(),7),paid:false};
 // Dati in più letti da un documento (lib/document-import.mjs): periodo e consumo si salvano con la
 // bolletta (servono ai grafici dei consumi), POD e PDR si mostrano solo per controllo.
@@ -198,6 +204,9 @@ export default function Page() {
 
   const notify = txt=>{setToast(txt);};
   const homesSeq=useRef(0), dataSeq=useRef(0), dataHome=useRef(undefined);
+  // Dati caricati almeno una volta: prima «Per cominciare» compariva per un attimo anche a chi ha già
+  // bollette, mentre si caricavano.
+  const [dataLoaded,setDataLoaded]=useState(false);
   // Ultimo caricamento dei dati riuscito (per ricaricare tornando all'app, vedi più sotto).
   const lastLoad=useRef(Date.now());
   const reloadHomes=useCallback(async()=>{
@@ -244,6 +253,7 @@ export default function Page() {
       if (dataHome.current===(activeHomeId||null)) return;
     }
     dataHome.current=err?undefined:(activeHomeId||null);
+    if(!err)setDataLoaded(true);
     setData({bills:b.data||[],utilities:u.data||[],tasks:t.data||[],suppliers:sp.data||[],summaries:sm.data||[],profile:p.data||null,
       reminders:(r.data||[]).filter(item=>item.bills&&!item.bills.paid_at&&item.bills.home_id===activeHomeId)});
   },[client,activeHomeId]);
@@ -684,7 +694,9 @@ export default function Page() {
   const recentMonths=Array.from({length:6},(_,i)=>{const d=new Date(`${today.slice(0,7)}-01T12:00:00Z`);d.setUTCMonth(d.getUTCMonth()-5+i);return d.toISOString().slice(0,7);});
   const monthly=recentMonths.map(m=>({label:new Date(`${m}-01T12:00:00Z`).toLocaleDateString(locale,{month:'short',timeZone:'UTC'}), total:bills.filter(b=>b.due_date.startsWith(m)).reduce((sum,b)=>sum+Number(b.amount),0)}));
   const maxMonthly=Math.max(...monthly.map(x=>x.total),1);
-  const displayName=(data.profile?.full_name||user?.email?.split('@')[0]||'').split(' ')[0];
+  // Nome nel saluto: quello del profilo; senza, dall'indirizzo email solo se sembra un nome
+  // («mario.rossi82» → «Mario»; «info», «x7» o «casa.rossi» no). Prima «Buongiorno, mario.rossi82!».
+  const displayName=(data.profile?.full_name||'').trim().split(/\s+/)[0]||nameFromEmail(user?.email);
   function openModal(type){if(!canWrite){notify(tr('v32.feedback.30'));return;}setForm({...({bill:billDefault,utility:utilityDefault,task:taskDefault}[type])});setModal(type);}
   function changePage(id){setTab(id);setMobile(false);setBellOpen(false);}
   // Menu in gruppi: quelli aperti si ricordano su questo dispositivo; il gruppo della pagina aperta
@@ -747,7 +759,7 @@ export default function Page() {
         {tab==='automations'&&<Automations client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} bills={bills} onNotify={notify}/>}
         {['tags','sos','radar','simulator','passport','vacation','inventory','decisions','briefing'].includes(tab)&&<V21Hub client={client} user={user} homeId={activeHomeId} homeName={homeMembership?.homes?.name||''} canWrite={canWrite} demo={demo} bills={bills} tasks={tasks} tab={tab} onNotify={notify}/>}
         {['monitor','fraud','pagopa','history','moving','savings','offline'].includes(tab)&&<V20Hub client={client} user={user} homeId={activeHomeId} canWrite={canWrite} demo={demo} bills={bills} utilities={utilities} tab={tab} onNotify={notify} onRefresh={reload}/>}
-        {tab==='dashboard'&&<PersonalizedHome client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} bills={bills} tasks={tasks} displayName={displayName} onNavigate={changePage} onNewBill={()=>openModal('bill')} onNewTask={()=>openModal('task')} onPay={pay} onToggleTask={toggleTask} onRefresh={reload} onNotify={notify}/>}
+        {tab==='dashboard'&&<PersonalizedHome client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} bills={bills} tasks={tasks} loaded={demo||dataLoaded} displayName={displayName} onNavigate={changePage} onNewBill={()=>openModal('bill')} onNewTask={()=>openModal('task')} onPay={pay} onToggleTask={toggleTask} onRefresh={reload} onNotify={notify}/>}
         {tab==='overview'&&<>
           <div className="page-heading"><div><div className="eyebrow">{tr('overview.eyebrow')}</div><h1>{tr('home.greeting',{who:displayName?`, ${displayName}`:''})} <span className="wave">✳</span></h1><p>{tr('overview.subtitle')}</p></div><button className="btn btn-primary" onClick={()=>openModal('bill')}><Plus size={18}/> {tr('home.widget.bills.new')}</button></div>
           <div className="stat-grid"><div className="stat-card"><div className="stat-top"><span>{tr('overview.totalDue')}</span><span className="stat-icon coral"><Wallet size={20}/></span></div><strong>{money(dueAmount)}</strong><small><span className="small-dot orange"/>{tr('overview.openCount',{count:open.length})}</small></div>

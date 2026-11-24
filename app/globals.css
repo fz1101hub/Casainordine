@@ -556,3 +556,7 @@ select{min-height:24px}
 /* Finestra di conferma: i messaggi su più righe (per esempio l'elenco dell'estratto conto). */
 #app-dialog-message{white-space:pre-line}
 .bills-more{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;padding:16px 8px 4px}
+/* Telefono stretto, lingue con parole lunghe (tedesco «PDF oder Foto hochladen»): il testo dei
+   pulsanti in cima alla pagina va a capo invece di uscire dallo schermo (scripts/prove-primo-utilizzo.mjs). */
+@media(max-width:600px){.heading-actions .btn{white-space:normal;text-align:center;min-width:0;line-height:1.25}}
+.home3-start{padding:20px 22px;margin-bottom:16px;border-color:#cfe6dc;background:linear-gradient(130deg,#f2faf6,#fff)}.home3-start h2{font-size:16px;margin:0 0 6px}.home3-start p{color:var(--muted);font-size:12.5px;line-height:1.6;margin:0 0 14px}.home3-start-actions{display:flex;flex-wrap:wrap;gap:9px}@media(max-width:600px){.home3-start-actions .btn{flex:1 1 100%;white-space:normal}}

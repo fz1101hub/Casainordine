@@ -2,7 +2,7 @@
 import {useEffect,useMemo,useState} from 'react';
 import {
   ArrowDown,ArrowUp,Bell,Check,CheckCircle2,ChevronRight,Clock,ClipboardCheck,
-  ListChecks,Plus,ReceiptText,RotateCcw,Save,Settings2,ShoppingBasket,Wallet
+  ListChecks,Plus,ReceiptText,RotateCcw,Save,Settings2,ShoppingBasket,UploadCloud,Users,Wallet
 } from 'lucide-react';
 import {todayRome} from '../lib/dates.mjs';
 import {useLanguage} from './LanguageProvider';
@@ -29,7 +29,7 @@ function HomeWidget({title,icon:Icon,count,actionLabel,onAction,children}){
 
 export default function PersonalizedHome({
  client,demo,user,homeId,canWrite,bills=[],tasks=[],displayName='',
- sampleExtras=null,onSampleShoppingChange=()=>{},onNavigate,onNewBill,onNewTask,onPay,onToggleTask,onRefresh,onNotify=()=>{}
+ sampleExtras=null,onSampleShoppingChange=()=>{},onNavigate,onNewBill,onNewTask,onPay,onToggleTask,onRefresh,onNotify=()=>{},loaded=true
 }){
  const {t:tr,money,date,language}=useLanguage();
  const shortDate=iso=>date(iso,{day:'numeric',month:'short'});
@@ -185,6 +185,16 @@ export default function PersonalizedHome({
     <button type="button" className="btn btn-primary" onClick={()=>setEditing(old=>!old)} aria-expanded={editing} aria-controls="home3-editor"><Settings2 size={17}/> {tr('home.personalize')}</button>
    </div>
   </div>
+  {/* Primo utilizzo (scripts/prove-primo-utilizzo.mjs): un account senza bollette né attività vedeva
+      solo riquadri vuoti; ora tre modi per cominciare. */}
+  {!demo&&loaded&&!bills.length&&!tasks.length&&<section className="panel home3-start" aria-labelledby="home3-start-title">
+   <h2 id="home3-start-title">{tr('home.start.title')}</h2><p>{tr('home.start.help')}</p>
+   <div className="home3-start-actions">
+    <button type="button" className="btn btn-primary" onClick={onNewBill} disabled={!canWrite}><Plus size={16}/> {tr('home.start.bill')}</button>
+    <button type="button" className="btn btn-soft" onClick={()=>onNavigate('connect')}><UploadCloud size={16}/> {tr('home.start.document')}</button>
+    <button type="button" className="btn btn-soft" onClick={()=>onNavigate('household')}><Users size={16}/> {tr('home.start.home')}</button>
+   </div>
+  </section>}
   {status&&<p role="status" className="home3-success"><CheckCircle2 size={16}/>{status}</p>}
   {error&&<p role="alert" className="home3-warning">{error}</p>}
   {editing&&<section className="panel home3-editor" id="home3-editor" aria-label={tr('home.editor.title')}>

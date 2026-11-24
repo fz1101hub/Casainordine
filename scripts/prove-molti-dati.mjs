@@ -39,7 +39,7 @@ try {
   check(await ui.login(anna), 'Anna entra');
   // Le prossime scadenze nel cruscotto: con una sola richiesta arrivavano solo le 1000 bollette più
   // vecchie, tutte pagate, e il cruscotto restava senza bollette da pagare.
-  await page.waitForFunction(() => /\d+ aperte/.test(document.querySelector('main')?.innerText || ''), null, { timeout: 60000 }).catch(() => {});
+  await page.waitForFunction(() => /[1-9]\d* aperte/.test(document.querySelector('main')?.innerText || ''), null, { timeout: 60000 }).catch(() => {});
   const home = Date.now() - t0, open = (await ui.main()).match(/(\d+) aperte/)?.[1];
   check(open === '50', `le bollette da pagare ci sono tutte nel cruscotto: ${open ?? 0} di 50 (${home} ms dall'accesso)`);
   console.log(`   lavoro più lungo all'accesso: ${await longest()} ms`);
