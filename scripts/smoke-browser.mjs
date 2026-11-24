@@ -35,7 +35,8 @@ try {
   // Acquisizione unica: un PDF di bolletta letto nel browser propone la bolletta, poi apre il modulo compilato.
   await page.getByRole('button', { name: 'Importa e collega', exact: true }).first().click();
   await page.locator('input[type=file][accept*="pdf"]').first().setInputFiles({ name: 'bolletta.pdf', mimeType: 'application/pdf',
-    buffer: Buffer.from(textPdf(['Enel Energia', 'Bolletta luce', 'Totale da pagare 84,50 EUR', 'Scadenza 25/11/2026'])) });
+    buffer: Buffer.from(textPdf(['Enel Energia', 'Bolletta luce', 'POD IT001E12345678', 'Periodo di fatturazione dal 01/09/2026 al 31/10/2026',
+      'Consumo fatturato 305 kWh', 'Totale da pagare 84,50 EUR', 'Scadenza 25/11/2026'])) });
   const capture = page.locator('.capture-modal');
   await capture.waitFor({ timeout: 30000 }).catch(() => {});
   check(await capture.count() === 1, 'un PDF caricato apre la scelta di cosa salvare');
@@ -43,7 +44,17 @@ try {
     check(/Bolletta/.test(await capture.locator('.capture-option.selected').innerText()), 'per una bolletta propone la bolletta');
     await capture.locator('.btn-primary').click();
     check(await page.locator('.modal input[type=number]').first().inputValue().then(value => Number(value) === 84.5, () => false), 'il modulo della bolletta arriva con l’importo letto');
-    await page.keyboard.press('Escape');
+    // Periodo, consumo e codice della fornitura letti dal PDF, modificabili prima di salvare.
+    const dates = await page.locator('.modal input[type=date]').evaluateAll(list => list.map(x => x.value));
+    check(dates.includes('2026-09-01') && dates.includes('2026-10-31'), `il periodo letto è nel modulo (${dates.join(', ')})`);
+    check(await page.locator('.modal input[type=number]').nth(1).inputValue().then(v => Number(v) === 305, () => false) &&
+      await page.locator('.modal select').last().inputValue() === 'kWh', 'il consumo letto è nel modulo (305 kWh)');
+    check(/IT001E12345678/.test(await page.locator('.modal').innerText()), 'il codice POD letto si vede da controllare');
+    await page.locator('.modal form.modal-form button[type=submit]').click();
+    await page.waitForTimeout(1000);
+    const saved = await page.evaluate(() => (JSON.parse(localStorage.getItem('casainordine-demo-v1') || '{}').bills || []).find(b => b.source === 'document' && Number(b.amount) === 84.5));
+    check(saved?.period_start === '2026-09-01' && saved?.period_end === '2026-10-31' && Number(saved?.consumption_value) === 305 && saved?.consumption_unit === 'kWh',
+      `la bolletta si salva con periodo e consumo (${JSON.stringify(saved && { p: [saved.period_start, saved.period_end], c: [saved.consumption_value, saved.consumption_unit] })})`);
   }
 
   await page.goto(`${BASE}/prova`, { waitUntil: 'networkidle' });

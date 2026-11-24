@@ -73,7 +73,9 @@ const RESERVED = new Set(['select', 'order', 'limit', 'offset', 'on_conflict', '
 const EMBED = { homes: 'home_id', bills: 'bill_id' };
 
 // latency: millisecondi di attesa per ogni richiesta (per le prove con molti dati: rete simulata).
-export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = false, latency = 0 } = {}) {
+// maxRows: come l'impostazione «Max rows» di Supabase (1000 sul progetto vero), nessuna risposta
+// supera quel numero di righe, qualunque sia limit o range.
+export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = false, latency = 0, maxRows = Infinity } = {}) {
   const state = { tables: {}, tokens: new Map(), users: new Map(), passwords: new Map(), rpc: {}, removed: [], files: {}, uploads: [], requests: [], deletedUsers: [], rejectKeys: new Set() };
   const table = name => (state.tables[name] ||= []);
   const isOwner = (user, homeId) => table('homes').some(h => h.id === homeId && h.owner_id === user.id);
@@ -272,7 +274,7 @@ export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = fa
       const range = String(req.headers.range || '').match(/^(\d+)-(\d+)$/);
       if (range) list = list.slice(Number(range[1]), Number(range[2]) + 1);
       else list = list.slice(offset, limit ? offset + Number(limit) : undefined);
-      return reply(list);
+      return reply(list.slice(0, maxRows));
     }
     if (req.method === 'POST') {
       const input = Array.isArray(body) ? body : [body];

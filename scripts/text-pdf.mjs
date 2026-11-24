@@ -1,8 +1,20 @@
 // Usato dai test e dalla prova nel browser: niente file binari nel repository.
 // Un PDF di una pagina con una riga di testo per voce, come quelli dei negozi e dei fornitori.
+// € è 0x80 in WinAnsiEncoding: senza questa conversione diventava «¬».
+const escapePdf = line => line.replace(/[\\()]/g, m => '\\' + m).replace(/€/g, '\\200');
 export function textPdf(lines) {
-  const escape = line => line.replace(/[\\()]/g, m => '\\' + m);
-  const content = 'BT /F1 12 Tf 50 780 Td 16 TL ' + lines.map(line => `(${escape(line)}) '`).join(' ') + ' ET';
+  return pdfWith('BT /F1 12 Tf 50 780 Td 16 TL ' + lines.map(line => `(${escapePdf(line)}) '`).join(' ') + ' ET');
+}
+// Due colonne: ogni riga ha un testo a sinistra (x 50) e uno a destra (x 320) alla stessa altezza,
+// come le intestazioni «Scadenza | Totale da pagare» di molte bollette.
+export function columnsPdf(rows) {
+  const parts = rows.map(([left, right], i) => {
+    const y = 780 - i * 18;
+    return `BT /F1 11 Tf 50 ${y} Td (${escapePdf(left)}) Tj ET` + (right ? ` BT /F1 11 Tf 320 ${y} Td (${escapePdf(right)}) Tj ET` : '');
+  });
+  return pdfWith(parts.join(' '));
+}
+function pdfWith(content) {
   const objects = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
     '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>',
