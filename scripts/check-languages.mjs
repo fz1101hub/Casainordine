@@ -69,6 +69,9 @@ try {
   for (const lang of LANGUAGES) results.set(lang, await crawl(browser, lang));
 } finally { await browser.close(); }
 
+// Coincidenze linguistiche verificate nella CI 1964: in portoghese «Data prevista»
+// è corretto e «SOS Casa» è il nome della sezione. Eccezioni esatte e solo per pt.
+const SAME_BY_LANGUAGE = { pt: new Set(['SOS Casa', 'Data prevista']) };
 const KEY = /^[a-z][a-z0-9]*(?:\.[a-zA-Z0-9_-]+)+$/;
 const italian = results.get('it');
 for (const [lang, seen] of results) {
@@ -83,7 +86,8 @@ for (const [lang, seen] of results) {
   if (lang === 'it') continue;
   const untranslated = [...seen].filter(([text]) => italian.has(text)
     && text.split(' ').filter(word => /[a-zà-ÿ]{3}/i.test(word)).length >= 2
-    && !SAME.some(pattern => pattern.test(text)));
+    && !SAME.some(pattern => pattern.test(text))
+    && !SAME_BY_LANGUAGE[lang]?.has(text));
   for (const [text, step] of untranslated) console.error(`[${lang}] [${step}] Testo identico all'italiano (da verificare): ${text.slice(0, 160)}`);
   if (untranslated.length) process.exitCode = 1;
 }
