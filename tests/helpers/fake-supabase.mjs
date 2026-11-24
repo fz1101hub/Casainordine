@@ -67,7 +67,8 @@ function matches(row, col, expr) {
     case 'lte': return value !== null && value !== undefined && String(value) <= raw;
     case 'lt': return value !== null && value !== undefined && String(value) < raw;
     case 'ilike': case 'like': {
-      const pattern = new RegExp(`^${raw.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/[*%]/g, '.*')}$`, op === 'ilike' ? 'is' : 's');
+      // * e % qualsiasi testo, _ una lettera qualsiasi (come in PostgreSQL).
+      const pattern = new RegExp(`^${raw.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/[*%]/g, '.*').replace(/_/g, '.')}$`, op === 'ilike' ? 'is' : 's');
       return value !== null && value !== undefined && pattern.test(String(value));
     }
     default: throw new Error(`filtro non gestito: ${col}=${expr}`);
@@ -276,8 +277,9 @@ export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = fa
     const withEmbeds = list => embeds.length ? list.map(r => ({ ...r, ...Object.fromEntries(embeds.map(e => [e, table(e).find(x => x.id === r[EMBED[e]]) || null])) })) : list;
     const prefer = String(req.headers.prefer || '');
     const wantsObject = String(req.headers.accept || '').includes('vnd.pgrst.object');
-    const reply = (list, status = 200) => {
-      const headers = { 'content-range': `0-${Math.max(list.length - 1, 0)}/${list.length}` };
+    // total: righe che rispondono alla lettura prima di limit/range (come il conteggio di PostgREST).
+    const reply = (list, status = 200, total = list.length, from = 0) => {
+      const headers = { 'content-range': `${list.length ? `${from}-${from + list.length - 1}` : '*'}/${total}` };
       if (req.method === 'HEAD') { res.writeHead(status, { ...cors, ...headers }); return res.end(); }
       list = withEmbeds(list);
       if (wantsObject) return list.length === 1 ? send(status, list[0], headers) : send(406, { code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned' });
@@ -293,9 +295,10 @@ export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = fa
       }
       const offset = Number(url.searchParams.get('offset') || 0), limit = url.searchParams.get('limit');
       const range = String(req.headers.range || '').match(/^(\d+)-(\d+)$/);
+      const total = list.length, from = range ? Number(range[1]) : offset;
       if (range) list = list.slice(Number(range[1]), Number(range[2]) + 1);
       else list = list.slice(offset, limit ? offset + Number(limit) : undefined);
-      return reply(list.slice(0, maxRows));
+      return reply(list.slice(0, maxRows), 200, total, from);
     }
     if (req.method === 'POST') {
       const input = Array.isArray(body) ? body : [body];

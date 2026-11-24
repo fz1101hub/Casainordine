@@ -24,3 +24,10 @@ test('migration uses row-level policies and immutable scope guards',()=>{const s
 test('public temporary link returns only selected text (not house details)',()=>{const src=readFileSync(new URL('../app/api/vacation/share/[token]/route.js',import.meta.url),'utf8');assert.match(src,/shared_text,expires_at,revoked_at/);assert.match(src,/instructions:data\.shared_text/);assert.doesNotMatch(src,/select\('\*'\)/);});
 test('encrypted SOS uses PBKDF2 with AES-GCM and no plaintext in localStorage',()=>{const s=readFileSync(new URL('../lib/sos-private.js',import.meta.url),'utf8');assert.match(s,/PBKDF2/);assert.match(s,/AES-GCM/);assert.match(s,/250000/);assert.match(s,/localStorage.setItem\(KEY,JSON\.stringify\(\{v:1,salt:/);assert.ok(readFileSync(new URL('../public/sos-private.js',import.meta.url),'utf8')===s);});
 test('radar notices paid invoice reissued with changed amount',()=>{const x=detectBillingInconsistencies({copy,bills:[bill('old',{paid_at:'2026-09-01',amount:40}),bill('new',{amount:42})]});assert.equal(x[0].code,'repeat_paid_period');});
+
+test('cinque minuti: «oggi» e il singolare per le bollette in scadenza (prima «entro 0 giorni», «entro 1 giorni»)',async()=>{
+ const {translate}=await import('../lib/i18n.mjs');const tr=(k,p)=>translate('it',k,p);
+ const x=buildFiveMinuteBriefing({copy,today:'2026-11-02',bills:[bill('a',{due_date:'2026-11-02'}),bill('b',{due_date:'2026-11-03'}),bill('c',{due_date:'2026-11-04'})],
+  paymentDue:days=>tr(days===0?'briefing.briefingPaymentToday':'briefing.briefingPaymentDue',{days})});
+ assert.deepEqual(x.map(i=>i.label.split(':')[0]),['Da pagare oggi','Pagamento entro 1 giorno','Pagamento entro 2 giorni']);
+});

@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import {
   LayoutDashboard, ReceiptText, PlugZap, House, UploadCloud, Settings, Bell,
   Plus, Search, CheckCircle2, CalendarDays, LogOut, ArrowUpRight, TrendingDown,
@@ -12,6 +12,8 @@ import { addDaysISO, nextRecurringDue, todayRome, normalizeDate, euro } from '..
 import { BILL_CATEGORIES } from '../lib/bill-categories.mjs';
 // Lettura di CSV, piani rate e documenti: moduli scaricati solo quando servono (import()).
 import { billTitle } from '../lib/bill-title.mjs';
+import { selectAll } from '../lib/select-all.mjs';
+import { textMatches } from '../lib/search-text.mjs';
 import { downloadCalendar } from '../lib/calendar-download.js';
 import { ForgotPasswordButton, PasswordRecoveryDialog, DeleteAccountPanel } from './AccountSecurity';
 import { MIN_PASSWORD_LENGTH, passwordTooShort, markPasswordUpgrade, clearPasswordUpgrade, needsPasswordUpgrade } from '../lib/password-policy.mjs';
@@ -95,6 +97,7 @@ const menu = [
   {id:'settings',icon:Settings},
 ];
 const menuIcons = Object.fromEntries(menu.map(({id,icon})=>[id,icon]));
+const BILL_PAGE = 100;
 const billDefault = {title:'',supplier:'',category:'Luce',amount:'',due_date:addDaysISO(todayRome(),7),paid:false};
 // Dati in più letti da un documento (lib/document-import.mjs): periodo e consumo si salvano con la
 // bolletta (servono ai grafici dei consumi), POD e PDR si mostrano solo per controllo.
@@ -214,10 +217,13 @@ export default function Page() {
     if (!client) return;
     const seq=++dataSeq.current;
     const scope=q=>activeHomeId?q.eq('home_id',activeHomeId):q.is('home_id',null);
+    // Bollette, utenze e attività possono superare le 1000 righe (il massimo di Supabase per richiesta):
+    // si leggono a pagine (lib/select-all.mjs), con l'id come ultimo ordine.
+    const all=(table,order)=>selectAll(count=>scope(client.from(table).select('*',count?{count:'exact'}:undefined)).order(order,{ascending:true}).order('id',{ascending:true}));
     const [b,u,t,p,r,sp,sm] = await Promise.all([
-      scope(client.from('bills').select('*')).order('due_date',{ascending:true}),
-      scope(client.from('utilities').select('*')).order('next_due_date',{ascending:true}),
-      scope(client.from('house_tasks').select('*')).order('due_date',{ascending:true}),
+      all('bills','due_date'),
+      all('utilities','next_due_date'),
+      all('house_tasks','due_date'),
       client.from('profiles').select('*').single(),
       client.from('reminders').select('*,bills(id,title,supplier,due_date,amount,paid_at,home_id)').order('created_at',{ascending:false}).limit(30),
       client.from('user_suppliers').select('*').order('created_at',{ascending:true}),
@@ -485,15 +491,48 @@ export default function Page() {
   async function pay(bill) {const ok=await updateRow('bills',bill.id,{paid_at:bill.paid_at?null:new Date().toISOString()});if(ok)notify(bill.paid_at?tr('v32.payment.reopened'):tr('v32.payment.paid'));}
   async function toggleTask(t) {await updateRow('house_tasks',t.id,{done_at:t.done_at?null:new Date().toISOString()},'tasks');}
   const categoryCode=value=>{const v=String(value||'').trim().toLowerCase();return categories.find(c=>c.toLowerCase()===v||tr('billCategory.'+c).toLowerCase()===v)||'Altro';};
+  // Estratto conto: le uscite che corrispondono a una bolletta da pagare la segnano pagata, gli altri
+  // pagamenti di bollette diventano bollette già pagate; il resto (spesa, carburante, prelievi) no.
+  async function importBankStatement(bank,statement){
+    const plan=bank.billPaymentsFromBank(statement,data.bills);
+    if(!plan.paid.length&&!plan.added.length)throw shownError(tr(plan.already?'v32.import.bankAlready':'v32.import.bankNothing'));
+    const line=(day,supplier,amount,what)=>`• ${formatDay(day,{day:'numeric',month:'short'})} · ${supplier} · ${money(amount)} — ${what}`;
+    const list=[...plan.paid.map(p=>line(p.row.date,p.bill.supplier||p.bill.title,p.row.amount,tr('v32.import.bankMarkPaid'))),
+      ...plan.added.map(b=>line(b.due_date,b.supplier,b.amount,tr('v32.import.bankAdd')))];
+    const shown=list.slice(0,12).join('\n')+(list.length>12?'\n…':'')+(plan.already?'\n'+tr('v32.import.bankAlreadyCount',{count:plan.already}):'');
+    if(!(await askConfirm(tr('v32.import.bankConfirm',{paid:plan.paid.length,added:plan.added.length,skipped:plan.skipped,list:shown}))))return;
+    const added=plan.added.map(({description,...b})=>({...b,title:billTitle(tr,{category:b.category,supplier:b.supplier})}));
+    if(demo){
+      const paidAt=new Map(plan.paid.map(p=>[p.bill.id,`${p.row.date}T12:00:00.000Z`]));
+      localUpdate('bills',x=>{const known=new Set(x.map(b=>b.external_id).filter(Boolean));
+        return [...x.map(b=>paidAt.has(b.id)&&!b.paid_at?{...b,paid_at:paidAt.get(b.id)}:b),...added.filter(b=>!known.has(b.external_id)).map(b=>({...b,id:uuid()}))];});
+    } else {
+      for(const p of plan.paid){const {error}=await client.from('bills').update({paid_at:`${p.row.date}T12:00:00.000Z`}).eq('id',p.bill.id).is('paid_at',null);if(error)throw error;}
+      if(added.length){const {error}=await client.from('bills').upsert(added.map(b=>({...b,user_id:user.id,home_id:activeHomeId})),{onConflict:'user_id,source,external_id',ignoreDuplicates:true});if(error)throw error;}
+      await reload();
+    }
+    notify(tr('v32.import.bankSaved',{paid:plan.paid.length,added:added.length}));
+  }
   async function csvImport(event) {
     if(!canWrite)return notify(tr('v32.feedback.3'));
     const file=event.target.files?.[0];if(!file)return;
     try {
-      const {parseBillsCsv}=await import('../lib/csv.mjs');
-      const text=await file.text(),parsed=parseBillsCsv(text),errors=parsed.errors.map(e=>tr(e.key,e.params));
+      const [{parseBillsCsv},bank]=await Promise.all([import('../lib/csv.mjs'),import('../lib/bank-csv.mjs')]);
+      // UTF-8 o Windows-1252 (CSV salvati da Excel e da molte banche): prima «Società» diventava «Soci�t�».
+      const text=bank.decodeCsvBytes(await file.arrayBuffer());
+      let parsed;
+      try{parsed=parseBillsCsv(text);}
+      catch(csvError){
+        // Non è un elenco di bollette: forse è l'estratto conto della banca o di PayPal.
+        const statement=csvError?.i18nKey==='csv.columnsRequired'?bank.parseBankStatement(text):null;
+        if(!statement)throw csvError;
+        await importBankStatement(bank,statement);return;
+      }
+      const errors=parsed.errors.map(e=>tr(e.key,e.params));
       // Categorie scritte nella lingua dell'app («Electricity», «Strom»…) → codice; il titolo mancante si propone.
       const bills=parsed.bills.map(b=>{const category=categoryCode(b.category);return {...b,category,title:b.title||billTitle(tr,{category,supplier:b.supplier})};});
-      if(!bills.length) throw new Error(errors.slice(0,3).join(' · ') || tr('csv.noValidRows'));
+      // shownError: il motivo (righe non valide) si mostra; con un Error semplice compariva l'errore generico.
+      if(!bills.length) throw shownError(errors.slice(0,3).join(' · ') || tr('csv.noValidRows'));
       if(!(await askConfirm(tr('v32.import.csvConfirm',{count:bills.length,excluded:errors.length?tr('v32.import.csvExcluded',{count:errors.length}):''}))))return;
       if(demo)localUpdate('bills',x=>[...x,...bills.map(b=>({...b,id:uuid()}))]);
       else {const {error}=await client.from('bills').insert(bills.map(b=>({...b,user_id:user.id,home_id:activeHomeId})));if(error)throw error;await reload();}
@@ -603,15 +642,25 @@ export default function Page() {
   const spent=monthBills.filter(b=>b.paid_at).reduce((a,b)=>a+Number(b.amount),0);
   const dueAmount=open.reduce((a,b)=>a+Number(b.amount),0);
   const overdue=open.filter(b=>b.due_date<today);
-  const filteredBills=bills.filter(b=>{
-    const q=search.trim().toLowerCase();
-    if(q&&!`${b.title} ${b.supplier} ${b.category}`.toLowerCase().includes(q))return false;
-    if(billFilter==='unpaid'&&b.paid_at)return false;
-    if(billFilter==='paid'&&!b.paid_at)return false;
-    if(billFilter==='soon'&&!!b.paid_at)return false;
-    if(billFilter==='soon'&&b.due_date>soon)return false;
-    return true;
-  }).sort((a,b)=>a.due_date.localeCompare(b.due_date));
+  // Elenco delle bollette con anni di storico (scripts/prove-molti-dati.mjs): prima 3000 righe in
+  // ordine dalla più vecchia, 10 s per aprire l'elenco su un telefono lento e più di 1 s per lettera
+  // nella ricerca. Ora: prima le bollette da pagare (dalla scadenza più vicina), poi le pagate dalla più
+  // recente; 100 righe alla volta; filtro ricalcolato solo quando servono; ricerca «differita».
+  const deferredSearch=useDeferredValue(search);
+  const filteredBills=useMemo(()=>{
+    const q=deferredSearch.trim();
+    return bills.filter(b=>{
+      if(q&&!textMatches(`${b.title} ${b.supplier} ${b.category} ${tr('billCategory.'+b.category)}`,q))return false;
+      if(billFilter==='unpaid'&&b.paid_at)return false;
+      if(billFilter==='paid'&&!b.paid_at)return false;
+      if(billFilter==='soon'&&!!b.paid_at)return false;
+      if(billFilter==='soon'&&b.due_date>soon)return false;
+      return true;
+    }).sort((a,b)=>Boolean(a.paid_at)-Boolean(b.paid_at)||(a.paid_at?b.due_date.localeCompare(a.due_date):a.due_date.localeCompare(b.due_date)));
+  },[bills,deferredSearch,billFilter,soon,tr]);
+  const [billRows,setBillRows]=useState(BILL_PAGE);
+  useEffect(()=>{setBillRows(BILL_PAGE);},[deferredSearch,billFilter,activeHomeId]);
+  const visibleBills=filteredBills.slice(0,billRows);
   const recentMonths=Array.from({length:6},(_,i)=>{const d=new Date(`${today.slice(0,7)}-01T12:00:00Z`);d.setUTCMonth(d.getUTCMonth()-5+i);return d.toISOString().slice(0,7);});
   const monthly=recentMonths.map(m=>({label:new Date(`${m}-01T12:00:00Z`).toLocaleDateString(locale,{month:'short',timeZone:'UTC'}), total:bills.filter(b=>b.due_date.startsWith(m)).reduce((sum,b)=>sum+Number(b.amount),0)}));
   const maxMonthly=Math.max(...monthly.map(x=>x.total),1);
@@ -662,7 +711,7 @@ export default function Page() {
     </aside>
     <main className="main">
       <header className="topbar"><button className="icon-button burger" onClick={()=>setMobile(true)} aria-label={tr('ui.openMenu')}><Menu size={23}/></button><div className="crumb"><span>{activeHomeId?homeMembership?.homes?.name||tr('v32.overview.sharedHome'):tr('v32.overview.personalSpace')}</span><ChevronRight size={15}/><b>{tr('nav.'+tab)}</b></div>
-        <div className="topbar-right"><UniversalSearch client={client} userId={user?.id} homeId={activeHomeId} spaceName={activeHomeId?homeMembership?.homes?.name||tr('general.house'):tr('v32.overview.personalSpace')} demoData={demo?{bills:shown.bills,tasks:shown.tasks,utilities:shown.utilities}:null} onOpen={changePage}/><LanguageSelector id="topbar-language" className="topbar-language" label={false}/><select className="house-switch" aria-label={tr('ui.selectSpace')} value={activeHomeId||''} onChange={e=>switchHome(e.target.value||null)}><option value="">{tr('general.private')}</option>{homes.map(h=><option key={h.home_id} value={h.home_id}>{h.homes?.name||tr('general.house')}</option>)}</select><span className="today-label"><CalendarDays size={16}/> <DateText iso={today}/></span><div className="bell-parent"><button className="icon-button bell-button" onClick={()=>setBellOpen(!bellOpen)} aria-label={tr('ui.reminders')}><Bell size={20}/>{data.reminders.length>0&&<span className="notification-dot"/>}</button>{bellOpen&&<div className="bell-popover"><b>{tr('v32.notifications.reminderHeading')}</b>{shown.reminders.length?shown.reminders.slice(0,6).map(r=><div className="bell-entry" key={r.id}><p><Bell size={14}/> <span><strong>{tr('v32.notifications.reminderQuestion')}</strong><span>{r.bills?.title||tr('v32.notifications.billFallback')} · {tr('v32.notifications.dueOn')} <DateText iso={r.bills?.due_date||r.reminder_date}/></span></span></p>{r.bills&&!r.bills.paid_at&&<button className="text-link" onClick={()=>{const b=bills.find(x=>x.id===r.bills.id);if(b)pay(b);setBellOpen(false);}}>{tr('v32.notifications.markPaid')} <Check size={13}/></button>}</div>):<p>{tr('v32.notifications.noReminders')}</p>}</div>}</div><span className="top-avatar"><UserRound size={18}/></span></div>
+        <div className="topbar-right"><UniversalSearch client={client} userId={user?.id} homeId={activeHomeId} spaceName={activeHomeId?homeMembership?.homes?.name||tr('general.house'):tr('v32.overview.personalSpace')} demoData={demo?{bills:shown.bills,tasks:shown.tasks,utilities:shown.utilities}:null} localData={{bills:shown.bills,tasks:shown.tasks,utilities:shown.utilities}} onOpen={changePage}/><LanguageSelector id="topbar-language" className="topbar-language" label={false}/><select className="house-switch" aria-label={tr('ui.selectSpace')} value={activeHomeId||''} onChange={e=>switchHome(e.target.value||null)}><option value="">{tr('general.private')}</option>{homes.map(h=><option key={h.home_id} value={h.home_id}>{h.homes?.name||tr('general.house')}</option>)}</select><span className="today-label"><CalendarDays size={16}/> <DateText iso={today}/></span><div className="bell-parent"><button className="icon-button bell-button" onClick={()=>setBellOpen(!bellOpen)} aria-label={tr('ui.reminders')}><Bell size={20}/>{data.reminders.length>0&&<span className="notification-dot"/>}</button>{bellOpen&&<div className="bell-popover"><b>{tr('v32.notifications.reminderHeading')}</b>{shown.reminders.length?shown.reminders.slice(0,6).map(r=><div className="bell-entry" key={r.id}><p><Bell size={14}/> <span><strong>{tr('v32.notifications.reminderQuestion')}</strong><span>{r.bills?.title||tr('v32.notifications.billFallback')} · {tr('v32.notifications.dueOn')} <DateText iso={r.bills?.due_date||r.reminder_date}/></span></span></p>{r.bills&&!r.bills.paid_at&&<button className="text-link" onClick={()=>{const b=bills.find(x=>x.id===r.bills.id);if(b)pay(b);setBellOpen(false);}}>{tr('v32.notifications.markPaid')} <Check size={13}/></button>}</div>):<p>{tr('v32.notifications.noReminders')}</p>}</div>}</div><span className="top-avatar"><UserRound size={18}/></span></div>
       </header>
       <div className="content" id="contenuto" tabIndex={-1}>
         {activeHomeId&&!canWrite&&<div className="informative"><ShieldCheck size={17}/><p>{tr('v32.shell.readOnly')}</p></div>}
@@ -696,7 +745,7 @@ export default function Page() {
         </>}
         {tab==='bills'&&<><div className="page-heading"><div><div className="eyebrow">{tr('bills.eyebrow')}</div><h1>{tr('bills.heading')}</h1><p>{tr('bills.help')}</p></div><div className="heading-actions"><label className="btn btn-soft upload-label"><FileImage size={17}/> {tr('bills.upload')}<input type="file" accept=".pdf,application/pdf,.jpg,.jpeg,image/jpeg,.png,image/png,.webp,image/webp" onChange={documentImport} disabled={documentState.busy} hidden/></label><button className="btn btn-primary" onClick={()=>openModal('bill')}><Plus size={18}/> {tr('bills.add')}</button></div></div>
           <section className="panel padded"><div className="table-controls"><div className="searchbox"><Search size={18} aria-hidden="true"/><input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder={tr('bills.search')} aria-label={tr('bills.search')}/></div><div className="filter-tabs">{[['all',tr('general.all')],['unpaid',tr('bills.filter.unpaid')],['soon',tr('bills.filter.soon')],['paid',tr('bills.filter.paid')]].map(([k,label])=><button key={k} onClick={()=>setBillFilter(k)} className={billFilter===k?'selected':''}>{label}</button>)}</div></div>
-            {filteredBills.length?<div className="table-scroll"><table className="bills-table"><thead><tr><th>{tr('bills.column.bill')}</th><th>{tr('bills.column.due')}</th><th>{tr('bills.column.amount')}</th><th>{tr('bills.column.status')}</th><th>{tr('bills.column.actions')}</th></tr></thead><tbody>{filteredBills.map(b=><tr key={b.id}><td><div className="table-identity"><CategoryIcon value={b.category}/><div><b>{b.title}</b><small>{b.supplier||tr('billCategory.'+b.category)} {b.is_estimate?' · '+tr('bills.estimated'):''}</small></div></div></td><td><DateText iso={b.due_date}/></td><td className="amount-cell">{money(b.amount)}</td><td><Status bill={b}/></td><td><div className="actions"><button className={`action-btn ${b.paid_at?'muted-action':'pay-action'}`} title={b.paid_at?tr('demo.bill.reopen'):tr('demo.bill.markPaid')} onClick={()=>pay(b)}>{b.paid_at?<RefreshCcw size={16}/>:<Check size={17}/>}</button><button className="action-btn muted-action" title={tr('ui.delete')} onClick={()=>deleteRow('bills',b.id)}><Trash2 size={16}/></button></div></td></tr>)}</tbody></table></div>:<Empty icon={Filter} title={tr('bills.empty.title')} body={tr('bills.empty.help')} action={()=>openModal('bill')} button={tr('form.addBill')}/>}</section>
+            {filteredBills.length?<div className="table-scroll"><table className="bills-table"><thead><tr><th>{tr('bills.column.bill')}</th><th>{tr('bills.column.due')}</th><th>{tr('bills.column.amount')}</th><th>{tr('bills.column.status')}</th><th>{tr('bills.column.actions')}</th></tr></thead><tbody>{visibleBills.map(b=><tr key={b.id}><td><div className="table-identity"><CategoryIcon value={b.category}/><div><b>{b.title}</b><small>{b.supplier||tr('billCategory.'+b.category)} {b.is_estimate?' · '+tr('bills.estimated'):''}</small></div></div></td><td><DateText iso={b.due_date}/></td><td className="amount-cell">{money(b.amount)}</td><td><Status bill={b}/></td><td><div className="actions"><button className={`action-btn ${b.paid_at?'muted-action':'pay-action'}`} title={b.paid_at?tr('demo.bill.reopen'):tr('demo.bill.markPaid')} onClick={()=>pay(b)}>{b.paid_at?<RefreshCcw size={16}/>:<Check size={17}/>}</button><button className="action-btn muted-action" title={tr('ui.delete')} onClick={()=>deleteRow('bills',b.id)}><Trash2 size={16}/></button></div></td></tr>)}</tbody></table>{filteredBills.length>visibleBills.length&&<div className="bills-more"><button type="button" className="btn btn-soft" onClick={()=>setBillRows(n=>n+BILL_PAGE)}>{tr('bills.showMore',{count:Math.min(BILL_PAGE,filteredBills.length-visibleBills.length)})}</button><small className="muted">{tr('bills.shownOf',{shown:visibleBills.length,total:filteredBills.length})}</small></div>}</div>:<Empty icon={Filter} title={tr('bills.empty.title')} body={tr('bills.empty.help')} action={()=>openModal('bill')} button={tr('form.addBill')}/>}</section>
         </>}
         {tab==='utilities'&&<><div className="page-heading"><div><div className="eyebrow">{tr('utilities.eyebrow')}</div><h1>{tr('utilities.heading')}</h1><p>{tr('utilities.help')}</p></div><button className="btn btn-primary" onClick={()=>openModal('utility')}><Plus size={18}/> {tr('utilities.new')}</button></div>
           <section className="panel supplier-panel"><div className="panel-header"><div><h2>{tr('utilities.supplierHeading')}</h2><p>{tr('utilities.supplierHelp')}</p></div></div>

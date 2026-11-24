@@ -27,7 +27,8 @@
     "test:email": "node scripts/prove-email.mjs",
     "test:night": "node scripts/prove-notte.mjs",
     "test:slow-phone": "node scripts/prove-telefono-lento.mjs",
-    "test:photos": "node scripts/prove-foto.mjs"
+    "test:photos": "node scripts/prove-foto.mjs",
+    "test:many-data": "node scripts/prove-molti-dati.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "5.3.0",

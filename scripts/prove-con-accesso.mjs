@@ -132,6 +132,22 @@ try {
   const ics = icsDownload ? readFileSync(await icsDownload.path(), 'utf8') : '';
   check(/^BEGIN:VCALENDAR\r\n/.test(ics) && /SUMMARY:Pagamento: (Luce|Gas) di casa/.test(ics) && /scadenze-personali\.ics$/.test(icsDownload?.suggestedFilename() || ''), '«Esporta calendario» scarica il file .ics con le bollette da pagare');
 
+  // 7d. Avviso pagoPA della TARI con rata unica o due rate (24 novembre 2026): ente, rate proposte,
+  // la scelta compila codice, importo e scadenza.
+  await go('Avvisi pagoPA');
+  const { AVVISI } = await import('../tests/fixtures/avvisi-pagopa.mjs');
+  const pagopa = page.locator('main');
+  await pagopa.getByLabel('Testo copiato', { exact: true }).fill(AVVISI[0].text);
+  await pagopa.getByRole('button', { name: 'Cerca codice nel testo', exact: true }).click();
+  const installments = pagopa.locator('.notice-options button');
+  await installments.first().waitFor({ timeout: 5000 }).catch(() => {});
+  check(await installments.count() === 3, `pagoPA: rata unica e due rate proposte (${await installments.count()})`);
+  await installments.filter({ hasText: '2a RATA' }).click();
+  const noticeValue = label => pagopa.getByLabel(label, { exact: true }).inputValue().catch(() => '');
+  const chosen = [await noticeValue('Codice avviso (15 o 18 cifre)'), await noticeValue('Importo'), await noticeValue('Scadenza'), await noticeValue('Ente / Comune')];
+  check(chosen[0] === '301234567890123472' && Number(chosen[1]) === 56 && chosen[2] === '2026-12-02' && chosen[3] === 'Comune di Torino',
+    `pagoPA: la seconda rata compila codice, importo, scadenza ed ente (${chosen.join(', ')})`);
+
   // 8. Uscita.
   const login = async (email, password) => {
     await page.locator('input[type=email]').fill(email);
