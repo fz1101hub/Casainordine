@@ -10,6 +10,7 @@ import { friendlyError } from '../lib/friendly-error.mjs';
 import { todayRome } from '../lib/dates.mjs';
 import { uploadHouseDocument, IMAGE_MIME_TYPES } from '../lib/document-upload.mjs';
 import { PROJECT_STATUSES, QUOTE_STATUSES, PHOTO_KINDS, PROJECT_LIMITS, normalizeProject, normalizePhase, normalizeQuote, normalizeExpense, projectSummary, sortPhases, photosByKind } from '../lib/projects.mjs';
+import DecimalInput from './DecimalInput';
 
 const MISSING_TABLE = new Set(['42P01', 'PGRST205']);
 const TABLES = Object.freeze({ phases: 'home_project_phases', quotes: 'home_project_quotes', expenses: 'home_project_expenses', photos: 'home_project_photos' });
@@ -198,7 +199,7 @@ function ProjectsSection({ client, demo, user, homeId, canWrite, onNotify = () =
     <Field label={tr('project.title')}><input required minLength={2} maxLength={PROJECT_LIMITS.title} value={form.title} placeholder={tr('project.titlePlaceholder')} onChange={e => set(setForm)({ title: e.target.value })} /></Field>
     <div className="extra-row">
       <Field label={tr('project.status')}><select value={form.status} onChange={e => set(setForm)({ status: e.target.value })}>{PROJECT_STATUSES.map(s => <option key={s} value={s}>{tr('project.status.' + s)}</option>)}</select></Field>
-      <Field label={tr('project.budget')}><input type="number" inputMode="decimal" min="0" step="0.01" value={form.budget} onChange={e => set(setForm)({ budget: e.target.value })} /></Field>
+      <Field label={tr('project.budget')}><DecimalInput min="0" value={form.budget} onChange={e => set(setForm)({ budget: e.target.value })} /></Field>
     </div>
     <div className="extra-row">
       <Field label={tr('project.start')}><input type="date" value={form.start_on} onChange={e => set(setForm)({ start_on: e.target.value })} /></Field>
@@ -274,7 +275,7 @@ function ProjectsSection({ client, demo, user, homeId, canWrite, onNotify = () =
             {!quote.professional_id && <Field label={tr('project.supplier')}><input maxLength={PROJECT_LIMITS.supplier} value={quote.supplier} onChange={e => set(setQuote)({ supplier: e.target.value })} /></Field>}
           </div>
           <div className="extra-row">
-            <Field label={tr('project.amount')}><input required type="number" inputMode="decimal" min="0" step="0.01" value={quote.amount} onChange={e => set(setQuote)({ amount: e.target.value })} /></Field>
+            <Field label={tr('project.amount')}><DecimalInput required min="0" value={quote.amount} onChange={e => set(setQuote)({ amount: e.target.value })} /></Field>
             <Field label={tr('project.received')}><input type="date" value={quote.received_on} onChange={e => set(setQuote)({ received_on: e.target.value })} /></Field>
           </div>
           <Field label={tr('project.quoteFile')}><input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" onChange={e => set(setQuote)({ file: e.target.files?.[0] || null })} /></Field>
@@ -290,7 +291,7 @@ function ProjectsSection({ client, demo, user, homeId, canWrite, onNotify = () =
         {writable && <form className="extra-form project-subform" onSubmit={addExpense}>
           <Field label={tr('project.expenseDescription')}><input required minLength={2} maxLength={PROJECT_LIMITS.expense} value={expense.description} placeholder={tr('project.expensePlaceholder')} onChange={e => set(setExpense)({ description: e.target.value })} /></Field>
           <div className="extra-row">
-            <Field label={tr('project.amount')}><input required type="number" inputMode="decimal" min="0" step="0.01" value={expense.amount} onChange={e => set(setExpense)({ amount: e.target.value })} /></Field>
+            <Field label={tr('project.amount')}><DecimalInput required min="0" value={expense.amount} onChange={e => set(setExpense)({ amount: e.target.value })} /></Field>
             <Field label={tr('project.paidOn')}><input required type="date" value={expense.paid_on} onChange={e => set(setExpense)({ paid_on: e.target.value })} /></Field>
           </div>
           {own.quotes.length > 0 && <Field label={tr('project.linkedQuote')}><select value={expense.quote_id} onChange={e => set(setExpense)({ quote_id: e.target.value })}><option value="">{tr('project.noQuote')}</option>{own.quotes.map(q => <option key={q.id} value={q.id}>{supplierName(q)} · {money(Number(q.amount))}</option>)}</select></Field>}

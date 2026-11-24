@@ -61,7 +61,7 @@ try {
     const capture = page.locator('.capture-modal');
     if (!(await capture.waitFor({ timeout: 90000 }).then(() => true, () => false))) { check(false, `${label}: la foto non è stata letta`); continue; }
     await capture.locator('.btn-primary').click();
-    const amount = await page.locator('.modal input[type=number]').first().inputValue().catch(() => '');
+    const amount = (await page.locator('.modal input[inputmode=decimal]').first().inputValue().catch(() => '')).replace(',', '.');
     const due = await page.locator('.modal input[type=date]').first().inputValue().catch(() => '');
     const warned = /Lettura OCR poco chiara/.test(await page.locator('.modal').innerText().catch(() => ''));
     const right = Number(amount) === bill.amount && due === bill.due;

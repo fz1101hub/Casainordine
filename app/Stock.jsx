@@ -7,6 +7,7 @@ import { useLanguage, useSection } from './LanguageProvider';
 import { askConfirm } from './ConfirmDialog';
 import { friendlyError } from '../lib/friendly-error.mjs';
 import { STOCK_UNITS, STOCK_LIMITS, normalizeStockItem, stockStatus, stepFor, adjustQuantity, shoppingProposal, sortStock, titleKey } from '../lib/stock.mjs';
+import DecimalInput from './DecimalInput';
 
 const MISSING_TABLE = new Set(['42P01', 'PGRST205', 'PGRST202']);
 const blank = () => ({ id: null, name: '', unit: 'pcs', quantity: '1', threshold: '1', usual_buy: '1', location: '' });
@@ -127,12 +128,12 @@ function StockSection({ client, demo, user, homeId, canWrite, onNotify = () => {
         <form className="extra-form" onSubmit={save}>
           <Field label={tr('stock.name')}><input required minLength={2} maxLength={STOCK_LIMITS.name} value={form.name} placeholder={tr('stock.namePlaceholder')} onChange={e => set({ name: e.target.value })} /></Field>
           <div className="extra-row">
-            <Field label={tr('stock.quantity')}><input required type="number" inputMode="decimal" min="0" max={STOCK_LIMITS.maxQuantity} step="any" value={form.quantity} onChange={e => set({ quantity: e.target.value })} /></Field>
+            <Field label={tr('stock.quantity')}><DecimalInput decimals={3} required min="0" max={STOCK_LIMITS.maxQuantity} value={form.quantity} onChange={e => set({ quantity: e.target.value })} /></Field>
             <Field label={tr('stock.unit')}><select value={form.unit} onChange={e => set({ unit: e.target.value })}>{STOCK_UNITS.map(unit => <option key={unit} value={unit}>{tr('stock.unit.' + unit)}</option>)}</select></Field>
           </div>
           <div className="extra-row">
-            <Field label={tr('stock.threshold')}><input required type="number" inputMode="decimal" min="0" max={STOCK_LIMITS.maxQuantity} step="any" value={form.threshold} onChange={e => set({ threshold: e.target.value })} /></Field>
-            <Field label={tr('stock.usualBuy')}><input required type="number" inputMode="decimal" min="0.01" max={STOCK_LIMITS.maxQuantity} step="any" value={form.usual_buy} onChange={e => set({ usual_buy: e.target.value })} /></Field>
+            <Field label={tr('stock.threshold')}><DecimalInput decimals={3} required min="0" max={STOCK_LIMITS.maxQuantity} value={form.threshold} onChange={e => set({ threshold: e.target.value })} /></Field>
+            <Field label={tr('stock.usualBuy')}><DecimalInput decimals={3} required min="0.01" max={STOCK_LIMITS.maxQuantity} value={form.usual_buy} onChange={e => set({ usual_buy: e.target.value })} /></Field>
           </div>
           <Field label={tr('stock.location')}><input maxLength={STOCK_LIMITS.location} value={form.location} placeholder={tr('stock.locationPlaceholder')} onChange={e => set({ location: e.target.value })} /></Field>
           <div className="extra-buttons">

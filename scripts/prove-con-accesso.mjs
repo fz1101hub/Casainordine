@@ -145,7 +145,7 @@ try {
   await installments.filter({ hasText: '2a RATA' }).click();
   const noticeValue = label => pagopa.getByLabel(label, { exact: true }).inputValue().catch(() => '');
   const chosen = [await noticeValue('Codice avviso (15 o 18 cifre)'), await noticeValue('Importo'), await noticeValue('Scadenza'), await noticeValue('Ente / Comune')];
-  check(chosen[0] === '301234567890123472' && Number(chosen[1]) === 56 && chosen[2] === '2026-12-02' && chosen[3] === 'Comune di Torino',
+  check(chosen[0] === '301234567890123472' && Number(chosen[1].replace(',', '.')) === 56 && chosen[2] === '2026-12-02' && chosen[3] === 'Comune di Torino',
     `pagoPA: la seconda rata compila codice, importo, scadenza ed ente (${chosen.join(', ')})`);
 
   // 8. Uscita.

@@ -8,6 +8,7 @@ import { useLanguage, useSection } from './LanguageProvider';
 import { friendlyError } from '../lib/friendly-error.mjs';
 import { todayRome } from '../lib/dates.mjs';
 import { REPLACEMENT_TYPES, REPLACEMENT_TYPE_KEYS, REPLACEMENT_LIMITS, normalizePlan, replacementEstimate, fundSummary } from '../lib/replacement.mjs';
+import DecimalInput from './DecimalInput';
 
 const MISSING_TABLE = new Set(['42P01', 'PGRST205']);
 // Oggetti d'esempio per la prova senza account (nomi tradotti, date fisse).
@@ -98,8 +99,8 @@ function ReplacementSection({ client, demo, user, homeId, canWrite, onNotify = (
             </select></label>
             <label className="extra-field">{tr('replacement.life')}<input type="number" inputMode="numeric" min={REPLACEMENT_LIMITS.minLife} max={REPLACEMENT_LIMITS.maxLife} placeholder={String(REPLACEMENT_TYPES[e.type].life)} disabled={!writable || missing} value={value(asset, 'life_years')} onChange={ev => edit(asset, { life_years: ev.target.value })} /></label>
             {!asset.purchased_on && <label className="extra-field">{tr('replacement.installed')}<input type="date" disabled={!writable || missing} value={value(asset, 'installed_on')} onChange={ev => edit(asset, { installed_on: ev.target.value })} /></label>}
-            <label className="extra-field">{tr('replacement.cost')}<input type="number" inputMode="decimal" min="0" step="0.01" disabled={!writable || missing} value={value(asset, 'cost')} onChange={ev => edit(asset, { cost: ev.target.value })} /></label>
-            <label className="extra-field">{tr('replacement.saved')}<input type="number" inputMode="decimal" min="0" step="0.01" disabled={!writable || missing} value={value(asset, 'saved')} placeholder="0" onChange={ev => edit(asset, { saved: ev.target.value })} /></label>
+            <label className="extra-field">{tr('replacement.cost')}<DecimalInput min="0" disabled={!writable || missing} value={value(asset, 'cost')} onChange={ev => edit(asset, { cost: ev.target.value })} /></label>
+            <label className="extra-field">{tr('replacement.saved')}<DecimalInput min="0" disabled={!writable || missing} value={value(asset, 'saved')} placeholder="0" onChange={ev => edit(asset, { saved: ev.target.value })} /></label>
           </div>
           {writable && !missing && changed && <button className="btn btn-primary" disabled={saving === asset.id} onClick={() => save(asset)}>{tr('replacement.save')}</button>}
         </article>;
