@@ -130,8 +130,10 @@ export default function PersonalizedHome({
   if(!client||!homeId)return;
   setShoppingBusy(true);
   try{
-   const {error:updateError}=await client.from('home_shopping').update({checked:!item.checked}).eq('id',item.id).eq('home_id',homeId);
+   // Solo se è ancora come sullo schermo: un altro membro può averla già spuntata o tolta.
+   const {data:changed,error:updateError}=await client.from('home_shopping').update({checked:!item.checked}).eq('id',item.id).eq('home_id',homeId).eq('checked',Boolean(item.checked)).select('id');
    if(updateError)throw updateError;
+   if(!changed?.length){onNotify(tr('v32.flow.changedByOther'));refresh();return;}
    setExtras(old=>({...old,shopping:old.shopping.map(x=>x.id===item.id?{...x,checked:!item.checked}:x)}));
    onNotify(tr('home.shoppingUpdated'));
   }catch(e){console.error('[home]',e?.message||e);setExtraError(tr('home.shoppingFailed'));}

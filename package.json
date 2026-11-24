@@ -29,7 +29,8 @@
     "test:slow-phone": "node scripts/prove-telefono-lento.mjs",
     "test:photos": "node scripts/prove-foto.mjs",
     "test:many-data": "node scripts/prove-molti-dati.mjs",
-    "test:big-backup": "node scripts/prove-backup-grande.mjs"
+    "test:big-backup": "node scripts/prove-backup-grande.mjs",
+    "test:two-people": "node scripts/prove-due-persone.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "5.3.0",

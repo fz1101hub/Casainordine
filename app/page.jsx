@@ -198,6 +198,8 @@ export default function Page() {
 
   const notify = txt=>{setToast(txt);};
   const homesSeq=useRef(0), dataSeq=useRef(0), dataHome=useRef(undefined);
+  // Ultimo caricamento dei dati riuscito (per ricaricare tornando all'app, vedi più sotto).
+  const lastLoad=useRef(Date.now());
   const reloadHomes=useCallback(async()=>{
     if(!client)return;
     const seq=++homesSeq.current;
@@ -232,6 +234,7 @@ export default function Page() {
     // Cambiando casa in fretta può arrivare per ultima la risposta della casa precedente: si scarta,
     // altrimenti le sue bollette comparirebbero (e si segnerebbero pagate) sotto la casa nuova.
     if (seq!==dataSeq.current) return;
+    lastLoad.current=Date.now();
     const err = [b,u,t,p,r,sp,sm].find(x=>x.error);
     // Con un errore (per esempio rete assente) restano i dati già mostrati della STESSA casa: le
     // liste vuote farebbero credere che non ci sia nessuna bolletta da pagare. Quelli di un'altra
@@ -244,6 +247,14 @@ export default function Page() {
     setData({bills:b.data||[],utilities:u.data||[],tasks:t.data||[],suppliers:sp.data||[],summaries:sm.data||[],profile:p.data||null,
       reminders:(r.data||[]).filter(item=>item.bills&&!item.bills.paid_at&&item.bills.home_id===activeHomeId)});
   },[client,activeHomeId]);
+  // Tornando all'app (scheda o telefono riaperti) dopo almeno un minuto si ricaricano i dati: un altro
+  // membro della casa può aver pagato, aggiunto o eliminato qualcosa nel frattempo.
+  useEffect(()=>{
+    if(demo||!client)return;
+    const onVisible=()=>{if(document.visibilityState==='visible'&&user&&Date.now()-lastLoad.current>=60_000){lastLoad.current=Date.now();reloadRef.current();reloadHomesRef.current();}};
+    document.addEventListener('visibilitychange',onVisible);
+    return()=>document.removeEventListener('visibilitychange',onVisible);
+  },[demo,client,user]);
   // Cambio di casa: si ricaricano solo i dati, senza rifare la sottoscrizione all'autenticazione
   // (prima ogni cambio la rifaceva e i dati venivano caricati due volte).
   const reloadRef=useRef(reload), reloadHomesRef=useRef(reloadHomes), firstHome=useRef(true);
@@ -330,18 +341,25 @@ export default function Page() {
   }
   function writeDemo(next) {setData(next);localStorage.setItem('casainordine-demo-v1',JSON.stringify(next));}
   function localUpdate(key,fn) {writeDemo({...data,[key]:fn(data[key])});}
-  async function updateRow(table,id,patch,key=table) {
+  // Due persone nella stessa casa (scripts/prove-due-persone.mjs): l'altra può aver già cambiato o
+  // eliminato la voce mentre questa pagina mostrava i dati vecchi. guard: condizione sul valore che
+  // la pagina vedeva (per esempio «ancora da pagare»). Se nessuna riga cambia lo si dice e si
+  // ricaricano i dati, invece di confermare un'operazione che non è avvenuta o di sovrascrivere.
+  async function updateRow(table,id,patch,key=table,guard=q=>q) {
     if(!canWrite){notify(tr('v32.feedback.1'));return false;}
     if (demo) {localUpdate(key,rows=>rows.map(x=>x.id===id?{...x,...patch}:x));return true;}
-    const {error} = await client.from(table).update(patch).eq('id',id);
-    if(error) {notify(friendlyError(error,tr));return false;} await reload();return true;
+    const {data,error} = await guard(client.from(table).update(patch).eq('id',id)).select('id');
+    if(error) {notify(friendlyError(error,tr));return false;}
+    await reload();
+    if(!data?.length){notify(tr('v32.flow.changedByOther'));return false;}
+    return true;
   }
   async function deleteRow(table,id,key=table) {
     if(!canWrite){notify(tr('v32.feedback.1'));return;}
     if (!(await askConfirm(tr('v32.flow.deleteConfirm'),{danger:true}))) return;
     if(demo){localUpdate(key,rows=>rows.filter(x=>x.id!==id));notify(tr('v32.feedback.2'));return;}
-    const {error}=await client.from(table).delete().eq('id',id);
-    if(error)notify(friendlyError(error,tr));else{await reload();notify(tr('v32.feedback.2'));}
+    const {data,error}=await client.from(table).delete().eq('id',id).select('id');
+    if(error)notify(friendlyError(error,tr));else{await reload();notify(tr(data?.length?'v32.feedback.2':'v32.flow.changedByOther'));}
   }
   async function saveBill(e) {
     e.preventDefault();if(!canWrite)return notify(tr('v32.feedback.3'));
@@ -488,8 +506,10 @@ export default function Page() {
     const {error}=await client.from('profiles').update(patch).eq('id',user.id);
     if(error)notify(friendlyError(error,tr));else await reload();
   }
-  async function pay(bill) {const ok=await updateRow('bills',bill.id,{paid_at:bill.paid_at?null:new Date().toISOString()});if(ok)notify(bill.paid_at?tr('v32.payment.reopened'):tr('v32.payment.paid'));}
-  async function toggleTask(t) {await updateRow('house_tasks',t.id,{done_at:t.done_at?null:new Date().toISOString()},'tasks');}
+  // Solo se la bolletta è ancora com'era sullo schermo: se un altro membro l'ha già segnata pagata,
+  // non si sovrascrive la sua data e si avvisa (niente doppio pagamento senza saperlo).
+  async function pay(bill) {const ok=await updateRow('bills',bill.id,{paid_at:bill.paid_at?null:new Date().toISOString()},'bills',q=>bill.paid_at?q.not('paid_at','is',null):q.is('paid_at',null));if(ok)notify(bill.paid_at?tr('v32.payment.reopened'):tr('v32.payment.paid'));}
+  async function toggleTask(t) {await updateRow('house_tasks',t.id,{done_at:t.done_at?null:new Date().toISOString()},'tasks',q=>t.done_at?q.not('done_at','is',null):q.is('done_at',null));}
   const categoryCode=value=>{const v=String(value||'').trim().toLowerCase();return categories.find(c=>c.toLowerCase()===v||tr('billCategory.'+c).toLowerCase()===v)||'Altro';};
   // Estratto conto: le uscite che corrispondono a una bolletta da pagare la segnano pagata, gli altri
   // pagamenti di bollette diventano bollette già pagate; il resto (spesa, carburante, prelievi) no.
