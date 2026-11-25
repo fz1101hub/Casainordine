@@ -93,6 +93,23 @@ try {
     check(!(await has('Detersivo lavatrice')), 'Scorte: la scorta si elimina');
   });
 
+  // Giardino e orto (25 novembre 2026): nella demo le piante restano nella pagina.
+  await section('Giardino e orto', async () => {
+    await main().getByLabel('Tipo di pianta').selectOption('houseplants');
+    check(await field('Nome').inputValue() === 'Piante verdi da appartamento (pothos, ficus, monstera)', 'Giardino: il tipo di pianta dà il nome');
+    await field('Nome').fill('Monstera del salotto');
+    check(await main().locator('.garden-proposal li').count() === 3, 'Giardino: tre interventi proposti');
+    await button('Salva la pianta con 3 interventi').click(); await settle();
+    check(await has('Monstera del salotto') && /Pianta salvata con 3 interventi/.test(await toast()), 'Giardino: pianta salvata con il piano');
+    // La pulizia delle foglie (tutto l'anno, ogni 30 giorni) è da fare subito.
+    const done = main().getByRole('button', { name: 'Segna come fatto: Pulizia delle foglie (Monstera del salotto)' }).first();
+    check(await done.count() === 1, 'Giardino: «Da fare» propone la pulizia delle foglie');
+    await done.click(); await settle();
+    check(/Prossima volta/.test(await toast()), 'Giardino: fatto, con la prossima data');
+    await main().getByRole('button', { name: 'Elimina la pianta: Monstera del salotto' }).click(); await confirm();
+    check(!(await has('Monstera del salotto')), 'Giardino: la pianta si elimina');
+  });
+
   await section('Programma stagionale', async () => {
     const before = await button('Segna come fatta').count();
     await button('Segna come fatta').first().click(); await settle();
