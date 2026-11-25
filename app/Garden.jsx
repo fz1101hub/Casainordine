@@ -180,7 +180,9 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
   async function insertTasks(plantId, list) {
     const rows = [];
     for (const item of list) {
-      const result = normalizeTask(item, today);
+      // Intervento nuovo: la prossima data si calcola adesso, dai mesi e dalla frequenza scelti
+      // (la proposta può essere stata cambiata dopo che era stata preparata).
+      const result = normalizeTask({ ...item, next_on: null }, today);
       if (result.error) { onNotify(tr(result.error)); return null; }
       rows.push({ ...result.value, plant_id: plantId });
     }
