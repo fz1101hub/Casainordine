@@ -56,6 +56,14 @@ test.before(async () => {
 });
 test.after(() => fake?.close());
 const connection = () => fake.rows('mail_connections')[0];
+// Sincronizzazione che deve riuscire: se fallisce, la prova mostra l'errore vero (raramente, sotto carico,
+// le prime due prove fallivano con il solo messaggio generico e non si capiva il perché).
+async function syncOk(options) {
+  let cause = null;
+  const result = await syncImapConnection(admin, connection(), { ...options, onError: e => { cause = e; } });
+  assert.ok(!result.error, `la sincronizzazione non doveva fallire: ${cause?.stack || cause}${cause?.cause ? `\ncausa: ${cause.cause?.stack || cause.cause}` : ''}`);
+  return result;
+}
 const docs = () => fake.rows('mail_documents');
 
 const MESSAGES = [
@@ -79,7 +87,7 @@ const MESSAGES = [
 ];
 
 test('prima sincronizzazione: due bollette importate, con i dati letti dal PDF', async () => {
-  const result = await syncImapConnection(admin, connection(), { imapClient: mailbox(MESSAGES) });
+  const result = await syncOk({ imapClient: mailbox(MESSAGES) });
   assert.equal(result.error, undefined);
   assert.equal(result.imported, 2, JSON.stringify(result));
   const [gas, luce] = docs().sort((a, b) => a.message_id.localeCompare(b.message_id));
@@ -97,7 +105,7 @@ test('prima sincronizzazione: due bollette importate, con i dati letti dal PDF',
 });
 
 test('seconda sincronizzazione: nessun doppione', async () => {
-  const result = await syncImapConnection(admin, connection(), { imapClient: mailbox(MESSAGES) });
+  const result = await syncOk({ imapClient: mailbox(MESSAGES) });
   assert.equal(result.imported, 0);
   assert.equal(docs().length, 2);
   assert.equal((fake.state.files['mail-bills'] || []).length, 2, 'nessun file in più (e nessun file orfano)');
@@ -107,14 +115,16 @@ test('al massimo i documenti chiesti per giro', async () => {
   const many = Array.from({ length: 8 }, (_, i) => mime({ from: 'GasNord Energia <bollette@gasnord.example>', subject: `Bolletta n. ${i}`,
     attachments: [pdf(['GasNord Energia S.r.l.', `Totale da pagare € ${20 + i},00`, 'Scadenza 20/12/2026'])] }));
   const before = docs().length;
-  const result = await syncImapConnection(admin, connection(), { imapClient: mailbox(many), docLimit: 3 });
+  const result = await syncOk({ imapClient: mailbox(many), docLimit: 3 });
   assert.equal(result.imported, 3);
   assert.equal(docs().length, before + 3);
 });
 
 test('casella che rifiuta l\'accesso: errore generico, senza password né dettagli del server', async () => {
-  const result = await syncImapConnection(admin, connection(), { imapClient: mailbox([], { fail: true }) });
+  let cause = null;
+  const result = await syncImapConnection(admin, connection(), { imapClient: mailbox([], { fail: true }), onError: e => { cause = e; } });
   assert.match(result.error, /Connessione IMAP non riuscita/);
+  assert.match(String(cause?.message), /AUTHENTICATIONFAILED/, "l'errore originale arriva solo a onError");
   assert.equal(connection().status, 'error');
   assert.doesNotMatch(JSON.stringify(connection()) + result.error, /segreto123|AUTHENTICATIONFAILED|password-per-app/);
 });
