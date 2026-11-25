@@ -145,6 +145,9 @@ jobs:
       - name: Spese detraibili per il 730
         timeout-minutes: 4
         run: node scripts/prove-spese-detraibili.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
+      - name: Salute e terapie
+        timeout-minutes: 4
+        run: node scripts/prove-salute.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
 
   database:
     # Migrazioni e prove del database su PostgreSQL 17 (la versione di Supabase), con un

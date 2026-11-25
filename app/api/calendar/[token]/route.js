@@ -4,6 +4,7 @@ import {calendarText} from '../../../../lib/calendar.mjs';
 import {todayRome,addDaysISO} from '../../../../lib/dates.mjs';
 import {gardenCalendarEvents} from '../../../../lib/garden.mjs';
 import {petCalendarEvents} from '../../../../lib/pets.mjs';
+import {healthCalendarEvents} from '../../../../lib/health.mjs';
 
 // Interventi del giardino e dell'orto dello spazio personale e delle case: se le tabelle non ci sono
 // ancora (migrazione v57 non eseguita) il calendario resta quello delle bollette.
@@ -30,6 +31,20 @@ async function petEvents(admin,userId,homes,today){
  const tasks=await readIn(admin,'home_pet_tasks','id,pet_id,title,product,every_days,next_on','pet_id',pets.map(p=>p.id),q=>q.not('next_on','is',null).order('id'));
  return petCalendarEvents(pets,tasks,today);
 }
+// Visite e vaccinazioni (migrate_v60): il titolo solo se chi ha il calendario vuole i dettagli
+// (user_alert_preferences.health_push_details), altrimenti il tipo. Senza la v60 nessun evento.
+async function healthEvents(admin,userId,homes,today){
+ const columns='id,name',people=[];
+ try{
+  people.push(...await readAll(admin,'health_people',columns,q=>q.eq('user_id',userId).is('home_id',null).order('id')));
+  if(homes.length)people.push(...await readIn(admin,'health_people',columns,'home_id',homes,q=>q.order('id')));
+ }catch(error){if(['42P01','PGRST205'].includes(error?.code))return [];throw error;}
+ if(!people.length)return [];
+ const appointments=await readIn(admin,'health_appointments','id,person_id,kind,title,on_date,at_time,place,done_on','person_id',people.map(p=>p.id),q=>q.is('done_on',null).gte('on_date',addDaysISO(today,-7)).order('id'));
+ const {data:pref}=await admin.from('user_alert_preferences').select('health_push_details').eq('user_id',userId).maybeSingle();
+ const details=pref?.health_push_details===true;
+ return healthCalendarEvents(people,appointments,today).map(e=>({...e,what:details?e.title:'',place:details?e.place:''}));
+}
 export const runtime='nodejs';
 export async function GET(_request,{params}){
  try{
@@ -48,14 +63,15 @@ export async function GET(_request,{params}){
   let shared=[];
   if(members?.length){try{shared=await readIn(admin,'bills','id,title,supplier,amount,due_date,paid_at','home_id',members.map(m=>m.home_id),period);}catch{throw new Error('calendar unavailable');}}
   const bills=[...new Map([...(personal||[]),...shared].map(b=>[b.id,b])).values()];
-  let garden=[];
+  let garden=[],health=[];
   try{
    const homes=(members||[]).map(m=>m.home_id);
    const [plants,animals]=await Promise.all([gardenEvents(admin,feed.user_id,homes,today),petEvents(admin,feed.user_id,homes,today)]);
    garden=[...plants,...animals].sort((a,b)=>a.date.localeCompare(b.date)||a.uid.localeCompare(b.uid)).slice(0,3000);
+   health=await healthEvents(admin,feed.user_id,homes,today);
   }catch{throw new Error('calendar unavailable');}
   // Testi del calendario nella lingua scelta da chi lo ha creato (italiano se non l'ha mai scelta).
   const {data:preference}=await admin.from('user_language_preferences').select('language').eq('user_id',feed.user_id).maybeSingle();
-  return new Response(calendarText(bills,undefined,preference?.language||'it',garden),{status:200,headers:{'Content-Type':'text/calendar; charset=utf-8','Content-Disposition':'inline; filename="casa-in-ordine.ics"','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
+  return new Response(calendarText(bills,undefined,preference?.language||'it',garden,health),{status:200,headers:{'Content-Type':'text/calendar; charset=utf-8','Content-Disposition':'inline; filename="casa-in-ordine.ics"','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
  }catch{return Response.json({error:'calendarUnavailable'}, {status:503});}
 }
