@@ -25,7 +25,8 @@
     "test:keyboard": "node scripts/prove-tastiera-accesso.mjs",
     "test:account-deletion": "node scripts/prove-eliminazione-account.mjs",
     "test:email": "node scripts/prove-email.mjs",
-    "test:night": "node scripts/prove-notte.mjs"
+    "test:night": "node scripts/prove-notte.mjs",
+    "test:access-languages-real": "node scripts/prove-lingue-supabase-reale.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "5.3.0",
