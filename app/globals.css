@@ -560,3 +560,54 @@ select{min-height:24px}
    pulsanti in cima alla pagina va a capo invece di uscire dallo schermo (scripts/prove-primo-utilizzo.mjs). */
 @media(max-width:600px){.heading-actions .btn{white-space:normal;text-align:center;min-width:0;line-height:1.25}}
 .home3-start{padding:20px 22px;margin-bottom:16px;border-color:#cfe6dc;background:linear-gradient(130deg,#f2faf6,#fff)}.home3-start h2{font-size:16px;margin:0 0 6px}.home3-start p{color:var(--muted);font-size:12.5px;line-height:1.6;margin:0 0 14px}.home3-start-actions{display:flex;flex-wrap:wrap;gap:9px}@media(max-width:600px){.home3-start-actions .btn{flex:1 1 100%;white-space:normal}}
+/* Giardino e orto */
+.garden .extra-layout{grid-template-columns:minmax(280px,1fr) minmax(0,1.35fr)}
+.garden h3{font-size:.92rem;margin:1rem 0 .5rem}
+.garden-form-title{margin-top:1.6rem!important}
+.garden-agenda{display:flex;flex-direction:column}
+.garden-due{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:.55rem 1rem;padding:.75rem 0;border-bottom:1px solid #e8e9e8}
+.garden-due>div:first-child{display:flex;flex-direction:column;gap:.25rem;min-width:0;flex:1 1 220px;overflow-wrap:anywhere}
+.garden-due small,.garden-task small,.garden-plant-name small{color:var(--muted);line-height:1.45;font-size:.76rem}
+.garden-when{display:flex;flex-wrap:wrap;align-items:center;gap:.35rem;color:#2e5d52!important;font-weight:600}
+.garden-due.late .garden-when,.garden-task.late .garden-when{color:#9a5b12!important}
+.extra-pill.garden-late{background:#fdf1dc;color:#8a5a10}
+.extra-pill.garden-due{background:#e3f2e8;color:#1f6a3f}
+.extra-pill.garden-soon{background:#eef2f7;color:#3c5675}
+.extra-pill.garden-later{background:#f1efe9;color:#6b5f45}
+.garden-months{border:0;padding:0;margin:0;min-width:0}
+.garden-months legend{font-size:.83rem;font-weight:600;margin-bottom:.45rem;padding:0}
+.garden-months>div{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:.35rem}
+.garden-months button{border:1px solid #d6dae0;background:#fff;color:#1f2937;border-radius:8px;padding:.45rem .2rem;font:inherit;font-size:.8rem;cursor:pointer;min-width:0;text-transform:capitalize}
+.garden-months button[aria-pressed="true"]{background:#2e7d55;border-color:#2e7d55;color:#fff;font-weight:600}
+.garden-proposal-box{border:1px solid #dcece4;background:#f6faf8;border-radius:10px;padding:.8rem .9rem;display:flex;flex-direction:column;gap:.5rem}
+.garden-proposal-box h3{margin:0}
+.garden-proposal{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.garden-proposal li{border-bottom:1px solid #e3ece7;padding:.55rem 0}
+.garden-proposal li:last-child{border-bottom:0}
+.garden-proposal li.is-off b{color:var(--muted);text-decoration:line-through}
+.garden-proposal-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:.45rem}
+.garden-proposal-head .extra-toggle{align-items:flex-start;flex:1 1 220px;min-width:0}
+.garden-proposal-head .extra-toggle span{display:flex;flex-direction:column;gap:.15rem;min-width:0;overflow-wrap:anywhere}
+.garden-proposal-head .extra-toggle small{color:var(--muted);font-size:.76rem;line-height:1.4}
+.garden-proposal-head input{margin-top:.2rem;flex-shrink:0}
+.garden-proposal-edit{display:flex;flex-direction:column;gap:.8rem;margin-top:.6rem;padding:.7rem;border-radius:9px;background:#fff;border:1px solid #e3ece7}
+.garden-plants{display:flex;flex-direction:column;gap:.55rem}
+.garden-plant{border:1px solid #e3e7e4;border-radius:11px;background:#fff}
+.garden-plant>summary{cursor:pointer;padding:.8rem .9rem;list-style-position:inside}
+.garden-plant[open]>summary{border-bottom:1px solid #eef0ee}
+.garden-plant-name{display:inline-flex;flex-direction:column;gap:.2rem;vertical-align:top;max-width:calc(100% - 1.4rem);overflow-wrap:anywhere}
+.garden-plant-body{padding:.4rem .9rem .9rem;display:flex;flex-direction:column;gap:.35rem;min-width:0}
+.garden-plant-body>.extra-buttons:first-child,.garden-notes+.extra-buttons{justify-content:flex-end}
+.garden-notes{margin:.3rem 0;font-size:.84rem;white-space:pre-line}
+.garden-tasks,.garden-log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.garden-task{border-bottom:1px solid #eef0ee;padding:.6rem 0}
+.garden-task-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:.45rem .8rem}
+.garden-task-head>div:first-child{display:flex;flex-direction:column;gap:.22rem;min-width:0;flex:1 1 220px;overflow-wrap:anywhere}
+.garden-task-head .extra-buttons{align-items:center}
+.garden-inline{border:1px solid #e3ece7;background:#fafcfb;border-radius:10px;padding:.8rem;margin-top:.5rem}
+.garden-inline h3{margin:0}
+.garden-plant-actions{margin-top:.6rem}
+.garden-log li{display:flex;justify-content:space-between;align-items:flex-start;gap:.6rem;padding:.45rem 0;border-bottom:1px solid #f0f2f0;font-size:.83rem;overflow-wrap:anywhere}
+.garden-log li small{display:block;color:var(--muted);font-size:.75rem;margin-top:.15rem}
+@media (max-width:900px){.garden .extra-layout{grid-template-columns:1fr}}
+@media (max-width:600px){.garden-months>div{grid-template-columns:repeat(4,minmax(0,1fr))}.garden-due .extra-buttons,.garden-task-head .extra-buttons{width:100%}.garden-plant-actions .btn{flex:1 1 100%}}

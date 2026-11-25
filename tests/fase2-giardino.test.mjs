@@ -149,3 +149,90 @@ test('la migrazione accetta quello che il modulo produce', () => {
   assert.match(sql, />= 300/);
   assert.match(sql, />= 40/);
 });
+
+// Admin finto come in tests/fase2-automazioni.test.mjs: legge le tabelle in memoria, gli avvisi
+// sono unici per persona, tipo, voce e data.
+function fakeAdmin(tables) {
+  const alerts = tables.user_alerts ||= [];
+  return {
+    from(name) {
+      const filters = []; let upsertRow = null;
+      const builder = {
+        select() {
+          if (!upsertRow) return builder;
+          const added = [];
+          for (const row of [].concat(upsertRow)) {
+            const exists = alerts.some(a => a.user_id === row.user_id && a.kind === row.kind && a.reference_id === row.reference_id && a.event_date === row.event_date);
+            if (!exists) { alerts.push(row); added.push(row); }
+          }
+          return Promise.resolve({ data: added, error: null });
+        },
+        order() { return builder; },
+        range(from, to) { return builder.then(result => ({ data: result.data ? result.data.slice(from, to + 1) : null, error: result.error })); },
+        eq(column, value) { filters.push(row => row[column] === value); return builder; },
+        in(column, values) { filters.push(row => values.includes(row[column])); return builder; },
+        gte(column, value) { filters.push(row => row[column] >= value); return builder; },
+        lte(column, value) { filters.push(row => row[column] <= value); return builder; },
+        upsert(row) { upsertRow = row; return builder; },
+        then(resolve, reject) {
+          if (tables.error?.[name]) return Promise.resolve({ data: null, error: tables.error[name] }).then(resolve, reject);
+          return Promise.resolve({ data: (tables[name] || []).filter(row => filters.every(f => f(row))), error: null }).then(resolve, reject);
+        },
+      };
+      return builder;
+    },
+  };
+}
+
+test('promemoria del lavoro giornaliero: a chi ha la pianta o a tutta la casa, nella sua lingua, una volta', async () => {
+  const { processGardenAlerts, gardenAlertCopy } = await import('../lib/garden-alerts.mjs');
+  const today = '2026-05-10';
+  const tables = {
+    home_garden_plants: [{ id: 'p-casa', user_id: 'anna', home_id: 'h1', name: 'Limone sul terrazzo' }, { id: 'p-mia', user_id: 'carla', home_id: null, name: 'Basilico' }],
+    home_garden_tasks: [
+      { id: 't1', plant_id: 'p-casa', title: 'Concimazione', product: 'Concime per agrumi', next_on: today, remind: true },
+      { id: 't2', plant_id: 'p-mia', title: 'Potatura di forma', product: '', next_on: '2026-05-08', remind: true },
+      { id: 't3', plant_id: 'p-mia', title: 'Senza promemoria', product: '', next_on: today, remind: false },
+      { id: 't4', plant_id: 'p-casa', title: 'Domani', product: '', next_on: '2026-05-11', remind: true },
+    ],
+    home_members: [{ home_id: 'h1', user_id: 'anna' }, { home_id: 'h1', user_id: 'bruno' }],
+    user_language_preferences: [{ user_id: 'bruno', language: 'en' }],
+  };
+  const counts = { errors: [] };
+  await processGardenAlerts(fakeAdmin(tables), today, counts);
+  assert.deepEqual(counts.errors, []);
+  assert.deepEqual(tables.user_alerts.map(a => [a.user_id, a.kind, a.reference_id, a.event_date]).sort(), [
+    ['anna', 'garden', 't1', today], ['bruno', 'garden', 't1', today], ['carla', 'garden', 't2', '2026-05-08']]);
+  const anna = tables.user_alerts.find(a => a.user_id === 'anna'), bruno = tables.user_alerts.find(a => a.user_id === 'bruno');
+  assert.equal(anna.title, 'Giardino: Limone sul terrazzo');
+  assert.match(anna.body, /^È il momento di: Concimazione \(Concime per agrumi\)\. Data prevista: /);
+  assert.equal(bruno.title, 'Garden: Limone sul terrazzo');
+  const before = tables.user_alerts.length;
+  await processGardenAlerts(fakeAdmin(tables), today, { errors: [] });
+  assert.equal(tables.user_alerts.length, before, 'rilanciato non duplica');
+  for (const lang of LANGS) {
+    const copy = gardenAlertCopy({ plant: 'Rosa', task: 'Potatura', product: '', date: today }, lang);
+    assert.ok(copy.title.includes('Rosa') && copy.body.includes('Potatura') && !/\{|undefined/.test(copy.title + copy.body), lang);
+  }
+  assert.throws(() => gardenAlertCopy({ plant: '', task: 'x', date: today }));
+});
+
+test('senza la migrazione il lavoro giornaliero salta il giardino senza errori', async () => {
+  const { processGardenAlerts } = await import('../lib/garden-alerts.mjs');
+  const counts = { errors: [] };
+  await processGardenAlerts(fakeAdmin({ error: { home_garden_tasks: { code: 'PGRST205', message: 'missing' } } }), '2026-05-10', counts);
+  assert.deepEqual(counts.errors, []);
+  const other = { errors: [] };
+  await processGardenAlerts(fakeAdmin({ error: { home_garden_tasks: { code: '57014', message: 'timeout' } } }), '2026-05-10', other);
+  assert.equal(other.errors.length, 1);
+});
+
+test('notifiche push del giardino: interruttore proprio, collegato al lavoro giornaliero e alla schermata', async () => {
+  const { pushAllowed } = await import('../lib/extra-alerts.mjs');
+  const at = new Date('2026-05-10T10:00:00Z');
+  assert.ok(pushAllowed({}, 'garden', at));
+  assert.ok(!pushAllowed({ push_garden: false }, 'garden', at));
+  assert.match(readFileSync(new URL('../lib/daily-jobs.mjs', import.meta.url), 'utf8'), /await processGardenAlerts\(admin,today,counts,/);
+  assert.match(readFileSync(new URL('../app/HomeExtra.jsx', import.meta.url), 'utf8'), /\['push_garden','extra\.alerts\.garden'\]/);
+  assert.match(readFileSync(new URL('../supabase/migrate_v57_giardino.sql', import.meta.url), 'utf8'), /add column if not exists push_garden boolean not null default true/);
+});

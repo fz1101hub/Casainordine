@@ -27,7 +27,8 @@ test('le sezioni della Fase 2 e quelle rimaste fuori ora ci sono', () => {
   for (const t of ['home_automations', 'home_professionals', 'home_professional_notes', 'home_seasonal_settings', 'home_seasonal_done',
     'home_stock_items', 'home_projects', 'home_project_phases', 'home_project_quotes', 'home_project_expenses', 'home_project_photos',
     'home_replacement_plans', 'home_leases', 'home_lease_reports', 'home_lease_photos', 'pagopa_notices', 'home_inventory_items',
-    'home_move_plans', 'home_move_steps', 'home_decisions', 'home_decision_votes', 'home_savings_goals', 'home_vacation_plans', 'home_emergency_cards'])
+    'home_move_plans', 'home_move_steps', 'home_decisions', 'home_decision_votes', 'home_savings_goals', 'home_vacation_plans', 'home_emergency_cards',
+    'home_garden_plants', 'home_garden_tasks', 'home_garden_log'])
     assert.ok(names.includes(t), t);
   // Le tabelle collegate vengono dopo la loro tabella madre.
   for (const t of BACKUP_TABLES.filter(x => x.parent && !BACKUP_MAIN.includes(x.parent)))

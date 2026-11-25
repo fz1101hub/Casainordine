@@ -5,7 +5,7 @@ import {
   Plus, Search, CheckCircle2, CalendarDays, LogOut, ArrowUpRight, TrendingDown,
   Wallet, LockKeyhole, Trash2, Mail, ShieldCheck, RefreshCcw, Link2,
   Menu, X, UserRound, Download, Cloud, Info, Clock, AlertCircle, Check,
-  Filter, ChevronRight, Zap, CircleHelp, Send, Eye, EyeOff, FileImage, FileText, Users, ShoppingBasket, Car, Archive, BarChart3, Wrench, Building2, ClipboardList, ScanSearch, HardHat, SunSnow, Package, Hammer, PiggyBank, KeyRound, Gauge
+  Filter, ChevronRight, Zap, CircleHelp, Send, Eye, EyeOff, FileImage, FileText, Users, ShoppingBasket, Car, Archive, BarChart3, Wrench, Building2, ClipboardList, ScanSearch, HardHat, SunSnow, Sprout, Package, Hammer, PiggyBank, KeyRound, Gauge
 } from 'lucide-react';
 import { db } from '../lib/supabase-browser';
 import { addDaysISO, nextRecurringDue, todayRome, normalizeDate, euro } from '../lib/dates.mjs';
@@ -43,6 +43,7 @@ const Automations=lazy(()=>import('./Automations'));
 const Professionals=lazy(()=>import('./Professionals'));
 const Seasonal=lazy(()=>import('./Seasonal'));
 const Stock=lazy(()=>import('./Stock'));
+const Garden=lazy(()=>import('./Garden'));
 const Projects=lazy(()=>import('./Projects'));
 const ReplacementFund=lazy(()=>import('./ReplacementFund'));
 const Rental=lazy(()=>import('./Rental'));
@@ -61,6 +62,7 @@ const menu = [
   {id:'utilities',icon:PlugZap},
   {id:'tasks',icon:House},
   {id:'seasonal',icon:SunSnow},
+  {id:'garden',icon:Sprout},
   {id:'household',icon:Users},
   {id:'budget',icon:Wallet},
   {id:'shopping',icon:ShoppingBasket},
@@ -795,6 +797,7 @@ export default function Page() {
         {tab==='replacement'&&<ReplacementFund client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} onNotify={notify}/>}
         {tab==='projects'&&<Projects client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} onNotify={notify}/>}
         {tab==='stock'&&<Stock client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} onNotify={notify}/>}
+        {tab==='garden'&&<Garden client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} onNotify={notify}/>}
         {tab==='seasonal'&&<Seasonal client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} onNotify={notify} onAddTask={addTaskQuick}/>}
         {tab==='professionals'&&<Professionals client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} onNotify={notify}/>}
         {tab==='automations'&&<Automations client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} bills={bills} onNotify={notify}/>}
