@@ -132,6 +132,32 @@ async function provePersistence(browser) {
     ui = await openPage(browser, { locale: 'it-IT', language: null });
     if (!(await ui.login(a))) throw new Error('Nuovo accesso A non riuscito');
     await expectLanguage('fr', 'nuovo contesto A');
+    const selector = ui.page.locator('#topbar-language');
+    for (const lang of ['it', 'en', 'es', 'fr', 'de', 'pt']) {
+      await selector.selectOption(lang);
+      await expectLanguage(lang, 'selezione A');
+      await ui.page.waitForFunction(code => document.querySelector('#topbar-language')?.value === code, lang);
+      const deadline = Date.now() + 10000;
+      while (!fake.state.tables.user_language_preferences.some(row => row.user_id === a.id && row.language === lang)) {
+        if (Date.now() > deadline) throw new Error('Preferenza non salvata: ' + lang);
+        await ui.page.waitForTimeout(100);
+      }
+      if (!fake.state.tables.user_language_preferences.some(row => row.user_id === b.id && row.language === 'de'))
+        throw new Error('Preferenza B alterata');
+    }
+    // Interrompe solo la scrittura, non la lettura né l'autenticazione.
+    const pattern = '**/rest/v1/user_language_preferences*';
+    const rejectWrite = route => route.request().method() === 'POST' ? route.abort('failed') : route.continue();
+    await ui.page.route(pattern, rejectWrite);
+    await selector.selectOption('en');
+    await expectLanguage('en', 'selezione locale senza rete');
+    await ui.page.locator('.topbar-language [role="alert"]').waitFor({ timeout: 15000 });
+    if (!fake.state.tables.user_language_preferences.some(row => row.user_id === a.id && row.language === 'pt'))
+      throw new Error('Scrittura fallita ma preferenza server alterata');
+    await ui.page.unroute(pattern, rejectWrite);
+    await ui.page.reload({ waitUntil: 'networkidle' });
+    await expectLanguage('pt', 'recupero dopo errore di rete');
+    console.log('Salvataggio simulato: sei lingue, isolamento B ed errore di rete verificati.');
   } finally {
     try { await ui?.context.close(); } finally { await fake.close(); }
   }
