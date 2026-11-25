@@ -105,11 +105,44 @@ async function crawl(browser, lang) {
   }
 }
 
+
+// Preferenze già salvate sul server simulato: nessuna lingua imposta dal test nel browser.
+async function provePersistence(browser) {
+  const { fake, person } = await startScenario();
+  const a = person('persist-a', '11111111-1111-4111-8111-111111111111', 'persist-a@example.org');
+  const b = person('persist-b', '22222222-2222-4222-8222-222222222222', 'persist-b@example.org');
+  fake.seed('user_language_preferences', [
+    { user_id: a.id, language: 'fr' }, { user_id: b.id, language: 'de' },
+  ]);
+  let ui;
+  const expectLanguage = async (lang, step) => {
+    await ui.page.waitForFunction(code => document.documentElement.lang.split('-')[0] === code, lang, { timeout: 15000 });
+    console.log('Persistenza simulata: ' + step + ' (' + lang + ')');
+  };
+  try {
+    ui = await openPage(browser, { locale: 'it-IT', language: null });
+    if (!(await ui.login(a))) throw new Error('Accesso A non riuscito');
+    await expectLanguage('fr', 'recupero A');
+    await ui.page.reload({ waitUntil: 'networkidle' });
+    await expectLanguage('fr', 'ricaricamento A');
+    if (!(await ui.logout(TRANSLATIONS.fr['settings.signout']))) throw new Error('Uscita A non riuscita');
+    if (!(await ui.login(b))) throw new Error('Accesso B non riuscito');
+    await expectLanguage('de', 'cambio account nello stesso browser');
+    await ui.context.close();
+    ui = await openPage(browser, { locale: 'it-IT', language: null });
+    if (!(await ui.login(a))) throw new Error('Nuovo accesso A non riuscito');
+    await expectLanguage('fr', 'nuovo contesto A');
+  } finally {
+    try { await ui?.context.close(); } finally { await fake.close(); }
+  }
+}
+
 const LANGUAGES = ['it', 'en', 'es', 'fr', 'de', 'pt'];
 const browser = await launch();
 const runs = new Map();
 let failed = false;
 try {
+  try { await provePersistence(browser); } catch (error) { failed = true; console.error('Persistenza simulata: ' + error.message); }
   for (const lang of LANGUAGES) {
     try { runs.set(lang, await crawl(browser, lang)); }
     catch (error) { failed = true; console.error(`Scenario fallito (${lang}): ${error.message}`); }
