@@ -2,7 +2,7 @@
 // la demo; qui la stessa ricerca di testi non tradotti gira sulle schermate con accesso, contro il
 // Supabase finto (vedi scripts/prove-con-accesso.mjs): spazio personale e casa condivisa, tutte le
 // voci del menu con il loro modulo, famiglia e inviti, anteprima del ripristino, stato della
-// configurazione. Segnala i testi uguali in italiano e in inglese e le chiavi mostrate al posto del testo.
+// configurazione. Segnala i testi uguali all'italiano nelle altre cinque lingue e le chiavi mostrate al posto del testo.
 // Uso: node scripts/prove-lingue-accesso.mjs [indirizzo dell'app]
 import { BASE, startScenario, openPage, launch } from './accesso-comune.mjs';
 import { TRANSLATIONS } from '../lib/i18n.mjs';
@@ -105,28 +105,94 @@ async function crawl(browser, lang) {
   }
 }
 
+
+// Preferenze già salvate sul server simulato: nessuna lingua imposta dal test nel browser.
+async function provePersistence(browser) {
+  const { fake, person } = await startScenario();
+  const a = person('persist-a', '11111111-1111-4111-8111-111111111111', 'persist-a@example.org');
+  const b = person('persist-b', '22222222-2222-4222-8222-222222222222', 'persist-b@example.org');
+  fake.seed('user_language_preferences', [
+    { user_id: a.id, language: 'fr' }, { user_id: b.id, language: 'de' },
+  ]);
+  let ui;
+  const expectLanguage = async (lang, step) => {
+    await ui.page.waitForFunction(code => document.documentElement.lang.split('-')[0] === code, lang, { timeout: 15000 });
+    console.log('Persistenza simulata: ' + step + ' (' + lang + ')');
+  };
+  try {
+    ui = await openPage(browser, { locale: 'it-IT', language: null });
+    if (!(await ui.login(a))) throw new Error('Accesso A non riuscito');
+    await expectLanguage('fr', 'recupero A');
+    await ui.page.reload({ waitUntil: 'networkidle' });
+    await expectLanguage('fr', 'ricaricamento A');
+    if (!(await ui.logout(TRANSLATIONS.fr['settings.signout']))) throw new Error('Uscita A non riuscita');
+    if (!(await ui.login(b))) throw new Error('Accesso B non riuscito');
+    await expectLanguage('de', 'cambio account nello stesso browser');
+    await ui.context.close();
+    ui = await openPage(browser, { locale: 'it-IT', language: null });
+    if (!(await ui.login(a))) throw new Error('Nuovo accesso A non riuscito');
+    await expectLanguage('fr', 'nuovo contesto A');
+    const selector = ui.page.locator('#topbar-language');
+    for (const lang of ['it', 'en', 'es', 'fr', 'de', 'pt']) {
+      await selector.selectOption(lang);
+      await expectLanguage(lang, 'selezione A');
+      await ui.page.waitForFunction(code => document.querySelector('#topbar-language')?.value === code, lang);
+      const deadline = Date.now() + 10000;
+      while (!fake.state.tables.user_language_preferences.some(row => row.user_id === a.id && row.language === lang)) {
+        if (Date.now() > deadline) throw new Error('Preferenza non salvata: ' + lang);
+        await ui.page.waitForTimeout(100);
+      }
+      if (!fake.state.tables.user_language_preferences.some(row => row.user_id === b.id && row.language === 'de'))
+        throw new Error('Preferenza B alterata');
+    }
+    // Interrompe solo la scrittura, non la lettura né l'autenticazione.
+    const pattern = '**/rest/v1/user_language_preferences*';
+    const rejectWrite = route => route.request().method() === 'POST' ? route.abort('failed') : route.continue();
+    await ui.page.route(pattern, rejectWrite);
+    await selector.selectOption('en');
+    await expectLanguage('en', 'selezione locale senza rete');
+    await ui.page.locator('.topbar-language [role="alert"]').waitFor({ timeout: 15000 });
+    if (!fake.state.tables.user_language_preferences.some(row => row.user_id === a.id && row.language === 'pt'))
+      throw new Error('Scrittura fallita ma preferenza server alterata');
+    await ui.page.unroute(pattern, rejectWrite);
+    await ui.page.reload({ waitUntil: 'networkidle' });
+    await expectLanguage('pt', 'recupero dopo errore di rete');
+    console.log('Salvataggio simulato: sei lingue, isolamento B ed errore di rete verificati.');
+  } finally {
+    try { await ui?.context.close(); } finally { await fake.close(); }
+  }
+}
+
+const LANGUAGES = ['it', 'en', 'es', 'fr', 'de', 'pt'];
 const browser = await launch();
-let italian, english;
+const runs = new Map();
+let failed = false;
 try {
-  italian = await crawl(browser, 'it');
-  english = await crawl(browser, 'en');
+  try { await provePersistence(browser); } catch (error) { failed = true; console.error('Persistenza simulata: ' + error.message); }
+  for (const lang of LANGUAGES) {
+    try { runs.set(lang, await crawl(browser, lang)); }
+    catch (error) { failed = true; console.error(`Scenario fallito (${lang}): ${error.message}`); }
+  }
 } finally { await browser.close(); }
 
-let failed = false;
-// La prova vale solo se ha raggiunto le schermate con accesso: questi testi devono esserci, in tutte e due le lingue.
 const REACHED = ['config.title', 'config.item.database', 'extra.restore.title', 'extra.restore.reason.otherPeople', 'family.generateInvite', 'family.deleteAction', 'family.owner', 'family.revoke', 'settings.signout'];
-for (const [lang, run] of [['it', italian], ['en', english]]) {
-  const missing = REACHED.filter(key => ![...run.seen.keys()].some(text => text.includes(TRANSLATIONS[lang][key].replace(/\{[^}]+\}.*$/, '').trim())));
+const italian = runs.get('it');
+const legitimate = { pt: new Set(['SOS Casa', 'Data prevista']) };
+for (const [lang, run] of runs) {
+  const missing = REACHED.filter(key => {
+    const expected = TRANSLATIONS[lang][key]?.replace(/\{[^}]+\}.*$/, '').trim();
+    return !expected || ![...run.seen.keys()].some(text => text.includes(expected));
+  });
   if (missing.length) { failed = true; console.error(`Schermate non raggiunte (${lang}): ${missing.join(', ')}`); }
+  const rawKeys = [...run.seen].filter(([text]) => KEY.test(text) && !/\.(?:com|org|it|pdf|csv|json|html|zip)$/.test(text));
+  const untranslated = lang === 'it' || !italian ? [] : [...run.seen].filter(([text]) => italian.seen.has(text) && !DATA.has(text)
+    && !legitimate[lang]?.has(text)
+    && text.split(' ').filter(word => /[a-zà-ÿ]{3}/i.test(word)).length >= 2
+    && !SAME.some(pattern => pattern.test(text)) && ![...DATA].some(d => text.includes(d)));
+  console.log(`Testi con accesso (${lang}): ${run.seen.size}; chiavi: ${rawKeys.length}; possibili residui: ${untranslated.length}.`);
+  for (const [t, s] of [...rawKeys, ...untranslated]) console.error(`  [${lang}: ${s}] ${t.slice(0, 160)}`);
+  if (rawKeys.length || untranslated.length || run.errors.length) failed = true;
+  if (run.errors.length) console.error(`Errori JavaScript (${lang}): ${run.errors.slice(0, 3).join(' | ')}`);
 }
-const rawKeys = [...italian.seen, ...english.seen].filter(([text]) => KEY.test(text) && !/\.(?:com|org|it|pdf|csv|json|html|zip)$/.test(text));
-if (rawKeys.length) { failed = true; console.error(`${rawKeys.length} chiavi del dizionario mostrate al posto del testo:`); for (const [t, s] of rawKeys) console.error(`  [${s}] ${t}`); }
-const untranslated = [...english.seen].filter(([text]) => italian.seen.has(text) && !DATA.has(text)
-  && text.split(' ').filter(word => /[a-zà-ÿ]{3}/i.test(word)).length >= 2
-  && !SAME.some(pattern => pattern.test(text)) && ![...DATA].some(d => text.includes(d)));
-console.log(`Testi visti con accesso: ${italian.seen.size} in italiano, ${english.seen.size} in inglese.`);
-if (untranslated.length) { failed = true; console.error(`\n${untranslated.length} testi uguali in italiano e in inglese (non tradotti?):`); for (const [t, s] of untranslated) console.error(`  [${s}] ${t.slice(0, 160)}`); }
-const errors = [...italian.errors, ...english.errors];
-if (errors.length) { failed = true; console.error(`\nErrori JavaScript: ${errors.slice(0, 3).join(' | ')}`); }
-if (failed) process.exit(1);
-console.log('Lingue con accesso: nessun testo rimasto in italiano nella versione inglese e nessuna chiave al posto del testo.');
+if (failed || runs.size !== LANGUAGES.length) process.exit(1);
+console.log('Lingue con accesso: controllo euristico superato in tutte le sei lingue (Supabase simulato).');

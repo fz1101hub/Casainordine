@@ -34,7 +34,8 @@ export async function startScenario(options = {}) {
 // device: altre opzioni del browser (per esempio isMobile e hasTouch per il telefono).
 export async function openPage(browser, { locale = 'it-IT', language = 'it', viewport = { width: 1360, height: 900 }, device = {} } = {}) {
   const context = await browser.newContext({ locale, viewport, acceptDownloads: true, ...device });
-  await context.addInitScript(lang => { try { localStorage.setItem('casainordine-language-v32', lang); } catch {} }, language);
+  // null: contesto pulito, senza sovrascrivere la preferenza a ogni navigazione.
+  if (language !== null) await context.addInitScript(lang => { try { localStorage.setItem('casainordine-language-v32', lang); } catch {} }, language);
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));

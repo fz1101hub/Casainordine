@@ -1,5 +1,5 @@
 // Come si vedono le email (scelta dell'utente «Email dei promemoria più complete», 23 novembre
-// 2026): promemoria e riepilogo in italiano e in inglese, con un titolo lungo e caratteri speciali,
+// 2026): promemoria e riepilogo in tutte le sei lingue, con un titolo lungo e caratteri speciali,
 // aperti in Chromium a 360 px (telefono) e 600 px (computer), più la pagina per smettere di
 // riceverle. Controlla: nessuna violazione WCAG 2.1 A/AA (contrasto compreso), niente scorrimento
 // di lato, testo di almeno 13 px, pulsante e collegamento per disiscriversi presenti e cliccabili.
@@ -21,9 +21,9 @@ const bills = [
   { title: 'Gas <b>& acqua</b>', supplier: 'Eni', amount: 80, due_date: '2026-12-18' },
 ];
 const emails = [];
-for (const language of ['it', 'en']) {
-  emails.push({ name: `promemoria-${language}`, ...reminderEmail({ language, bill: { title: bills[0].title, due_date: bills[0].due_date }, appUrl: APP, userId: USER }) });
-  emails.push({ name: `riepilogo-${language}`, ...summaryEmail({ language, bills, today: '2026-12-01', appUrl: APP, userId: USER }) });
+for (const language of ['it', 'en', 'es', 'fr', 'de', 'pt']) {
+  emails.push({ language, name: `promemoria-${language}`, ...reminderEmail({ language, bill: { title: bills[0].title, due_date: bills[0].due_date }, appUrl: APP, userId: USER }) });
+  emails.push({ language, name: `riepilogo-${language}`, ...summaryEmail({ language, bills, today: '2026-12-01', appUrl: APP, userId: USER }) });
 }
 
 const axeSource = readFileSync(new URL('../node_modules/axe-core/axe.min.js', import.meta.url), 'utf8');
@@ -34,6 +34,7 @@ try {
     for (const email of emails) {
       const where = `${email.name} a ${width} px`;
       await page.setContent(email.html, { waitUntil: 'load' });
+      check((await page.locator('html').getAttribute('lang'))?.split('-')[0] === email.language, `${where}: lingua HTML corretta`);
       await page.addScriptTag({ content: axeSource });
       const violations = await page.evaluate(async () => (await window.axe.run(document, { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] } })).violations.map(v => `${v.id}:${v.nodes.length}`));
       check(violations.length === 0, `${where}: nessuna violazione WCAG ${violations.join(' ')}`);

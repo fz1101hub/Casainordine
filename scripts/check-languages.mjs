@@ -1,5 +1,5 @@
-// Cerca nell'app compilata i testi rimasti non tradotti: apre le stesse pagine in italiano e in
-// inglese (modalità senza account) e segnala ogni testo visibile identico nelle due lingue.
+// Cerca nell'app compilata i testi rimasti non tradotti: apre le stesse pagine in italiano e nelle altre cinque lingue
+// supportate (modalità senza account) e segnala ogni testo visibile identico rispetto all’italiano.
 // Uso: node scripts/check-languages.mjs [indirizzo]   (predefinito http://localhost:3000). La usa la CI.
 import { chromium } from 'playwright';
 
@@ -62,28 +62,33 @@ async function crawl(browser, lang) {
   return seen;
 }
 
+const LANGUAGES = ['it', 'en', 'es', 'fr', 'de', 'pt'];
 const browser = await chromium.launch();
-let italian, english;
+const results = new Map();
 try {
-  italian = await crawl(browser, 'it');
-  english = await crawl(browser, 'en');
+  for (const lang of LANGUAGES) results.set(lang, await crawl(browser, lang));
 } finally { await browser.close(); }
 
-// Una chiave mostrata al posto del testo (per esempio «v20.ui.monitorTitle») vuol dire testo mancante.
+// Coincidenze linguistiche verificate nella CI 1964: in portoghese «Data prevista»
+// è corretto e «SOS Casa» è il nome della sezione. Eccezioni esatte e solo per pt.
+const SAME_BY_LANGUAGE = { pt: new Set(['SOS Casa', 'Data prevista']) };
 const KEY = /^[a-z][a-z0-9]*(?:\.[a-zA-Z0-9_-]+)+$/;
-const rawKeys = [...italian, ...english].filter(([text]) => KEY.test(text) && !/\.(?:com|it|pdf|csv|json|html)$/.test(text));
-if (rawKeys.length) {
-  console.error(`${rawKeys.length} chiavi del dizionario mostrate al posto del testo:`);
-  for (const [text, step] of rawKeys) console.error(`  [${step}] ${text}`);
-  process.exitCode = 1;
+const italian = results.get('it');
+for (const [lang, seen] of results) {
+  console.log(`[${lang}] Testi visti: ${seen.size}`);
+  if (!seen.size) {
+    console.error(`[${lang}] Nessun testo rilevato`);
+    process.exitCode = 1;
+  }
+  const rawKeys = [...seen].filter(([text]) => KEY.test(text) && !/\.(?:com|it|pdf|csv|json|html)$/.test(text));
+  for (const [text, step] of rawKeys) console.error(`[${lang}] [${step}] Chiave esposta: ${text}`);
+  if (rawKeys.length) process.exitCode = 1;
+  if (lang === 'it') continue;
+  const untranslated = [...seen].filter(([text]) => italian.has(text)
+    && text.split(' ').filter(word => /[a-zà-ÿ]{3}/i.test(word)).length >= 2
+    && !SAME.some(pattern => pattern.test(text))
+    && !SAME_BY_LANGUAGE[lang]?.has(text));
+  for (const [text, step] of untranslated) console.error(`[${lang}] [${step}] Testo identico all'italiano (da verificare): ${text.slice(0, 160)}`);
+  if (untranslated.length) process.exitCode = 1;
 }
-const untranslated = [...english].filter(([text]) => italian.has(text)
-  && text.split(' ').filter(word => /[a-zà-ÿ]{3}/i.test(word)).length >= 2
-  && !SAME.some(pattern => pattern.test(text)));
-console.log(`Testi visti: ${italian.size} in italiano, ${english.size} in inglese.`);
-if (untranslated.length) {
-  console.error(`\n${untranslated.length} testi uguali in italiano e in inglese (non tradotti?):`);
-  for (const [text, step] of untranslated) console.error(`  [${step}] ${text.slice(0, 160)}`);
-  process.exit(1);
-}
-if (!process.exitCode) console.log('Nessun testo rimasto in italiano nella versione inglese e nessuna chiave al posto del testo.');
+if (!process.exitCode) console.log('Nessuna chiave esposta o testo sospetto secondo i criteri del controllo nelle sei lingue.');
