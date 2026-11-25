@@ -5,7 +5,7 @@ import {
   Plus, Search, CheckCircle2, CalendarDays, LogOut, ArrowUpRight, TrendingDown,
   Wallet, LockKeyhole, Trash2, Mail, ShieldCheck, RefreshCcw, Link2,
   Menu, X, UserRound, Download, Cloud, Info, Clock, AlertCircle, Check,
-  Filter, ChevronRight, Zap, CircleHelp, Send, Eye, EyeOff, FileImage, FileText, Users, ShoppingBasket, Car, Archive, BarChart3, Wrench, Building2, ClipboardList, ScanSearch, HardHat, SunSnow, Sprout, PawPrint, Package, Hammer, PiggyBank, KeyRound, Gauge
+  Filter, ChevronRight, Zap, CircleHelp, Send, Eye, EyeOff, FileImage, FileText, Users, ShoppingBasket, Car, Archive, BarChart3, Wrench, Building2, ClipboardList, ScanSearch, HardHat, SunSnow, Sprout, PawPrint, Landmark, Package, Hammer, PiggyBank, KeyRound, Gauge
 } from 'lucide-react';
 import { db } from '../lib/supabase-browser';
 import { addDaysISO, nextRecurringDue, todayRome, normalizeDate, euro } from '../lib/dates.mjs';
@@ -45,6 +45,7 @@ const Seasonal=lazy(()=>import('./Seasonal'));
 const Stock=lazy(()=>import('./Stock'));
 const Garden=lazy(()=>import('./Garden'));
 const Pets=lazy(()=>import('./Pets'));
+const Taxes=lazy(()=>import('./Taxes'));
 const Projects=lazy(()=>import('./Projects'));
 const ReplacementFund=lazy(()=>import('./ReplacementFund'));
 const Rental=lazy(()=>import('./Rental'));
@@ -84,6 +85,7 @@ const menu = [
   {id:'automations',icon:Zap},
   {id:'monitor',icon:Mail},
   {id:'fraud',icon:ShieldCheck},
+  {id:'taxes',icon:Landmark},
   {id:'pagopa',icon:ReceiptText},
   {id:'history',icon:Clock},
   {id:'moving',icon:House},
@@ -801,6 +803,7 @@ export default function Page() {
         {tab==='stock'&&<Stock client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} onNotify={notify}/>}
         {tab==='garden'&&<Garden client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} onNotify={notify}/>}
         {tab==='pets'&&<Pets client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} onNotify={notify}/>}
+        {tab==='taxes'&&<Taxes client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} onNotify={notify}/>}
         {tab==='seasonal'&&<Seasonal client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} onNotify={notify} onAddTask={addTaskQuick}/>}
         {tab==='professionals'&&<Professionals client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} onNotify={notify}/>}
         {tab==='automations'&&<Automations client={client} demo={demo} user={user} homeId={activeHomeId} canWrite={canWrite} bills={bills} onNotify={notify}/>}
