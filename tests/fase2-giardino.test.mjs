@@ -5,6 +5,7 @@ import {
   TASK_KINDS, PLANT_KINDS, GARDEN_LIMITS, EVERY_CHOICES, PRESETS, PRESET_KEYS, ALL_MONTHS,
   normalizeMonths, monthWindows, windowAt, firstActiveFrom, nextWindowStart, nextDue, deadlineOf, taskState, markDone, postpone,
   gardenAgenda, normalizePlant, normalizeTask, normalizeLog, presetTextKeys, presetTasks, presetTaskTitle, missingPresetTasks, gardenEventsToday, addDays,
+  expectedHarvest as expectedHarvestOf, safeHarvestFrom as safeFrom, FAMILIES,
 } from '../lib/garden.mjs';
 import { TRANSLATIONS, translate } from '../lib/i18n.mjs';
 
@@ -99,7 +100,8 @@ test('pianta, intervento e registro controllati', () => {
 });
 
 test('proposte: tipi, mesi e frequenze validi, testi in tutte le lingue', () => {
-  assert.ok(PRESET_KEYS.length >= 18);
+  assert.ok(PRESET_KEYS.length >= 25);
+  for (const lang of LANGS) for (const f of FAMILIES) assert.ok(TRANSLATIONS[lang]['garden.family.' + f], `garden.family.${f} in ${lang}`);
   for (const [key, preset] of Object.entries(PRESETS)) {
     assert.match(key, /^[a-z][a-z_]{1,39}$/, 'come chiede il database');
     assert.ok(PLANT_KINDS.includes(preset.kind), key);
@@ -241,4 +243,102 @@ test('notifiche push del giardino: interruttore proprio, collegato al lavoro gio
   assert.match(readFileSync(new URL('../lib/daily-jobs.mjs', import.meta.url), 'utf8'), /await processGardenAlerts\(admin,today,counts,/);
   assert.match(readFileSync(new URL('../app/HomeExtra.jsx', import.meta.url), 'utf8'), /\['push_garden','extra\.alerts\.garden'\]/);
   assert.match(readFileSync(new URL('../supabase/migrate_v57_giardino.sql', import.meta.url), 'utf8'), /add column if not exists push_garden boolean not null default true/);
+});
+
+// Seconda parte (25 novembre 2026): clima, calendario, prodotti e sicurezza, orto.
+test('clima della zona: i periodi si spostano di un mese, senza ridursi troppo', async () => {
+  const { adjustMonths, shiftMonth, presetTasks: tasksFor, presetPlant } = await import('../lib/garden.mjs');
+  assert.equal(shiftMonth(3, 'cold'), 4); assert.equal(shiftMonth(10, 'cold'), 9); assert.equal(shiftMonth(12, 'cold'), 12); assert.equal(shiftMonth(3, 'warm'), 2);
+  assert.deepEqual(adjustMonths([3, 4, 10, 11], 'mild'), [3, 4, 10, 11]);
+  assert.deepEqual(adjustMonths([3, 4, 10, 11], 'cold'), [4, 5, 9, 10], 'primavera più tardi, autunno prima');
+  assert.deepEqual(adjustMonths([3, 4, 10, 11], 'warm'), [2, 3, 11, 12]);
+  assert.deepEqual(adjustMonths([11], 'cold'), [10], 'riparo dal freddo prima dove gli inverni sono rigidi');
+  assert.deepEqual(adjustMonths([11, 12, 1, 2], 'cold'), [1, 2, 3, 10, 11, 12], 'periodo a cavallo dell\'anno più lungo');
+  assert.deepEqual(adjustMonths([7, 8, 9], 'cold'), [8, 9], 'un periodo estivo breve perde al massimo un mese');
+  assert.deepEqual(adjustMonths(ALL_MONTHS, 'warm'), ALL_MONTHS);
+  const cold = tasksFor('olive', it, '2026-11-25', 'cold').find(t => t.product.startsWith('Rame'));
+  assert.deepEqual(cold.months, [4, 5, 9, 10]);
+  assert.deepEqual(presetPlant('tomato'), { kind: 'vegetable', family: 'solanaceae', harvest_days: 75 });
+  assert.deepEqual(presetPlant('rose'), { kind: 'ornamental', family: null, harvest_days: null });
+});
+
+test('calendario dell\'anno: date ripetute nei loro mesi, dodici mesi da oggi', async () => {
+  const { projectDates, yearCalendar } = await import('../lib/garden.mjs');
+  assert.deepEqual(projectDates({ next_on: '2026-05-01', months: [5, 6], every_days: 15 }, '2026-05-01', '2026-12-31'),
+    ['2026-05-01', '2026-05-16', '2026-05-31', '2026-06-15', '2026-06-30']);
+  assert.deepEqual(projectDates({ next_on: '2026-11-25', months: [3, 4, 10, 11], every_days: 0 }, '2026-11-01', '2027-12-31'), ['2026-11-25', '2027-03-01', '2027-10-01']);
+  assert.deepEqual(projectDates({ next_on: null, months: [3] }, '2026-01-01', '2026-12-31'), []);
+  const months = yearCalendar([{ id: 'a', title: 'Concime', next_on: '2026-12-10', months: [12, 1], every_days: 14 }], '2026-11-25');
+  assert.equal(months.length, 12);
+  assert.deepEqual([months[0].key, months[11].key], ['2026-11', '2027-10']);
+  assert.deepEqual(months[1].entries[0].dates, ['2026-12-10', '2026-12-24']);
+  assert.deepEqual(months[2].entries[0].dates, ['2027-01-07', '2027-01-21']);
+  assert.equal(months[0].entries.length, 0);
+});
+
+test('raccolta prevista, attesa dopo i trattamenti e nuovi campi controllati', () => {
+  assert.equal(expectedHarvestOf({ planted_on: '2026-04-20', harvest_days: 75 }), '2026-07-04');
+  assert.equal(expectedHarvestOf({ planted_on: '2026-04-20' }), null);
+  const entries = [{ done_on: '2026-07-01', wait_days: 20 }, { done_on: '2026-07-10', wait_days: 3 }, { done_on: '2026-06-01' }];
+  assert.equal(safeFrom(entries, '2026-07-12'), '2026-07-21');
+  assert.equal(safeFrom(entries, '2026-07-21'), null, 'dal giorno sicuro in poi niente avviso');
+  const plant = normalizePlant({ name: 'Pomodori', preset: 'tomato', planted_on: '2026-04-20', harvest_days: '75', bed: ' Aiuola  1 ', family: 'solanaceae' }).value;
+  assert.deepEqual([plant.planted_on, plant.harvest_days, plant.bed, plant.family, plant.ended_on], ['2026-04-20', 75, 'Aiuola 1', 'solanaceae', null]);
+  assert.equal(normalizePlant({ name: 'Pomodori', harvest_days: 500 }).error, 'garden.error.harvest');
+  assert.equal(normalizePlant({ name: 'Pomodori', planted_on: '2026-04-20', ended_on: '2026-04-01' }).error, 'garden.error.ended');
+  assert.equal(normalizePlant({ name: 'Pomodori', family: 'rettili', bed: '' }).value.family, null);
+  assert.ok(!('bed' in normalizePlant({ name: 'Rosa' }).value), 'senza i campi dell\'orto il modulo resta quello della v57');
+  const task = normalizeTask({ title: 'Rame', months: [6], wait_days: '20', stock_item_id: 's1', stock_use: '0,05'.replace(',', '.') }, '2026-06-01').value;
+  assert.deepEqual([task.wait_days, task.stock_item_id, task.stock_use], [20, 's1', 0.05]);
+  assert.equal(normalizeTask({ title: 'Rame', months: [6], wait_days: 400 }, '2026-06-01').error, 'garden.error.wait');
+  assert.equal(normalizeTask({ title: 'Rame', months: [6], stock_item_id: 's1', stock_use: 0 }, '2026-06-01').error, 'garden.error.stockUse');
+  assert.equal(normalizeTask({ title: 'Rame', months: [6], stock_item_id: '', stock_use: 5 }, '2026-06-01').value.stock_use, null, 'senza scorta niente quantità');
+  assert.equal(normalizeLog({ title: 'Rame', done_on: '2026-06-01', wait_days: '20' }, '2026-06-02').value.wait_days, 20);
+});
+
+test('orto: rotazione nelle aiuole e storia degli ultimi anni', async () => {
+  const { rotationCheck, bedsOverview } = await import('../lib/garden.mjs');
+  const plants = [
+    { id: 'p1', name: 'Pomodori', bed: 'Aiuola 1', family: 'solanaceae', planted_on: '2025-04-20', ended_on: '2025-09-30' },
+    { id: 'p2', name: 'Fagiolini', bed: 'aiuola 1', family: 'fabaceae', planted_on: '2024-05-01', ended_on: '2024-08-30' },
+    { id: 'p3', name: 'Peperoni', bed: 'Aiuola 1', family: 'solanaceae', planted_on: '2022-04-20', ended_on: '2022-09-30' },
+    { id: 'p4', name: 'Insalata', bed: 'Aiuola 2', family: 'asteraceae', planted_on: '2026-03-10' },
+  ];
+  const tomatoes = rotationCheck(plants, { bed: 'AIUOLA 1', family: 'solanaceae', year: 2026 });
+  assert.deepEqual(tomatoes.conflicts.map(p => p.id), ['p1'], 'pomodori dell\'anno scorso; i peperoni di quattro anni fa non contano');
+  assert.ok(!tomatoes.suggestions.includes('solanaceae') && !tomatoes.suggestions.includes('fabaceae') && tomatoes.suggestions.includes('brassicaceae'));
+  assert.deepEqual(rotationCheck(plants, { bed: 'Aiuola 1', family: 'brassicaceae', year: 2026 }).conflicts, []);
+  assert.deepEqual(rotationCheck(plants, { bed: '', family: 'solanaceae', year: 2026 }), { conflicts: [], suggestions: [] });
+  const beds = bedsOverview(plants, 2026);
+  assert.deepEqual(beds.map(b => b.bed), ['Aiuola 1', 'Aiuola 2']);
+  assert.deepEqual(beds[0].now, [], 'aiuola 1 adesso libera');
+  assert.deepEqual(beds[0].years.map(([y, list]) => [y, list.map(p => p.id)]), [[2025, ['p1']], [2024, ['p2']]]);
+  assert.deepEqual(beds[1].now.map(p => p.id), ['p4']);
+});
+
+test('calendario del telefono: eventi del giardino, non delle colture finite', async () => {
+  const { gardenCalendarEvents } = await import('../lib/garden.mjs');
+  const { calendarText } = await import('../lib/calendar.mjs');
+  const plants = [{ id: 'g1', name: 'Limone' }, { id: 'g2', name: 'Pomodori', ended_on: '2026-09-30' }];
+  const tasks = [{ id: 't1', plant_id: 'g1', title: 'Concimazione', product: 'Concime per agrumi', months: [3, 4], every_days: 30, next_on: '2027-03-01' },
+    { id: 't2', plant_id: 'g2', title: 'Rame', months: [6], every_days: 10, next_on: '2027-06-01' }];
+  const events = gardenCalendarEvents(plants, tasks, '2026-11-25');
+  assert.deepEqual(events.map(e => e.uid), ['garden-t1-2027-03-01', 'garden-t1-2027-03-31', 'garden-t1-2027-04-30']);
+  const text = calendarText([], '20261125T090000Z', 'it', events).replace(/\r\n /g, ''); // righe ripiegate a 75 byte
+  assert.match(text, /SUMMARY:Giardino: Concimazione · Limone/);
+  assert.match(text, /DESCRIPTION:Prodotto: Concime per agrumi\. Segna «Fatto» nell’app quando l’hai fatto\./);
+  assert.match(text, /UID:garden-t1-2027-03-01@casainordine/);
+  assert.equal((text.match(/BEGIN:VEVENT/g) || []).length, 3);
+  for (const lang of LANGS) assert.ok(!/\{|undefined/.test(calendarText([], '20261125T090000Z', lang, events)), lang);
+});
+
+test('promemoria: niente avvisi per le colture finite', async () => {
+  const { processGardenAlerts } = await import('../lib/garden-alerts.mjs');
+  const today = '2026-05-10';
+  const tables = {
+    home_garden_plants: [{ id: 'p1', user_id: 'anna', home_id: null, name: 'Pomodori', ended_on: '2026-05-01' }, { id: 'p2', user_id: 'anna', home_id: null, name: 'Limone', ended_on: null }],
+    home_garden_tasks: [{ id: 't1', plant_id: 'p1', title: 'Rame', product: '', next_on: today, remind: true }, { id: 't2', plant_id: 'p2', title: 'Concime', product: '', next_on: today, remind: true }],
+  };
+  await processGardenAlerts(fakeAdmin(tables), today, { errors: [] });
+  assert.deepEqual(tables.user_alerts.map(a => a.reference_id), ['t2']);
 });
