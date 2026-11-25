@@ -34,6 +34,7 @@
     "test:first-use": "node scripts/prove-primo-utilizzo.mjs",
     "test:original-files": "node scripts/prove-file-originali.mjs",
     "test:garden": "node scripts/prove-giardino.mjs",
+    "test:plant-photos": "node scripts/prove-foto-piante.mjs",
     "test:pets": "node scripts/prove-animali.mjs"
   },
   "dependencies": {
