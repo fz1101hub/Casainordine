@@ -110,6 +110,37 @@ try {
   const next = rows('health_appointments').find(a => a.title === 'Antinfluenzale' && !a.done_on);
   check(rows('health_appointments').find(a => a.id === flu.id)?.done_on === '2026-11-25' && next?.on_date === '2027-11-28' && next?.at_time === '10:30', `fatto: la prossima è il ${next?.on_date}`);
 
+  // 3b. Un neonato: calendario delle vaccinazioni obbligatorie, prenota e «già fatta».
+  await main.getByRole('button', { name: tr('health.addPerson') }).click();
+  await main.getByLabel(tr('health.personName'), { exact: true }).fill('Luca');
+  await main.getByLabel(tr('health.relation')).selectOption('child');
+  await main.getByLabel(tr('health.birthOn'), { exact: true }).fill('2026-09-20');
+  await main.getByRole('button', { name: tr('health.save') }).click();
+  await page.waitForTimeout(800);
+  const luca = rows('health_people').find(p => p.name === 'Luca');
+  check(luca?.vaccine_plan === undefined || luca?.vaccine_plan === 'off' || !luca?.vaccine_plan, 'di partenza il calendario è spento');
+  await main.getByLabel(tr('health.vaccinePlan')).selectOption('mandatory');
+  await page.waitForTimeout(800);
+  check(rows('health_people').find(p => p.id === luca.id)?.vaccine_plan === 'mandatory', 'calendario delle obbligatorie acceso');
+  const steps = main.locator('.health-vaccine-list li');
+  check(await steps.count() === 7, `sette tappe obbligatorie (${await steps.count()})`);
+  check(/Esavalente – 1ª dose[\s\S]*3° mese di vita \(dal 61° giorno\) · dal gio 19 nov[\s\S]*Obbligatoria[\s\S]*Da fare ora/.test(await steps.nth(0).innerText()), 'prima tappa: esavalente dal 61° giorno, da fare ora');
+  await main.getByRole('button', { name: tr('health.bookAria', { name: tr('health.vaccine.hexa_1') }) }).click();
+  check(await main.getByLabel(tr('health.appointmentTitle'), { exact: true }).inputValue() === tr('health.vaccine.hexa_1'), 'prenota: il modulo è già compilato');
+  await main.getByLabel(tr('health.onDate'), { exact: true }).fill('2026-11-27');
+  await main.getByLabel(tr('health.atTime'), { exact: true }).fill('09:15');
+  await main.getByRole('button', { name: tr('health.save') }).click();
+  await page.waitForTimeout(800);
+  const hexa = rows('health_appointments').find(a => a.schedule_key === 'hexa_1');
+  check(hexa?.person_id === luca.id && hexa?.kind === 'vaccine' && hexa?.on_date === '2026-11-27' && JSON.stringify(hexa?.reminders) === '["day_before","same_morning"]', 'esavalente prenotata con i promemoria');
+  check(/Prenotata: ven 27 nov/.test(await steps.nth(0).innerText()), 'la tappa risulta prenotata');
+  await main.getByRole('button', { name: tr('health.alreadyDoneAria', { name: tr('health.vaccine.hexa_2') }) }).click();
+  await main.getByLabel(tr('health.doneDate'), { exact: true }).fill('2026-11-24');
+  await main.locator('.health-done-form').getByRole('button', { name: tr('health.save') }).click();
+  await page.waitForTimeout(800);
+  check(rows('health_appointments').some(a => a.schedule_key === 'hexa_2' && a.done_on === '2026-11-24'), '«già fatta» segnata con la sua data');
+  check(/Fatta il mar 24 nov/.test(await steps.nth(1).innerText()), 'la tappa risulta fatta');
+
   // 4. Nomi nelle notifiche: di partenza spento.
   const detailsBox = main.getByRole('checkbox', { name: tr('health.details') });
   check(!(await detailsBox.isChecked()), 'di partenza le notifiche non mostrano i nomi');
