@@ -35,7 +35,8 @@ test('ordine: ogni voce dopo quelle a cui è collegata', () => {
     home_refund_expectations: ['bills'], maintenance_events: ['maintenance_assets', 'home_professionals'], home_professional_notes: ['home_professionals'],
     home_replacement_plans: ['maintenance_assets'], home_inventory_items: ['maintenance_assets', 'home_properties'], meter_readings: ['home_properties'],
     meter_reminders: ['home_properties'], home_contracts: ['home_properties'], home_project_phases: ['home_projects'], home_project_quotes: ['home_projects', 'home_professionals'],
-    home_project_expenses: ['home_projects', 'home_project_quotes'], home_move_steps: ['home_move_plans'] };
+    home_project_expenses: ['home_projects', 'home_project_quotes'], home_move_steps: ['home_move_plans'],
+    home_garden_tasks: ['home_garden_plants'], home_garden_log: ['home_garden_plants', 'home_garden_tasks'] };
   for (const [child, list] of Object.entries(parents)) for (const parent of list)
     assert.ok(RESTORE_ORDER.indexOf(parent) < RESTORE_ORDER.indexOf(child), `${parent} prima di ${child}`);
   for (const target of Object.values(LINKS)) assert.ok(RESTORE_ORDER.includes(target), target);
@@ -161,4 +162,40 @@ test('copia ripetuta dello stesso backup: identificativi UUID stabili e nessun d
   const client = fakeClient({ existing });
   const result = await runRestore(client, { steps: [repeat.steps.find(s => s.table === 'bills')] });
   assert.deepEqual(result.bills, { added: 0, present: 1, failed: 0 });
+});
+
+test('tabelle collegate senza la colonna della casa: niente home_id nelle righe da scrivere', async () => {
+  const { NO_HOME } = await import('../lib/backup-restore.mjs');
+  const { readdirSync } = await import('node:fs');
+  // Le tabelle ripristinabili che nelle migrazioni non hanno home_id (né la ricevono dopo) sono tutte in NO_HOME.
+  const dir = new URL('../supabase/', import.meta.url);
+  const sql = readdirSync(dir).filter(f => f.endsWith('.sql')).map(f => readFileSync(new URL(f, dir), 'utf8')).join('\n');
+  const withoutHome = RESTORE_ORDER.filter(table => {
+    const body = sql.match(new RegExp(`create table (?:if not exists )?public\\.${table}\\s*\\(([\\s\\S]*?)\\n\\);`, 'i'))?.[1] || '';
+    const added = new RegExp(`alter table (?:if exists )?public\\.${table}[^;]*add column[^;]*home_id`, 'i').test(sql);
+    return !/\bhome_id\b/.test(body) && !added;
+  }).filter(table => table !== 'user_suppliers');
+  assert.deepEqual([...withoutHome].sort(), [...NO_HOME].sort());
+  for (const table of NO_HOME) {
+    const [row] = prepareRows(table, [{ id: 'x', project_id: 'p', plant_id: 'g', asset_id: 'a', professional_id: 'q', user_id: ME, created_by: 'altro', home_id: 'vecchia' }], { homeId: H2, userId: ME });
+    assert.equal('home_id' in row, false, table);
+  }
+  assert.equal(prepareRows('home_garden_plants', [{ id: 'g', user_id: 'altro', home_id: 'casa-1', name: 'Limone' }], { homeId: H2, userId: ME })[0].home_id, H2);
+});
+
+test('giardino: piante, piano e registro tornano insieme, con i collegamenti nelle copie', () => {
+  let n = 0; const makeId = () => `nuovo-${++n}`;
+  const file = backup({ home_garden_plants: [{ id: 'g1', user_id: 'altro', home_id: 'casa-1', name: 'Limone', kind: 'fruit' }],
+    home_garden_tasks: [{ id: 'gt1', plant_id: 'g1', created_by: 'altro', title: 'Concimazione', months: [3, 4] }],
+    home_garden_log: [{ id: 'gl1', plant_id: 'g1', task_id: 'gt1', created_by: 'altro', done_on: '2026-03-02', title: 'Concimazione' }] });
+  const copy = restorePlan(readBackup(JSON.stringify(file)), { homeId: H2, userId: ME }, { makeId });
+  const rows = Object.fromEntries(copy.steps.map(s => [s.table, s.rows]));
+  const plant = rows.home_garden_plants[0], task = rows.home_garden_tasks[0], entry = rows.home_garden_log[0];
+  assert.equal(plant.home_id, H2);
+  assert.equal(task.plant_id, plant.id);
+  assert.equal(entry.plant_id, plant.id);
+  assert.equal(entry.task_id, task.id);
+  assert.equal(task.created_by, ME);
+  assert.ok(!('home_id' in task) && !('home_id' in entry));
+  for (const table of ['home_garden_plants', 'home_garden_tasks', 'home_garden_log']) assert.equal(RESTORE_SECTIONS[table], 'garden');
 });

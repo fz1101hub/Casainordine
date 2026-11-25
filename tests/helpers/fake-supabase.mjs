@@ -98,7 +98,8 @@ const EMBED = { homes: 'home_id', bills: 'bill_id' };
 // maxRows: come l'impostazione «Max rows» di Supabase (1000 sul progetto vero), nessuna risposta
 // supera quel numero di righe, qualunque sia limit o range.
 // maxUrl: lunghezza massima dell'indirizzo (Supabase: 16 KB fra indirizzo e intestazioni, poi errore 520).
-export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = false, latency = 0, maxRows = Infinity, maxUrl = Infinity } = {}) {
+// tokenTtl: durata dei token in secondi (le prove con l'orologio del browser spostato in avanti ne usano una più lunga).
+export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = false, latency = 0, maxRows = Infinity, maxUrl = Infinity, tokenTtl = 3600 } = {}) {
   const state = { tables: {}, tokens: new Map(), users: new Map(), passwords: new Map(), rpc: {}, removed: [], files: {}, uploads: [], requests: [], deletedUsers: [], rejectKeys: new Set() };
   const table = name => (state.tables[name] ||= []);
   const isOwner = (user, homeId) => table('homes').some(h => h.id === homeId && h.owner_id === user.id);
@@ -207,9 +208,9 @@ export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = fa
     if (path === '/auth/v1/token' && url.searchParams.get('grant_type') === 'password') {
       const user = [...state.users.values()].find(u => u.email === body?.email);
       if (!user || state.passwords.get(user.id) !== body?.password) return send(400, { code: 400, error_code: 'invalid_credentials', msg: 'Invalid login credentials' });
-      const access_token = fakeJwt(user);
+      const access_token = fakeJwt(user, tokenTtl);
       state.tokens.set(access_token, user);
-      return send(200, { access_token, token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, refresh_token: `r-${user.id}`, user });
+      return send(200, { access_token, token_type: 'bearer', expires_in: tokenTtl, expires_at: Math.floor(Date.now() / 1000) + tokenTtl, refresh_token: `r-${user.id}`, user });
     }
     if (path === '/auth/v1/logout') return send(204);
     if (path === '/auth/v1/user') {

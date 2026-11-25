@@ -37,6 +37,8 @@ Ordine completo di installazione su un database nuovo, in quest'ordine:
 22. `migrate_v53_push_rinviate.sql`: le notifiche push che cadono nell'orario silenzioso si mettono da parte (tabella `push_deferred`, solo per il server) e partono dopo la sua fine, nello stesso giorno. Il giro orario si attiva con `migrate_v53_cron_push.sql` (vedi «Controlli programmati con Supabase Cron»).
 23. `migrate_v54_inviti_account.sql`: con l'account si cancellano anche gli inviti al suo indirizzo email (prima restavano negli inviti delle case di altri). Il lavoro giornaliero cancella gli inviti già usati o scaduti.
 24. `migrate_v55_autoletture_giorno.sql`: le autoletture ricorrenti ricordano il giorno scelto (`meter_reminders.due_day`): un promemoria per il 31 torna al 31 dopo febbraio, invece di restare al 28 per sempre.
+25. `migrate_v56_account_cleanup.sql`: cancellazione dell'account recuperabile. I file da togliere vanno in una coda (`account_cleanup_jobs`, solo per il server) e il lavoro giornaliero li cancella solo dopo aver verificato che l'utente non esiste più.
+26. `migrate_v57_giardino.sql`: giardino e orto. Piante (anche partendo da una proposta per tipo di pianta), piano di concimazioni, trattamenti, potature e rinvasi con mesi e ripetizione, registro di quello che si è fatto e promemoria (avvisi «garden», con la notifica push che si spegne in «Avvisi»). Finché non è eseguita, la sezione dice che va attivata e il lavoro giornaliero la salta.
 
 Ogni script è in una sola transazione e si può rieseguire. Dopo la v51 le migrazioni precedenti non vanno più rieseguite: cercherebbero le funzioni di controllo nello schema `public` e si fermerebbero senza cambiare niente.
 

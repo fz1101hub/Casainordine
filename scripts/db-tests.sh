@@ -27,7 +27,7 @@ MIGRATIONS=(
   migrate_v45_stagionale.sql migrate_v46_scorte.sql migrate_v47_progetti.sql migrate_v48_fondo.sql
   migrate_v49_affitti.sql migrate_v50_email_promemoria.sql migrate_v51_sicurezza_funzioni.sql
   migrate_v52_ripristino_scadenze.sql migrate_v53_push_rinviate.sql migrate_v54_inviti_account.sql
-  migrate_v55_autoletture_giorno.sql migrate_v56_account_cleanup.sql
+  migrate_v55_autoletture_giorno.sql migrate_v56_account_cleanup.sql migrate_v57_giardino.sql
 )
 PSQL=(psql -X -q -v ON_ERROR_STOP=0)
 failed=0

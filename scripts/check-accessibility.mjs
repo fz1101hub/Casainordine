@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 const AXE = require.resolve('axe-core/axe.min.js');
 const BASE = process.argv[2] || 'http://localhost:3000';
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
-const SECTIONS = ['Automazioni', 'Professionisti', 'Programma stagionale', 'Scorte', 'Progetti e lavori', 'Fondo sostituzioni', 'Affitti', 'Casa Control', 'Impostazioni', 'Bollette'];
+const SECTIONS = ['Automazioni', 'Professionisti', 'Programma stagionale', 'Scorte', 'Giardino e orto', 'Progetti e lavori', 'Fondo sostituzioni', 'Affitti', 'Casa Control', 'Impostazioni', 'Bollette'];
 
 const problems = [];
 async function scan(page, label) {
