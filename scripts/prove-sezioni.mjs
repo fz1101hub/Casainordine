@@ -203,6 +203,21 @@ try {
   });
 
   check(errors.length === 0, `nessun errore JavaScript${errors.length ? ': ' + errors.slice(0, 3).join(' | ') : ''}`);
+
+  // La pagina viene preparata al momento della pubblicazione: aperta qualche giorno dopo deve
+  // mostrare la data di oggi, senza errori di React tra la pagina preparata e quella nel browser.
+  const later = await browser.newContext({ locale: 'it-IT', timezoneId: 'Europe/Rome' });
+  const laterPage = await later.newPage();
+  const laterErrors = [];
+  laterPage.on('pageerror', error => laterErrors.push(error.message));
+  await laterPage.clock.setFixedTime(new Date(Date.now() + 3 * 86400000));
+  await laterPage.goto(BASE);
+  await laterPage.locator('.today-label').getByText(/\d{4}/).waitFor({ timeout: 15000 }).catch(() => {});
+  const expected = new Date(Date.now() + 3 * 86400000).toLocaleDateString('it-IT', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Rome' });
+  const shownDate = (await laterPage.locator('.today-label').innerText().catch(() => '')).trim();
+  check(shownDate === expected, `tre giorni dopo la pubblicazione: in alto la data giusta (${shownDate} / ${expected})`);
+  check(laterErrors.length === 0, `tre giorni dopo la pubblicazione: nessun errore${laterErrors.length ? ': ' + laterErrors[0].slice(0, 120) : ''}`);
+  await later.close();
 } finally {
   await browser.close();
 }
