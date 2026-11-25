@@ -215,5 +215,28 @@ try {
   const violations2 = await ui.axe();
   check(!violations2.length, `accessibilità con le parti nuove (${violations2.join(', ')})`);
   check(!ui.errors.length, `nessun errore nella pagina ${ui.errors.slice(0, 3).join(' | ')}`);
-} finally { await ui.context.close(); await browser.close(); fake.close(); }
+} finally { await ui.context.close(); await browser.close(); await fake.close(); }
+
+// 7. Prima della migrazione v58: le colonne nuove non ci sono; la sezione le nasconde e non le scrive.
+{
+  const { V58_FIELDS } = await import('../lib/garden.mjs');
+  const old = await startScenario({ tokenTtl: 3 * 86400, missingColumns: V58_FIELDS });
+  const carla = old.person('carla', '33333333-3333-4333-8333-333333333333', 'carla@example.org');
+  const browser2 = await launch();
+  const ui2 = await openPage(browser2);
+  await ui2.page.clock.setFixedTime(new Date('2026-11-25T09:00:00Z'));
+  try {
+    check(await ui2.login(carla), 'senza v58: Carla entra');
+    await ui2.go(tr('nav.garden'));
+    const main2 = ui2.page.locator('main');
+    await main2.getByLabel(tr('garden.preset')).selectOption('tomato');
+    check(await main2.locator('.garden-crop').count() === 0, 'senza v58: i campi dell\'orto non compaiono');
+    await main2.getByRole('button', { name: tr('garden.savePlantWith', { count: 4 }) }).click();
+    await ui2.page.waitForTimeout(1200);
+    const plant = old.fake.rows('home_garden_plants').find(p => p.preset === 'tomato');
+    check(Boolean(plant) && !('bed' in plant) && old.fake.rows('home_garden_tasks').filter(t => t.plant_id === plant?.id).length === 4, 'senza v58: pianta e piano salvati senza le colonne nuove');
+    check(!/Could not find|does not exist/.test(await ui2.toast()), `senza v58: nessun errore del database (${await ui2.toast()})`);
+    check(!ui2.errors.length, `senza v58: nessun errore nella pagina ${ui2.errors.slice(0, 3).join(' | ')}`);
+  } finally { await ui2.context.close(); await browser2.close(); await old.fake.close(); }
+}
 finish();

@@ -15,7 +15,7 @@ import DecimalInput from './DecimalInput';
 import {
   TASK_KINDS, PLANT_KINDS, GARDEN_LIMITS, EVERY_CHOICES, PRESET_KEYS, ALL_MONTHS, CLIMATES, FAMILIES, EDIBLE_KINDS, monthWindows, normalizePlant, normalizeTask, normalizeLog,
   presetTasks, presetPlant, missingPresetTasks, gardenAgenda, taskState, deadlineOf, markDone, postpone, yearCalendar, expectedHarvest, safeHarvestFrom,
-  rotationCheck, bedsOverview, addDays,
+  rotationCheck, bedsOverview, addDays, withoutV58,
 } from '../lib/garden.mjs';
 
 const MISSING_TABLE = new Set(['42P01', 'PGRST205', 'PGRST202']);
@@ -40,7 +40,7 @@ function MonthPicker({ value, onChange, legend, locale }) {
 }
 
 // Campi di un intervento (nuovo, da cambiare o proposto).
-function TaskFields({ task, onChange, tr, locale, notes = true, stock = [], edible = false }) {
+function TaskFields({ task, onChange, tr, locale, notes = true, stock = [], edible = false, v58 = true }) {
   const set = patch => onChange({ ...task, ...patch });
   const item = stock.find(s => s.id === task.stock_item_id);
   const choices = EVERY_CHOICES.includes(Number(task.every_days)) ? EVERY_CHOICES : [...EVERY_CHOICES, Number(task.every_days)].sort((a, b) => a - b);
@@ -56,17 +56,17 @@ function TaskFields({ task, onChange, tr, locale, notes = true, stock = [], edib
     <MonthPicker value={task.months} onChange={months => set({ months })} legend={tr('garden.months')} locale={locale} />
     <Field label={tr('garden.every')}><select value={String(task.every_days)} onChange={e => set({ every_days: Number(e.target.value) })}>
       {choices.map(n => <option key={n} value={n}>{n ? tr('garden.everyDays', { count: n }) : tr('garden.everyOnce')}</option>)}</select></Field>
-    {(task.kind === 'treatment' || task.wait_days !== '' && task.wait_days !== null && task.wait_days !== undefined) && <>
+    {v58 && (task.kind === 'treatment' || task.wait_days !== '' && task.wait_days !== null && task.wait_days !== undefined) && <>
       <Field label={tr('garden.waitDays')}><input type="number" inputMode="numeric" min="0" max={GARDEN_LIMITS.maxWaitDays} step="1" value={task.wait_days ?? ''} onChange={e => set({ wait_days: e.target.value })} /></Field>
       <small className={edible && task.kind === 'treatment' && (task.wait_days === '' || task.wait_days === null || task.wait_days === undefined) ? 'garden-warning' : 'muted'}>
         {edible && task.kind === 'treatment' && (task.wait_days === '' || task.wait_days === null || task.wait_days === undefined) ? tr('garden.waitMissing') : tr('garden.waitHelp')}</small>
     </>}
-    {stock.length > 0 && <div className="extra-row">
+    {v58 && stock.length > 0 && <div className="extra-row">
       <Field label={tr('garden.stockItem')}><select value={task.stock_item_id || ''} onChange={e => { const chosen = stock.find(s => s.id === e.target.value); set({ stock_item_id: e.target.value, ...(chosen && !String(task.product || '').trim() ? { product: chosen.name } : {}) }); }}>
         <option value="">{tr('garden.stockNone')}</option>{stock.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>
       {item && <Field label={tr('garden.stockUse', { unit: tr('garden.unit.' + item.unit) })}><DecimalInput decimals={3} min="0.01" max={GARDEN_LIMITS.maxStockUse} value={task.stock_use ?? ''} onChange={e => set({ stock_use: e.target.value })} /></Field>}
     </div>}
-    {stock.length > 0 && task.stock_item_id && <small className="muted">{tr('garden.stockHelp')}</small>}
+    {v58 && stock.length > 0 && task.stock_item_id && <small className="muted">{tr('garden.stockHelp')}</small>}
     <label className="extra-toggle"><input type="checkbox" checked={task.remind !== false} onChange={e => set({ remind: e.target.checked })} />{tr('garden.remind')}</label>
     {notes && <Field label={tr('garden.notes')}><textarea rows={2} maxLength={GARDEN_LIMITS.notes} value={task.notes || ''} onChange={e => set({ notes: e.target.value })} /></Field>}
   </>;
@@ -84,6 +84,7 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
   const [logForm, setLogForm] = useState(null);      // {plantId, ...voce}
   const [fullLog, setFullLog] = useState({});
   const [climate, setClimate] = useState('mild'), [climateRow, setClimateRow] = useState(null);
+  const [v58, setV58] = useState(true); // colonne della migrate_v58_giardino_orto.sql presenti
   const [stock, setStock] = useState([]), [shopping, setShopping] = useState([]);
   const today = todayRome();
   const writable = demo || canWrite;
@@ -116,6 +117,9 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
     setLoading(false);
     const failed = plan.error || done.error;
     if (failed) { onNotify(friendlyError(failed, tr)); return; }
+    // Senza la v58 (colonne dell'orto, delle scorte e dell'attesa) la sezione resta quella della v57.
+    const probe = list.data?.length ? { error: 'planted_on' in list.data[0] ? null : { code: '42703' } } : await client.from('home_garden_plants').select('planted_on').limit(1);
+    setV58(!(probe.error && ['42703', 'PGRST204'].includes(probe.error.code)));
     setMissing(false); setPlants(list.data || []); setTasks(plan.data || []); setLog(done.data || []);
   }, [client, demo, homeId, user?.id]);
   useEffect(() => { setPlants([]); setTasks([]); setLog([]); setStock([]); setShopping([]); setForm(blankPlant()); setProposal([]); setTaskForm(null); setExtra(null); setLogForm(null); load(); }, [load]);
@@ -189,7 +193,7 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
     if (!rows.length) return [];
     if ((tasksBy.get(plantId) || []).length + rows.length > GARDEN_LIMITS.tasksPerPlant) { onNotify(tr('garden.error.taskLimit')); return null; }
     if (demo) { const made = rows.map(r => ({ ...r, id: uid() })); setTasks(all => [...all, ...made]); return made; }
-    const { data, error } = await client.from('home_garden_tasks').insert(rows).select('*');
+    const { data, error } = await client.from('home_garden_tasks').insert(v58 ? rows : rows.map(r => withoutV58('home_garden_tasks', r))).select('*');
     if (error) { onNotify(friendlyError(error, tr)); return null; }
     setTasks(all => [...all, ...(data || [])]);
     return data || [];
@@ -207,7 +211,7 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
       if (form.id) {
         if (demo) setPlants(list => list.map(p => (p.id === form.id ? { ...p, ...result.value } : p)));
         else {
-          const { error } = await client.from('home_garden_plants').update(result.value).eq('id', form.id);
+          const { error } = await client.from('home_garden_plants').update(v58 ? result.value : withoutV58('home_garden_plants', result.value)).eq('id', form.id);
           if (error) { onNotify(friendlyError(error, tr)); return; }
           setPlants(list => list.map(p => (p.id === form.id ? { ...p, ...result.value } : p)));
         }
@@ -216,7 +220,7 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
         let plant;
         if (demo) plant = { ...result.value, id: uid(), home_id: homeId || null };
         else {
-          const { data, error } = await client.from('home_garden_plants').insert({ ...result.value, user_id: user.id, home_id: homeId || null }).select('*').single();
+          const { data, error } = await client.from('home_garden_plants').insert({ ...(v58 ? result.value : withoutV58('home_garden_plants', result.value)), user_id: user.id, home_id: homeId || null }).select('*').single();
           if (error) { onNotify(friendlyError(error, tr)); return; }
           plant = data;
         }
@@ -274,7 +278,7 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
         onNotify(tr('garden.taskSaved'));
       } else {
         if (!demo) {
-          const { error } = await client.from('home_garden_tasks').update(result.value).eq('id', id);
+          const { error } = await client.from('home_garden_tasks').update(v58 ? result.value : withoutV58('home_garden_tasks', result.value)).eq('id', id);
           if (error) { onNotify(friendlyError(error, tr)); return; }
         }
         setTasks(list => list.map(t => (t.id === id ? { ...t, ...result.value } : t)));
@@ -309,7 +313,7 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
 
   async function writeLog(plantId, entry) {
     if (demo) { const row = { ...entry, plant_id: plantId, id: uid(), created_at: new Date().toISOString() }; setLog(list => [row, ...list]); return true; }
-    const { data, error } = await client.from('home_garden_log').insert({ ...entry, plant_id: plantId }).select('*').single();
+    const { data, error } = await client.from('home_garden_log').insert({ ...(v58 ? entry : withoutV58('home_garden_log', entry)), plant_id: plantId }).select('*').single();
     if (error) { onNotify(friendlyError(error, tr)); return false; }
     setLog(list => [data, ...list].sort((a, b) => b.done_on.localeCompare(a.done_on)));
     return true;
@@ -404,7 +408,7 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
           <span><b>{item.title}</b><small>{summary(item)}</small></span></label>
         {item.use && <button type="button" className="btn btn-soft" aria-expanded={item.open} onClick={() => set({ open: !item.open })}>{tr(item.open ? 'garden.close' : 'garden.change')}</button>}
       </div>
-      {item.use && item.open && <div className="garden-proposal-edit"><TaskFields task={item} onChange={next => set(next)} tr={tr} locale={locale} notes={false} stock={demo ? [] : stock} edible={edible} /></div>}
+      {item.use && item.open && <div className="garden-proposal-edit"><TaskFields task={item} onChange={next => set(next)} tr={tr} locale={locale} notes={false} stock={demo ? [] : stock} edible={edible} v58={v58} /></div>}
     </li>;
   })}</ul>;
 
@@ -453,7 +457,7 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
             <Field label={tr('garden.location')}><input maxLength={GARDEN_LIMITS.location} value={form.location} placeholder={tr('garden.locationPlaceholder')} onChange={e => setPlantField({ location: e.target.value })} /></Field>
           </div>
           <Field label={tr('garden.notes')}><textarea rows={2} maxLength={GARDEN_LIMITS.notes} value={form.notes} onChange={e => setPlantField({ notes: e.target.value })} /></Field>
-          {(GARDEN_CROPS.includes(form.kind) || form.bed || form.family || form.planted_on) && <fieldset className="garden-crop">
+          {v58 && (GARDEN_CROPS.includes(form.kind) || form.bed || form.family || form.planted_on) && <fieldset className="garden-crop">
             <legend>{tr('garden.vegetableGarden')}</legend>
             <div className="extra-row">
               <Field label={tr('garden.plantedOn')}><input type="date" value={form.planted_on} onChange={e => setPlantField({ planted_on: e.target.value })} /></Field>
@@ -501,7 +505,7 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
               {plant.notes && <p className="garden-notes">{plant.notes}</p>}
               {(harvest || plant.family) && <p className="garden-notes">{[plant.family ? familyLabel(plant.family) : '', harvest ? tr('garden.expectedHarvest', { date: day(harvest) }) : ''].filter(Boolean).join(' · ')}</p>}
               {writable && <div className="extra-buttons">
-                <button className="btn btn-soft" aria-label={tr('garden.endCropAria', { name: plant.name })} onClick={() => setEnded(plant, today)}><Archive size={15} /> {tr('garden.endCrop')}</button>
+                {v58 && <button className="btn btn-soft" aria-label={tr('garden.endCropAria', { name: plant.name })} onClick={() => setEnded(plant, today)}><Archive size={15} /> {tr('garden.endCrop')}</button>}
                 <button className="icon-button" aria-label={tr('garden.editPlantAria', { name: plant.name })} title={tr('garden.edit')} onClick={() => editPlant(plant)}><Pencil size={15} /></button>
                 <button className="icon-button danger" aria-label={tr('garden.deletePlantAria', { name: plant.name })} title={tr('garden.delete')} onClick={() => deletePlant(plant)}><Trash2 size={15} /></button>
               </div>}
@@ -522,7 +526,7 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
                     </div>}
                   </div>
                   {editing && <form className="extra-form garden-inline" onSubmit={saveTask}>
-                    <TaskFields task={taskForm} onChange={next => setTaskForm(f => ({ ...f, ...next }))} tr={tr} locale={locale} stock={demo ? [] : stock} edible={EDIBLE_KINDS.includes(plant.kind)} />
+                    <TaskFields task={taskForm} onChange={next => setTaskForm(f => ({ ...f, ...next }))} tr={tr} locale={locale} stock={demo ? [] : stock} edible={EDIBLE_KINDS.includes(plant.kind)} v58={v58} />
                     <div className="extra-buttons"><button className="btn btn-primary" disabled={working}>{tr('garden.saveTask')}</button><button type="button" className="btn btn-soft" onClick={() => setTaskForm(null)}>{tr('garden.cancel')}</button></div>
                   </form>}
                 </li>;
@@ -534,7 +538,7 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
               </div>}
               {taskForm?.plantId === plant.id && !taskForm.id && <form className="extra-form garden-inline" onSubmit={saveTask}>
                 <h3>{tr('garden.addTask')}</h3>
-                <TaskFields task={taskForm} onChange={next => setTaskForm(f => ({ ...f, ...next }))} tr={tr} locale={locale} stock={demo ? [] : stock} edible={EDIBLE_KINDS.includes(plant.kind)} />
+                <TaskFields task={taskForm} onChange={next => setTaskForm(f => ({ ...f, ...next }))} tr={tr} locale={locale} stock={demo ? [] : stock} edible={EDIBLE_KINDS.includes(plant.kind)} v58={v58} />
                 <div className="extra-buttons"><button className="btn btn-primary" disabled={working}>{tr('garden.saveTask')}</button><button type="button" className="btn btn-soft" onClick={() => setTaskForm(null)}>{tr('garden.cancel')}</button></div>
               </form>}
               {extra?.plantId === plant.id && <form className="extra-form garden-inline" onSubmit={addExtra}>
@@ -560,7 +564,7 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
                   <Field label={tr('garden.product')}><input maxLength={GARDEN_LIMITS.product} value={logForm.product} placeholder={tr('garden.productPlaceholder')} onChange={e => setLogForm(f => ({ ...f, product: e.target.value }))} /></Field>
                   <Field label={tr('garden.dose')}><input maxLength={GARDEN_LIMITS.dose} value={logForm.dose} placeholder={tr('garden.dosePlaceholder')} onChange={e => setLogForm(f => ({ ...f, dose: e.target.value }))} /></Field>
                 </div>
-                {(logForm.kind === 'treatment' || logForm.wait_days !== '') && <Field label={tr('garden.waitDays')}><input type="number" inputMode="numeric" min="0" max={GARDEN_LIMITS.maxWaitDays} step="1" value={logForm.wait_days ?? ''} onChange={e => setLogForm(f => ({ ...f, wait_days: e.target.value }))} /></Field>}
+                {v58 && (logForm.kind === 'treatment' || logForm.wait_days !== '') && <Field label={tr('garden.waitDays')}><input type="number" inputMode="numeric" min="0" max={GARDEN_LIMITS.maxWaitDays} step="1" value={logForm.wait_days ?? ''} onChange={e => setLogForm(f => ({ ...f, wait_days: e.target.value }))} /></Field>}
                 <Field label={tr('garden.notes')}><textarea rows={2} maxLength={GARDEN_LIMITS.notes} value={logForm.notes} onChange={e => setLogForm(f => ({ ...f, notes: e.target.value }))} /></Field>
                 <div className="extra-buttons"><button className="btn btn-primary" disabled={working}>{tr('garden.logSave')}</button><button type="button" className="btn btn-soft" onClick={() => setLogForm(null)}>{tr('garden.cancel')}</button></div>
               </form>}

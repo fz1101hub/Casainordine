@@ -342,3 +342,19 @@ test('promemoria: niente avvisi per le colture finite', async () => {
   await processGardenAlerts(fakeAdmin(tables), today, { errors: [] });
   assert.deepEqual(tables.user_alerts.map(a => a.reference_id), ['t2']);
 });
+
+test('prima della migrazione v58 la schermata non scrive le colonne nuove', async () => {
+  const { withoutV58, V58_FIELDS } = await import('../lib/garden.mjs');
+  assert.deepEqual(withoutV58('home_garden_plants', { name: 'Pomodori', bed: 'A', family: 'solanaceae', planted_on: null, harvest_days: 75, ended_on: null, kind: 'vegetable' }), { name: 'Pomodori', kind: 'vegetable' });
+  assert.deepEqual(withoutV58('home_garden_tasks', { title: 'Rame', wait_days: 20, stock_item_id: 's', stock_use: 1, months: [6] }), { title: 'Rame', months: [6] });
+  assert.deepEqual(withoutV58('home_garden_log', { title: 'Rame', wait_days: 20 }), { title: 'Rame' });
+  const sql = readFileSync(new URL('../supabase/migrate_v58_giardino_orto.sql', import.meta.url), 'utf8');
+  for (const [table, columns] of Object.entries(V58_FIELDS)) for (const column of columns)
+    assert.match(sql, new RegExp(`alter table public\\.${table} add column if not exists ${column}\\b`), `${table}.${column}`);
+  const screen = readFileSync(new URL('../app/Garden.jsx', import.meta.url), 'utf8');
+  const writes = screen.match(/from\('home_garden_(plants|tasks|log)'\)\.(insert|update)\(/g) || [];
+  // Eccezioni: ended_on (pulsante nascosto senza v58) e patch di updateTask (solo next_on e last_done_on).
+  const guarded = screen.match(/from\('home_garden_(plants|tasks|log)'\)\.(insert|update)\((\{ \.\.\.\()?(v58 \?|\{ ended_on|patch\))/g) || [];
+  assert.equal(guarded.length, writes.length, 'ogni scrittura passa da withoutV58');
+  assert.match(screen, /const patch = markDone\(task, today\);/);
+});

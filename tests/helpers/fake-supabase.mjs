@@ -98,8 +98,10 @@ const EMBED = { homes: 'home_id', bills: 'bill_id' };
 // maxRows: come l'impostazione «Max rows» di Supabase (1000 sul progetto vero), nessuna risposta
 // supera quel numero di righe, qualunque sia limit o range.
 // maxUrl: lunghezza massima dell'indirizzo (Supabase: 16 KB fra indirizzo e intestazioni, poi errore 520).
+// missingColumns: { tabella: [colonne] } che il database non ha ancora (migrazione non eseguita):
+// chiederle o scriverle dà l'errore di PostgREST, con select=* non tornano.
 // tokenTtl: durata dei token in secondi (le prove con l'orologio del browser spostato in avanti ne usano una più lunga).
-export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = false, latency = 0, maxRows = Infinity, maxUrl = Infinity, tokenTtl = 3600 } = {}) {
+export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = false, latency = 0, maxRows = Infinity, maxUrl = Infinity, tokenTtl = 3600, missingColumns = {} } = {}) {
   const state = { tables: {}, tokens: new Map(), users: new Map(), passwords: new Map(), rpc: {}, removed: [], files: {}, uploads: [], requests: [], deletedUsers: [], rejectKeys: new Set() };
   const table = name => (state.tables[name] ||= []);
   const isOwner = (user, homeId) => table('homes').some(h => h.id === homeId && h.owner_id === user.id);
@@ -289,8 +291,17 @@ export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = fa
       if (!prefer.includes('return=representation') && req.method !== 'GET') return send(status === 200 ? 204 : status, undefined, headers);
       return send(status, list, headers);
     };
+    const absent = missingColumns[name] || [];
+    if (absent.length) {
+      const asked = String(url.searchParams.get('select') || '').split(',').map(c => c.trim().split(':').pop());
+      const missing = asked.find(c => absent.includes(c));
+      if (missing) return send(400, { code: '42703', message: `column ${name}.${missing} does not exist` });
+      const written = [].concat(body || []).flatMap(r => (r && typeof r === 'object' ? Object.keys(r) : [])).find(c => absent.includes(c));
+      if (written && req.method !== 'GET') return send(400, { code: 'PGRST204', message: `Could not find the '${written}' column of '${name}' in the schema cache` });
+    }
+    const strip = list => (absent.length ? list.map(r => Object.fromEntries(Object.entries(r).filter(([k]) => !absent.includes(k)))) : list);
     if (req.method === 'GET' || req.method === 'HEAD') {
-      let list = selected();
+      let list = strip(selected());
       const order = url.searchParams.get('order');
       if (order) {
         const [col, dir] = order.split(',')[0].split('.');
