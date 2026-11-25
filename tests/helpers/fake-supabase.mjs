@@ -231,6 +231,17 @@ export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = fa
       }
       return user ? send(200, user) : send(404, { code: 404, msg: 'User not found' });
     }
+    // Storage: collegamenti temporanei (createSignedUrls) e scaricamento con il collegamento.
+    const sign = path.match(/^\/storage\/v1\/object\/sign\/([^/]+)(?:\/(.+))?$/);
+    if (sign) {
+      const [, bucket, name] = sign.map(v => (v === undefined ? v : decodeURIComponent(v)));
+      if (req.method === 'POST' && !name) return send(200, (body?.paths || []).map(p => ({ path: p, signedURL: `/object/sign/${bucket}/${p}?token=finto`, error: (state.files[bucket] || []).some(f => f.name === p) ? null : 'Object not found' })));
+      if (req.method === 'GET' && name) {
+        const file = (state.files[bucket] || []).find(f => f.name === name);
+        if (!file) return send(400, { statusCode: '404', error: 'not_found', message: 'Object not found' });
+        res.writeHead(200, { 'content-type': file.type || 'application/octet-stream', ...cors }); return res.end(file.bytes);
+      }
+    }
     // Storage: file singoli (caricamento e scaricamento)
     const object = path.match(/^\/storage\/v1\/object\/(?:authenticated\/)?([^/]+)\/(.+)$/);
     if (object && object[1] !== 'list' && ['GET', 'POST', 'PUT'].includes(req.method)) {

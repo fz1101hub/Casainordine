@@ -131,6 +131,9 @@ jobs:
       - name: Giardino e orto
         timeout-minutes: 5
         run: node scripts/prove-giardino.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
+      - name: Foto e diario delle piante
+        timeout-minutes: 4
+        run: node scripts/prove-foto-piante.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
 
   database:
     # Migrazioni e prove del database su PostgreSQL 17 (la versione di Supabase), con un

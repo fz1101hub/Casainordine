@@ -4,7 +4,7 @@
 // cambiare prima di salvare; «Da fare» con fatto e rimanda; registro di quello che si è fatto.
 // I promemoria li manda il lavoro giornaliero (lib/garden-alerts.mjs).
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Sprout, CalendarCheck, CalendarDays, Clock, BellOff, Pencil, Trash2, Plus, Info, Check, NotebookPen, ShoppingBasket, ShieldAlert, LayoutGrid, Archive, RotateCcw } from 'lucide-react';
+import { Sprout, CalendarCheck, CalendarDays, Clock, BellOff, Pencil, Trash2, Plus, Info, Check, NotebookPen, ShoppingBasket, ShieldAlert, LayoutGrid, Archive, RotateCcw, Camera } from 'lucide-react';
 import { useLanguage, useSection } from './LanguageProvider';
 import { askConfirm } from './ConfirmDialog';
 import { friendlyError } from '../lib/friendly-error.mjs';
@@ -12,8 +12,10 @@ import { todayRome } from '../lib/dates.mjs';
 import { selectAll, selectIn } from '../lib/select-all.mjs';
 import { stockStatus, titleKey } from '../lib/stock.mjs';
 import DecimalInput from './DecimalInput';
+import { uploadHouseDocument, IMAGE_MIME_TYPES } from '../lib/document-upload.mjs';
+import { preparePhoto } from '../lib/image-prepare.js';
 import {
-  TASK_KINDS, PLANT_KINDS, GARDEN_LIMITS, EVERY_CHOICES, PRESET_KEYS, ALL_MONTHS, CLIMATES, FAMILIES, EDIBLE_KINDS, monthWindows, normalizePlant, normalizeTask, normalizeLog,
+  TASK_KINDS, LOG_KINDS, PLANT_KINDS, GARDEN_LIMITS, EVERY_CHOICES, PRESET_KEYS, ALL_MONTHS, CLIMATES, FAMILIES, EDIBLE_KINDS, monthWindows, normalizePlant, normalizeTask, normalizeLog,
   presetTasks, presetPlant, missingPresetTasks, gardenAgenda, taskState, deadlineOf, markDone, postpone, yearCalendar, expectedHarvest, safeHarvestFrom,
   rotationCheck, bedsOverview, addDays, withoutV58,
 } from '../lib/garden.mjs';
@@ -22,7 +24,8 @@ const MISSING_TABLE = new Set(['42P01', 'PGRST205', 'PGRST202']);
 const uid = () => (globalThis.crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
 const blankPlant = () => ({ id: null, preset: '', name: '', kind: 'other', location: '', notes: '', planted_on: '', harvest_days: '', bed: '', family: '' });
 const blankTask = () => ({ id: null, kind: 'fertilize', title: '', product: '', dose: '', notes: '', months: [], every_days: 0, remind: true, wait_days: '', stock_item_id: '', stock_use: '' });
-const blankLog = today => ({ done_on: today, task_id: '', kind: 'other', title: '', product: '', dose: '', notes: '', wait_days: '' });
+const blankLog = today => ({ done_on: today, task_id: '', kind: 'other', title: '', product: '', dose: '', notes: '', wait_days: '', photo: null });
+const PHOTO_ACCEPT = 'image/jpeg,image/png,image/webp,.heic,.heif,image/heic,image/heif';
 const GARDEN_CROPS = ['vegetable', 'herb'];
 
 function Field({ label, children }) { return <label className="extra-field">{label}{children}</label>; }
@@ -86,9 +89,21 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
   const [climate, setClimate] = useState('mild'), [climateRow, setClimateRow] = useState(null);
   const [v58, setV58] = useState(true); // colonne della migrate_v58_giardino_orto.sql presenti
   const [stock, setStock] = useState([]), [shopping, setShopping] = useState([]);
+  // Foto delle piante (migrate_v59): foto, documenti con il collegamento temporaneo, modulo aperto.
+  const [photos, setPhotos] = useState([]), [docs, setDocs] = useState({}), [photosOn, setPhotosOn] = useState(true), [photoForm, setPhotoForm] = useState(null), [photoBusy, setPhotoBusy] = useState(false);
   const today = todayRome();
   const writable = demo || canWrite;
   const day = iso => (iso ? date(iso, { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
+
+  // Collegamenti temporanei alle foto (un'ora), solo per chi può vedere il documento.
+  const attachDocuments = useCallback(async ids => {
+    if (!ids.length || !client) return {};
+    const { data } = await selectIn((part, count) => client.from('home_documents').select('id,storage_path,name,mime_type', count ? { count: 'exact' } : undefined).in('id', part).order('id'), ids);
+    const rows = data || [];
+    const signed = rows.length ? await client.storage.from('house-documents').createSignedUrls(rows.map(r => r.storage_path), 3600) : { data: [] };
+    const urls = new Map((signed.data || []).map(s => [s.path, s.signedUrl]));
+    return Object.fromEntries(rows.map(r => [r.id, { ...r, url: urls.get(r.storage_path) || '' }]));
+  }, [client]);
 
   const load = useCallback(async () => {
     if (demo || !client || !user?.id) { setLoading(false); return; }
@@ -121,8 +136,14 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
     const probe = list.data?.length ? { error: 'planted_on' in list.data[0] ? null : { code: '42703' } } : await client.from('home_garden_plants').select('planted_on').limit(1);
     setV58(!(probe.error && ['42703', 'PGRST204'].includes(probe.error.code)));
     setMissing(false); setPlants(list.data || []); setTasks(plan.data || []); setLog(done.data || []);
+    // Foto: senza la v59 la tabella non c'è e la sezione resta senza foto e senza note di diario.
+    const pics = await selectIn((part, count) => client.from('home_garden_photos').select('*', count ? { count: 'exact' } : undefined).in('plant_id', part).order('taken_on', { ascending: false }).order('id'), ids);
+    if (pics.error) { setPhotosOn(false); setPhotos([]); return; }
+    setPhotosOn(true); setPhotos(pics.data || []);
+    setDocs(await attachDocuments([...new Set((pics.data || []).map(f => f.document_id))]));
   }, [client, demo, homeId, user?.id]);
-  useEffect(() => { setPlants([]); setTasks([]); setLog([]); setStock([]); setShopping([]); setForm(blankPlant()); setProposal([]); setTaskForm(null); setExtra(null); setLogForm(null); load(); }, [load]);
+
+  useEffect(() => { setPlants([]); setTasks([]); setLog([]); setStock([]); setShopping([]); setForm(blankPlant()); setProposal([]); setTaskForm(null); setExtra(null); setLogForm(null); setPhotos([]); setDocs({}); setPhotoForm(null); load(); }, [load]);
 
   const plantsById = useMemo(() => new Map(plants.map(p => [p.id, p])), [plants]);
   const activePlants = useMemo(() => plants.filter(p => !p.ended_on), [plants]);
@@ -312,11 +333,56 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
   }
 
   async function writeLog(plantId, entry) {
-    if (demo) { const row = { ...entry, plant_id: plantId, id: uid(), created_at: new Date().toISOString() }; setLog(list => [row, ...list]); return true; }
+    if (demo) { const row = { ...entry, plant_id: plantId, id: uid(), created_at: new Date().toISOString() }; setLog(list => [row, ...list]); return row; }
     const { data, error } = await client.from('home_garden_log').insert({ ...(v58 ? entry : withoutV58('home_garden_log', entry)), plant_id: plantId }).select('*').single();
     if (error) { onNotify(friendlyError(error, tr)); return false; }
     setLog(list => [data, ...list].sort((a, b) => b.done_on.localeCompare(a.done_on)));
-    return true;
+    return data;
+  }
+
+  // Foto di una pianta: JPEG leggero (anche dall'iPhone), nell'archivio dello stesso spazio, poi la
+  // riga che la lega alla pianta (e, se c'è, alla riga del registro).
+  async function addPhoto(plant, picked, { taken_on = today, caption = '', log_id = null } = {}) {
+    if (!picked) return false;
+    setPhotoBusy(true);
+    try {
+      let file;
+      try { file = (await preparePhoto(picked)).file; } catch (error) { onNotify(friendlyError(error, tr)); return false; }
+      if (!IMAGE_MIME_TYPES.includes(file.type)) { onNotify(tr('garden.photoError')); return false; }
+      if ((photos.filter(f => f.plant_id === plant.id)).length >= GARDEN_LIMITS.photosPerPlant) { onNotify(tr('garden.error.photoLimit')); return false; }
+      const row = { plant_id: plant.id, log_id, caption: String(caption || '').trim().slice(0, GARDEN_LIMITS.caption), taken_on: taken_on || today };
+      if (demo) {
+        const id = uid();
+        setDocs(all => ({ ...all, [id]: { id, name: file.name, mime_type: file.type, url: URL.createObjectURL(file) } }));
+        setPhotos(list => [{ ...row, id: uid(), document_id: id }, ...list]);
+        onNotify(tr('garden.photoSaved'));
+        return true;
+      }
+      let documentId;
+      try { documentId = (await uploadHouseDocument(client, { file, userId: user.id, homeId: homeId || null, docType: 'altro', notes: plant.name, types: IMAGE_MIME_TYPES })).id; }
+      catch (error) { onNotify(error?.i18nKey ? tr(error.i18nKey) : tr('extra.archive.uploadError', { error: friendlyError(error, tr) })); return false; }
+      if (photos.some(f => f.plant_id === plant.id && f.document_id === documentId)) { onNotify(tr('garden.photoAlready')); return false; }
+      const { data, error } = await client.from('home_garden_photos').insert({ ...row, document_id: documentId }).select('*').single();
+      if (error) { onNotify(friendlyError(error, tr)); return false; }
+      const attached = await attachDocuments([documentId]);
+      setDocs(all => ({ ...all, ...attached }));
+      setPhotos(list => [data, ...list].sort((a, b) => b.taken_on.localeCompare(a.taken_on)));
+      onNotify(tr('garden.photoSaved'));
+      return true;
+    } finally { setPhotoBusy(false); }
+  }
+
+  // Togliere una foto la toglie anche dall'archivio: il file non serve più a nient'altro.
+  async function removePhoto(photo) {
+    if (!(await askConfirm(tr('garden.deletePhotoConfirm'), { danger: true }))) return;
+    if (!demo) {
+      const document = docs[photo.document_id];
+      if (document?.storage_path) { const { error } = await client.storage.from('house-documents').remove([document.storage_path]); if (error) { onNotify(friendlyError(error, tr)); return; } }
+      const { error } = await client.from('home_documents').delete().eq('id', photo.document_id);
+      if (error) { onNotify(friendlyError(error, tr)); return; }
+    }
+    setPhotos(list => list.filter(f => f.id !== photo.id));
+    onNotify(tr('garden.photoDeleted'));
   }
 
   async function done(task) {
@@ -369,12 +435,14 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
 
   async function saveLog(event) {
     event.preventDefault();
-    const { plantId, ...input } = logForm;
+    const { plantId, photo, ...input } = logForm;
     const result = normalizeLog(input, today);
     if (result.error) { onNotify(tr(result.error)); return; }
     setWorking(true);
     try {
-      if (!(await writeLog(plantId, result.value))) return;
+      const written = await writeLog(plantId, result.value);
+      if (!written) return;
+      if (photo && photosOn) await addPhoto(plantsById.get(plantId), photo, { taken_on: result.value.done_on, caption: result.value.kind === 'note' ? result.value.title : '', log_id: written.id });
       // Un intervento del piano fatto in una data più recente dell'ultima: si sposta la prossima data.
       const task = result.value.task_id ? tasks.find(t => t.id === result.value.task_id) : null;
       if (task && (!task.last_done_on || result.value.done_on > task.last_done_on)) await updateTask(task, markDone(task, result.value.done_on, today));
@@ -494,6 +562,13 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
           const next = plan.find(t => t.next_on);
           const missingTasks = writable && plant.preset ? missingPresetTasks(plant, plan, tr, today, climate).map(t => ({ ...t, wait_days: '', stock_item_id: '', stock_use: '' })) : [];
           const shownLog = fullLog[plant.id] ? entries : entries.slice(0, 5);
+          const plantPhotos = photos.filter(f => f.plant_id === plant.id);
+          // Una foto: miniatura che apre il file, data e didascalia, e il cestino per chi può modificare.
+          const photoFigure = photo => <figure key={photo.id}>
+            {docs[photo.document_id]?.url ? <a href={docs[photo.document_id].url} target="_blank" rel="noopener noreferrer"><img src={docs[photo.document_id].url} alt={tr('garden.photoAlt', { plant: plant.name, date: day(photo.taken_on) })} loading="lazy" /></a> : <div className="project-photo-missing"><Camera size={18} /></div>}
+            <figcaption>{day(photo.taken_on)}{photo.caption ? ' · ' + photo.caption : ''}</figcaption>
+            {writable && <button className="icon-button danger" aria-label={tr('garden.deletePhotoAria', { date: day(photo.taken_on) })} title={tr('garden.deletePhoto')} onClick={() => removePhoto(photo)}><Trash2 size={13} /></button>}
+          </figure>;
           const safeFrom = EDIBLE_KINDS.includes(plant.kind) ? safeHarvestFrom(entries, today) : null;
           const harvest = expectedHarvest(plant);
           return <details key={plant.id} className="garden-plant" open={Boolean(open[plant.id])} onToggle={e => { const isOpen = e.currentTarget.open; setOpen(o => (o[plant.id] === isOpen ? o : { ...o, [plant.id]: isOpen })); }}>
@@ -535,6 +610,19 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
                 <button className="btn btn-soft" aria-expanded={taskForm?.plantId === plant.id && !taskForm.id} onClick={() => setTaskForm(taskForm?.plantId === plant.id && !taskForm.id ? null : { ...blankTask(), plantId: plant.id })}><Plus size={15} /> {tr('garden.addTask')}</button>
                 {missingTasks.length > 0 && <button className="btn btn-soft" aria-expanded={extra?.plantId === plant.id} onClick={() => setExtra(extra?.plantId === plant.id ? null : { plantId: plant.id, items: missingTasks.map(t => ({ ...t, use: true, open: false })) })}>{tr('garden.addMissing', { count: missingTasks.length })}</button>}
                 <button className="btn btn-soft" aria-expanded={logForm?.plantId === plant.id} onClick={() => setLogForm(logForm?.plantId === plant.id ? null : { ...blankLog(today), plantId: plant.id })}><NotebookPen size={15} /> {tr('garden.logAdd')}</button>
+                {photosOn && <button className="btn btn-soft" onClick={() => setLogForm({ ...blankLog(today), kind: 'note', plantId: plant.id })}><NotebookPen size={15} /> {tr('garden.addNote')}</button>}
+                {photosOn && <button className="btn btn-soft" aria-expanded={photoForm?.plantId === plant.id} onClick={() => setPhotoForm(photoForm?.plantId === plant.id ? null : { plantId: plant.id, taken_on: today, caption: '' })}><Camera size={15} /> {tr('garden.addPhoto')}</button>}
+              </div>}
+              {photoForm?.plantId === plant.id && <div className="extra-form garden-inline">
+                <h3>{tr('garden.addPhoto')}</h3>
+                <div className="extra-row">
+                  <Field label={tr('garden.photoDate')}><input type="date" max={today} value={photoForm.taken_on} onChange={e => setPhotoForm(f => ({ ...f, taken_on: e.target.value }))} /></Field>
+                  <Field label={tr('garden.photoCaption')}><input maxLength={GARDEN_LIMITS.caption} value={photoForm.caption} placeholder={tr('garden.photoCaptionPlaceholder')} onChange={e => setPhotoForm(f => ({ ...f, caption: e.target.value }))} /></Field>
+                </div>
+                <div className="extra-buttons">
+                  <label className="btn btn-primary"><Camera size={15} /> {photoBusy ? tr('general.loading') : tr('garden.photoChoose')}<input type="file" accept={PHOTO_ACCEPT} hidden disabled={photoBusy} onChange={async e => { const picked = e.target.files?.[0]; e.target.value = ''; if (await addPhoto(plant, picked, photoForm)) setPhotoForm(null); }} /></label>
+                  <button type="button" className="btn btn-soft" onClick={() => setPhotoForm(null)}>{tr('garden.cancel')}</button>
+                </div>
               </div>}
               {taskForm?.plantId === plant.id && !taskForm.id && <form className="extra-form garden-inline" onSubmit={saveTask}>
                 <h3>{tr('garden.addTask')}</h3>
@@ -557,7 +645,7 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
                   }}><option value="">{tr('garden.taskNone')}</option>{plan.map(t => <option key={t.id} value={t.id}>{t.title}</option>)}</select></Field>
                 </div>
                 <div className="extra-row">
-                  <Field label={tr('garden.taskKind')}><select value={logForm.kind} onChange={e => setLogForm(f => ({ ...f, kind: e.target.value }))}>{TASK_KINDS.map(k => <option key={k} value={k}>{tr('garden.kind.' + k)}</option>)}</select></Field>
+                  <Field label={tr('garden.taskKind')}><select value={logForm.kind} onChange={e => setLogForm(f => ({ ...f, kind: e.target.value }))}>{(photosOn ? LOG_KINDS : TASK_KINDS).map(k => <option key={k} value={k}>{tr('garden.kind.' + k)}</option>)}</select></Field>
                   <Field label={tr('garden.taskTitle')}><input required minLength={2} maxLength={GARDEN_LIMITS.title} value={logForm.title} placeholder={tr('garden.taskTitlePlaceholder')} onChange={e => setLogForm(f => ({ ...f, title: e.target.value }))} /></Field>
                 </div>
                 <div className="extra-row">
@@ -566,14 +654,20 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
                 </div>
                 {v58 && (logForm.kind === 'treatment' || logForm.wait_days !== '') && <Field label={tr('garden.waitDays')}><input type="number" inputMode="numeric" min="0" max={GARDEN_LIMITS.maxWaitDays} step="1" value={logForm.wait_days ?? ''} onChange={e => setLogForm(f => ({ ...f, wait_days: e.target.value }))} /></Field>}
                 <Field label={tr('garden.notes')}><textarea rows={2} maxLength={GARDEN_LIMITS.notes} value={logForm.notes} onChange={e => setLogForm(f => ({ ...f, notes: e.target.value }))} /></Field>
-                <div className="extra-buttons"><button className="btn btn-primary" disabled={working}>{tr('garden.logSave')}</button><button type="button" className="btn btn-soft" onClick={() => setLogForm(null)}>{tr('garden.cancel')}</button></div>
+                {photosOn && <Field label={tr('garden.logPhoto')}><input type="file" accept={PHOTO_ACCEPT} onChange={e => setLogForm(f => ({ ...f, photo: e.target.files?.[0] || null }))} /></Field>}
+                <div className="extra-buttons"><button className="btn btn-primary" disabled={working || photoBusy}>{tr('garden.logSave')}</button><button type="button" className="btn btn-soft" onClick={() => setLogForm(null)}>{tr('garden.cancel')}</button></div>
               </form>}
               <h3>{tr('garden.log')}</h3>
               {!entries.length ? <p className="muted">{tr('garden.logEmpty')}</p> : <ul className="garden-log">{shownLog.map(entry => <li key={entry.id}>
-                <span><b>{day(entry.done_on)}</b> · {entry.title}{entry.product ? ' · ' + entry.product : ''}{entry.dose ? ' · ' + entry.dose : ''}{entry.notes ? <small>{entry.notes}</small> : null}</span>
+                <span><b>{day(entry.done_on)}</b> · {entry.kind === 'note' ? <NotebookPen size={13} aria-label={tr('garden.kind.note')} /> : null} {entry.title}{entry.product ? ' · ' + entry.product : ''}{entry.dose ? ' · ' + entry.dose : ''}{entry.notes ? <small>{entry.notes}</small> : null}
+                  {plantPhotos.some(f => f.log_id === entry.id) && <span className="project-photo-row">{plantPhotos.filter(f => f.log_id === entry.id).map(photoFigure)}</span>}</span>
                 {writable && <button className="icon-button danger" aria-label={tr('garden.logDeleteAria', { title: entry.title, date: day(entry.done_on) })} title={tr('garden.delete')} onClick={() => deleteLog(entry)}><Trash2 size={14} /></button>}
               </li>)}</ul>}
               {entries.length > shownLog.length && <button className="btn btn-soft" onClick={() => setFullLog(f => ({ ...f, [plant.id]: true }))}>{tr('garden.logMore')}</button>}
+              {photosOn && <>
+                <h3>{tr('garden.photos')}</h3>
+                {!plantPhotos.length ? <p className="muted">{tr('garden.photosEmpty')}</p> : <div className="project-photo-row garden-photos">{plantPhotos.map(photoFigure)}</div>}
+              </>}
             </div>
           </details>;
         })}</div>}
