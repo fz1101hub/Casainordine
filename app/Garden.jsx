@@ -23,13 +23,14 @@ const blankLog = today => ({ done_on: today, task_id: '', kind: 'other', title: 
 
 function Field({ label, children }) { return <label className="extra-field">{label}{children}</label>; }
 
-// Dodici mesi da accendere o spegnere.
+// Dodici mesi da accendere o spegnere. Il nome accessibile è quello scritto (WCAG 2.5.3: chi usa
+// la voce dice quello che vede); il nome intero è nel suggerimento.
 function MonthPicker({ value, onChange, legend, locale }) {
   const names = useMemo(() => ALL_MONTHS.map(m => new Intl.DateTimeFormat(locale, { month: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2026, m - 1, 15)))), [locale]);
   const full = useMemo(() => ALL_MONTHS.map(m => new Intl.DateTimeFormat(locale, { month: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(2026, m - 1, 15)))), [locale]);
   const set = new Set(value || []);
   return <fieldset className="garden-months"><legend>{legend}</legend><div>
-    {ALL_MONTHS.map((m, i) => <button type="button" key={m} aria-pressed={set.has(m)} aria-label={full[i]} title={full[i]}
+    {ALL_MONTHS.map((m, i) => <button type="button" key={m} aria-pressed={set.has(m)} title={full[i]}
       onClick={() => onChange(set.has(m) ? [...set].filter(x => x !== m) : [...set, m].sort((a, b) => a - b))}>{names[i]}</button>)}
   </div></fieldset>;
 }
@@ -159,7 +160,7 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
         let plant;
         if (demo) plant = { ...result.value, id: uid(), home_id: homeId || null };
         else {
-          const { data, error } = await client.from('home_garden_plants').insert({ ...result.value, home_id: homeId || null }).select('*').single();
+          const { data, error } = await client.from('home_garden_plants').insert({ ...result.value, user_id: user.id, home_id: homeId || null }).select('*').single();
           if (error) { onNotify(friendlyError(error, tr)); return; }
           plant = data;
         }
@@ -282,7 +283,7 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
       if (!(await writeLog(plantId, result.value))) return;
       // Un intervento del piano fatto in una data più recente dell'ultima: si sposta la prossima data.
       const task = result.value.task_id ? tasks.find(t => t.id === result.value.task_id) : null;
-      if (task && (!task.last_done_on || result.value.done_on > task.last_done_on)) await updateTask(task, markDone(task, result.value.done_on));
+      if (task && (!task.last_done_on || result.value.done_on > task.last_done_on)) await updateTask(task, markDone(task, result.value.done_on, today));
       onNotify(tr('garden.logSaved'));
       setLogForm(null);
     } finally { setWorking(false); }

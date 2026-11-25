@@ -36,6 +36,11 @@ test('prossima data: interventi ripetuti nei loro mesi', () => {
   assert.equal(nextDue({ ...feed, last_done_on: '2026-10-15' }, '2026-10-15'), '2027-03-01', 'fuori dai mesi si salta alla primavera');
   assert.equal(nextDue({ ...feed, last_done_on: '2026-05-01' }), '2026-05-31', 'con l\'ultima volta la data di oggi non serve');
   assert.equal(nextDue({ months: [], every_days: 7 }, '2026-05-01'), null);
+  // Registrato dopo: fatto a metà settembre, oggi è novembre e la stagione è chiusa → primavera, non «in ritardo».
+  assert.equal(nextDue({ ...feed, months: [3, 4, 5, 6, 7, 8, 9], every_days: 15, last_done_on: '2026-09-15' }, '2026-11-25'), '2027-03-01');
+  // Fatto ad agosto, oggi è il 20 settembre: la stagione continua e la volta dopo è già passata → da fare.
+  assert.equal(nextDue({ ...feed, months: [3, 4, 5, 6, 7, 8, 9], every_days: 15, last_done_on: '2026-08-01' }, '2026-09-20'), '2026-08-16');
+  assert.equal(nextDue({ months: [3, 4, 10, 11], every_days: 0, last_done_on: '2025-03-10' }, '2026-11-02'), '2026-11-02', 'una volta per periodo: il periodo in corso non è ancora fatto');
 });
 
 test('prossima data: una volta per periodo', () => {
@@ -62,6 +67,7 @@ test('stato, fine del tempo utile, fatto e rimandato', () => {
   assert.equal(taskState({ next_on: null }, '2026-03-01'), 'none');
   assert.deepEqual(markDone({ months: [3, 4, 10, 11], every_days: 0 }, '2026-03-12'), { last_done_on: '2026-03-12', next_on: '2026-10-01' });
   assert.equal(postpone('2026-12-28'), '2027-01-04');
+  assert.deepEqual(markDone({ months: [3, 4, 5, 6, 7, 8, 9], every_days: 15 }, '2026-09-15', '2026-11-25'), { last_done_on: '2026-09-15', next_on: '2027-03-01' }, 'registrato a novembre');
 });
 
 test('da fare: in ritardo, da fare, in arrivo; niente oltre 30 giorni', () => {
