@@ -5,7 +5,7 @@
 // se si ripete); medicine delle Scorte che finiscono. Per ogni persona: terapie e appuntamenti.
 // I promemoria li manda /api/cron/health ogni 5 minuti (lib/health-reminders.mjs).
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { HeartPulse, Pill, Stethoscope, Plus, Pencil, Trash2, Info, Check, X, Undo2, UserPlus, ShoppingBasket, BellRing, CalendarClock } from 'lucide-react';
+import { HeartPulse, Pill, Stethoscope, Plus, Pencil, Trash2, Info, Check, X, Undo2, UserPlus, ShoppingBasket, BellRing, CalendarClock, Syringe } from 'lucide-react';
 import { useLanguage, useSection } from './LanguageProvider';
 import { askConfirm } from './ConfirmDialog';
 import { friendlyError } from '../lib/friendly-error.mjs';
@@ -15,7 +15,7 @@ import { titleKey } from '../lib/stock.mjs';
 import DecimalInput from './DecimalInput';
 import {
   RELATIONS, THERAPY_KINDS, APPOINTMENT_KINDS, REMINDER_CODES, HEALTH_LIMITS, EVERY_CHOICES, REPEAT_CHOICES, normalizePerson, normalizeTherapy, normalizeAppointment,
-  dosesOnDate, doseState, stockEstimates, upcomingAppointments, addMonths, addDays, hhmm, romeInstant,
+  dosesOnDate, doseState, stockEstimates, upcomingAppointments, addMonths, addDays, hhmm, romeInstant, vaccinePlan, VACCINE_PLANS,
 } from '../lib/health.mjs';
 
 const MISSING_TABLE = new Set(['42P01', 'PGRST205', 'PGRST202']);
@@ -23,7 +23,7 @@ const uid = () => (globalThis.crypto?.randomUUID ? crypto.randomUUID() : String(
 const WEEK = [1, 2, 3, 4, 5, 6, 7];
 const blankPerson = () => ({ id: null, name: '', relation: 'self', birth_on: '', notes: '' });
 const blankTherapy = (personId, today) => ({ id: null, personId, kind: 'medicine', name: '', dose: '', instructions: '', times: ['08:00'], every_days: 1, weekdays: [], useWeekdays: false, start_on: today, end_on: '', remind: true, stock_item_id: '', stock_use: '', notes: '' });
-const blankAppointment = (personId, today) => ({ id: null, personId, kind: 'visit', title: '', on_date: addDays(today, 7), at_time: '', place: '', notes: '', reminders: ['day_before'], repeat_months: 0 });
+const blankAppointment = (personId, today) => ({ id: null, personId, kind: 'visit', title: '', on_date: addDays(today, 7), at_time: '', place: '', notes: '', reminders: ['day_before'], repeat_months: 0, schedule_key: null });
 
 function Field({ label, children }) { return <label className="extra-field">{label}{children}</label>; }
 
@@ -34,6 +34,7 @@ function HealthSection({ client, demo, user, homeId, canWrite, onNotify = () => 
   const [loading, setLoading] = useState(!demo), [missing, setMissing] = useState(false), [working, setWorking] = useState(false);
   const [selected, setSelected] = useState(null), [personForm, setPersonForm] = useState(null), [therapyForm, setTherapyForm] = useState(null), [appointmentForm, setAppointmentForm] = useState(null), [showDone, setShowDone] = useState(false);
   const [now, setNow] = useState(() => new Date());
+  const [doneForm, setDoneForm] = useState(null);
   const today = todayRome(now);
   const writable = demo || canWrite;
   const day = iso => (iso ? date(iso, { weekday: 'short', day: 'numeric', month: 'short' }) : '—');
@@ -76,6 +77,9 @@ function HealthSection({ client, demo, user, homeId, canWrite, onNotify = () => 
   const person = selected ? peopleById.get(selected) : null;
   const personTherapies = useMemo(() => therapies.filter(t => t.person_id === selected).sort((a, b) => a.name.localeCompare(b.name, locale)), [therapies, selected, locale]);
   const personAppointments = useMemo(() => appointments.filter(a => a.person_id === selected), [appointments, selected]);
+  const vaccines = useMemo(() => (person ? vaccinePlan(person, appointments, today) : []), [person, appointments, today]);
+  // Calendario vaccinale: per i figli e per chi ha meno di 17 anni.
+  const young = p => p && (p.relation === 'child' || (p.birth_on && p.birth_on > addDays(today, -17 * 366)));
 
   const timeText = list => list.map(hhmm).join(', ');
   const scheduleText = t => {
@@ -214,7 +218,7 @@ function HealthSection({ client, demo, user, homeId, canWrite, onNotify = () => 
   async function insertAppointment(row) {
     if (demo) { const made = { ...row, id: uid() }; setAppointments(list => [...list, made]); return made; }
     const { data, error } = await client.from('health_appointments').insert(row).select('*').single();
-    if (error) { onNotify(friendlyError(error, tr)); return null; }
+    if (error) { onNotify(error.code === '23505' ? tr('health.error.vaccineAlready') : friendlyError(error, tr)); return null; }
     setAppointments(list => [...list, data]);
     return data;
   }
@@ -237,6 +241,29 @@ function HealthSection({ client, demo, user, homeId, canWrite, onNotify = () => 
     setAppointments(list => list.filter(x => x.id !== a.id));
     onNotify(tr('health.appointmentDeleted'));
   }
+
+  // ===== Calendario vaccinale =====
+  async function savePlan(p, plan) {
+    if (!demo) { const { error } = await client.from('health_people').update({ vaccine_plan: plan }).eq('id', p.id); if (error) { onNotify(friendlyError(error, tr)); return; } }
+    setPeople(list => list.map(x => (x.id === p.id ? { ...x, vaccine_plan: plan } : x)));
+    onNotify(tr(plan === 'off' ? 'health.vaccinePlanOff' : 'health.vaccinePlanOn', { name: p.name }));
+  }
+  function bookVaccine(item) {
+    setTherapyForm(null);
+    setAppointmentForm({ ...blankAppointment(person.id, today), kind: 'vaccine', title: tr('health.vaccine.' + item.key), on_date: item.from > today ? item.from : today, reminders: ['day_before', 'same_morning'], schedule_key: item.key });
+  }
+  async function vaccineDone(event) {
+    event.preventDefault();
+    const { key, date: doneDate } = doneForm;
+    if (!doneDate || doneDate > today) { onNotify(tr('health.error.date')); return; }
+    setWorking(true);
+    try {
+      const made = await insertAppointment({ person_id: person.id, kind: 'vaccine', title: tr('health.vaccine.' + key), on_date: doneDate, at_time: null, place: '', notes: '', reminders: [], repeat_months: 0, done_on: doneDate, schedule_key: key });
+      if (made) { onNotify(tr('health.vaccineMarked', { name: made.title })); setDoneForm(null); }
+    } finally { setWorking(false); }
+  }
+  const vaccineState = item => (item.state === 'done' ? tr('health.vState.done', { date: day(item.appointment.done_on) })
+    : item.state === 'booked' ? tr('health.vState.booked', { date: day(item.appointment.on_date) }) : tr('health.vState.' + item.state));
 
   // Nomi nelle notifiche: di partenza no (sono dati sanitari sullo schermo bloccato).
   async function saveDetails(on) {
@@ -414,6 +441,7 @@ function HealthSection({ client, demo, user, homeId, canWrite, onNotify = () => 
           {writable && !appointmentForm && <button className="btn btn-soft" onClick={() => { setAppointmentForm(blankAppointment(person.id, today)); setTherapyForm(null); }}><Plus size={15} /> {tr('health.addAppointment')}</button>}
           {appointmentForm && <form className="extra-form garden-inline" onSubmit={saveAppointment}>
             <h3>{tr(appointmentForm.id ? 'health.editAppointment' : 'health.addAppointment')}</h3>
+            {appointmentForm.schedule_key && <small className="muted"><Syringe size={13} /> {tr('health.vaccineStep', { name: tr('health.vaccine.' + appointmentForm.schedule_key) })}</small>}
             <div className="extra-row">
               <Field label={tr('health.appointmentKind')}><select value={appointmentForm.kind} onChange={e => setA({ kind: e.target.value })}>{APPOINTMENT_KINDS.map(k => <option key={k} value={k}>{tr('health.appointmentKind.' + k)}</option>)}</select></Field>
               <Field label={tr('health.appointmentTitle')}><input required minLength={2} maxLength={HEALTH_LIMITS.title} value={appointmentForm.title} placeholder={tr('health.appointmentTitlePlaceholder')} onChange={e => setA({ title: e.target.value })} /></Field>
@@ -433,6 +461,30 @@ function HealthSection({ client, demo, user, homeId, canWrite, onNotify = () => 
             <Field label={tr('health.notes')}><textarea rows={2} maxLength={HEALTH_LIMITS.notes} value={appointmentForm.notes} placeholder={tr('health.appointmentNotesPlaceholder')} onChange={e => setA({ notes: e.target.value })} /></Field>
             <div className="extra-buttons"><button className="btn btn-primary" disabled={working}>{tr('health.save')}</button><button type="button" className="btn btn-soft" onClick={() => setAppointmentForm(null)}>{tr('health.cancel')}</button></div>
           </form>}
+
+          {young(person) && <div className="health-vaccines">
+            <h3><Syringe size={16} /> {tr('health.vaccines')}</h3>
+            {!person.birth_on ? <p className="muted">{tr('health.vaccinesNeedBirth')}</p> : <>
+              {writable && <Field label={tr('health.vaccinePlan')}><select value={person.vaccine_plan || 'off'} onChange={e => savePlan(person, e.target.value)}>{VACCINE_PLANS.map(p => <option key={p} value={p}>{tr('health.vaccinePlan.' + p)}</option>)}</select></Field>}
+              {!vaccines.length ? <p className="muted">{tr('health.vaccinesHelp')}</p> : <>
+                <p className="muted">{tr('health.vaccinesSource')}</p>
+                <ul className="health-list health-vaccine-list">{vaccines.map(item => <li key={item.key} className={`vaccine-${item.state}`}>
+                  <span><b>{tr('health.vaccine.' + item.key)}</b>
+                    <small>{tr('health.vaccineAge.' + item.key)} · {tr('health.vaccineFrom', { date: day(item.from) })}</small>
+                    <small><span className={`extra-pill ${item.mandatory ? 'health-mandatory' : 'health-recommended'}`}>{tr(item.mandatory ? 'health.mandatory' : 'health.recommended')}</span> <span className={`extra-pill health-v-${item.state}`}>{vaccineState(item)}</span></small></span>
+                  {writable && item.state !== 'done' && <span className="extra-buttons">
+                    {item.state !== 'booked' && <button className="btn btn-soft" aria-label={tr('health.bookAria', { name: tr('health.vaccine.' + item.key) })} onClick={() => bookVaccine(item)}><CalendarClock size={15} /> {tr('health.book')}</button>}
+                    {item.state !== 'booked' && <button className="btn btn-soft" aria-label={tr('health.alreadyDoneAria', { name: tr('health.vaccine.' + item.key) })} onClick={() => setDoneForm({ key: item.key, date: item.from < today ? item.from : today })}><Check size={15} /> {tr('health.alreadyDone')}</button>}
+                  </span>}
+                  {doneForm?.key === item.key && <form className="health-done-form" onSubmit={vaccineDone}>
+                    <Field label={tr('health.doneDate')}><input type="date" required max={today} value={doneForm.date} onChange={e => setDoneForm(f => ({ ...f, date: e.target.value }))} /></Field>
+                    <span className="extra-buttons"><button className="btn btn-primary" disabled={working}>{tr('health.save')}</button><button type="button" className="btn btn-soft" onClick={() => setDoneForm(null)}>{tr('health.cancel')}</button></span>
+                  </form>}
+                </li>)}</ul>
+                {person.vaccine_plan === 'all' && <p className="muted">{tr('health.vaccinesOthers')}</p>}
+              </>}
+            </>}
+          </div>}
         </div>}
       </section>
     </div>}

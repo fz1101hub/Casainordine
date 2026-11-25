@@ -689,3 +689,9 @@ select{min-height:24px}
 .health-reminders{border:1px solid var(--line);border-radius:10px;padding:.5rem .7rem;display:flex;flex-direction:column;gap:.2rem}
 .health-reminders legend{font-weight:600;font-size:.86rem;padding:0 .3rem}
 .health-notify{margin-top:1rem;border-top:1px solid var(--line);padding-top:.6rem}
+/* Calendario vaccinale (v61) */
+.health-vaccines{margin-top:1rem;border-top:1px solid var(--line);padding-top:.6rem}
+.health-vaccine-list li.vaccine-done b{color:var(--muted)}
+.health-done-form{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:flex-end;gap:.5rem}
+.health-mandatory{background:#e8eefb;color:#2b4a8b}.health-recommended{background:#f2f0ec;color:#6b6257}
+.health-v-done{background:#e7f3e5;color:#2f6b2c}.health-v-booked{background:#eef1f5;color:#47586b}.health-v-due,.health-v-soon{background:#fbeee0;color:#9a5b12}.health-v-late{background:#fbe3e0;color:#9b2c22}.health-v-later{background:#f4f5f4;color:#5d655f}
