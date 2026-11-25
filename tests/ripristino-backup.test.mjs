@@ -199,3 +199,16 @@ test('giardino: piante, piano e registro tornano insieme, con i collegamenti nel
   assert.ok(!('home_id' in task) && !('home_id' in entry));
   for (const table of ['home_garden_plants', 'home_garden_tasks', 'home_garden_log']) assert.equal(RESTORE_SECTIONS[table], 'garden');
 });
+
+test('giardino: la scorta collegata segue la copia, o si toglie se non viene dal file', () => {
+  let n = 0; const makeId = () => `nuovo-${++n}`;
+  const file = backup({ home_stock_items: [{ id: 's1', user_id: 'altro', home_id: 'casa-1', name: 'Rame' }],
+    home_garden_plants: [{ id: 'g1', user_id: 'altro', home_id: 'casa-1', name: 'Vite' }],
+    home_garden_tasks: [{ id: 'gt1', plant_id: 'g1', stock_item_id: 's1', title: 'Rame', months: [5] }, { id: 'gt2', plant_id: 'g1', stock_item_id: 's-altrove', title: 'Zolfo', months: [5] }] });
+  const copy = restorePlan(readBackup(JSON.stringify(file)), { homeId: H2, userId: ME }, { makeId });
+  const rows = Object.fromEntries(copy.steps.map(s => [s.table, s.rows]));
+  assert.equal(rows.home_garden_tasks.find(t => t.title === 'Rame').stock_item_id, rows.home_stock_items[0].id);
+  assert.equal(rows.home_garden_tasks.find(t => t.title === 'Zolfo').stock_item_id, null);
+  const same = restorePlan(readBackup(JSON.stringify(file)), { homeId: 'casa-1', userId: ME }, { makeId });
+  assert.equal(same.steps.find(s => s.table === 'home_garden_tasks').rows.find(t => t.title === 'Zolfo').stock_item_id, 's-altrove', 'nello stesso spazio resta com\'era');
+});

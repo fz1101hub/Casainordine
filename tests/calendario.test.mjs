@@ -121,3 +121,35 @@ test('il collegamento: crearlo, leggerlo, rigenerarlo e revocarlo', async () => 
     assert.equal(fake.state.requests.length, 0);
   } finally { await fake.close(); }
 });
+
+test('il collegamento porta anche gli interventi del giardino e dell\'orto (25 novembre 2026)', async () => {
+  const fake = await startFakeSupabase();
+  Object.assign(process.env, { NEXT_PUBLIC_SUPABASE_URL: fake.url, NEXT_PUBLIC_SUPABASE_ANON_KEY: 'chiave-pubblica-finta', SUPABASE_SECRET_KEY: 'chiave-di-servizio-finta' });
+  try {
+    const ANNA = '11111111-1111-4111-8111-111111111111', HOME = '10000000-0000-4000-8000-0000000000c1', OTHER = '10000000-0000-4000-8000-0000000000c2';
+    const token = fake.addUser(ANNA, 'anna@example.org');
+    fake.seed('home_members', [{ home_id: HOME, user_id: ANNA, role: 'owner' }]);
+    const today = new Date().toISOString().slice(0, 10);
+    const month = Number(today.slice(5, 7));
+    fake.seed('home_garden_plants', [
+      { id: 'g-mia', user_id: ANNA, home_id: null, name: 'Basilico', ended_on: null },
+      { id: 'g-casa', user_id: 'altro', home_id: HOME, name: 'Limone', ended_on: null },
+      { id: 'g-finita', user_id: ANNA, home_id: null, name: 'Pomodori', ended_on: today },
+      { id: 'g-altra', user_id: 'altro', home_id: OTHER, name: 'Di altri', ended_on: null }]);
+    fake.seed('home_garden_tasks', [
+      { id: 'tm', plant_id: 'g-mia', title: 'Concime', product: '', months: [month], every_days: 0, next_on: today },
+      { id: 'tc', plant_id: 'g-casa', title: 'Rame', product: 'Rame', months: [month], every_days: 0, next_on: today },
+      { id: 'tf', plant_id: 'g-finita', title: 'Finito', product: '', months: [month], every_days: 0, next_on: today },
+      { id: 'ta', plant_id: 'g-altra', title: 'Di altri', product: '', months: [month], every_days: 0, next_on: today }]);
+    const feed = await import('../app/api/calendar/feed/route.js');
+    const reader = await import('../app/api/calendar/[token]/route.js');
+    const url = (await (await feed.POST(new Request('https://casa.example/api/calendar/feed', { method: 'POST', headers: { authorization: `Bearer ${token}` } }))).json()).url;
+    const res = await reader.GET(new Request(url), { params: Promise.resolve({ token: url.split('/').pop() }) });
+    assert.equal(res.status, 200);
+    const text = await res.text();
+    assert.deepEqual(formatProblems(text), []);
+    const uids = new ICAL.Component(ICAL.parse(text)).getAllSubcomponents('vevent').map(v => new ICAL.Event(v).uid).filter(u => u.startsWith('garden-') && u.includes(today));
+    // (ogni intervento compare anche l'anno dopo, nel suo mese: il calendario guarda avanti un anno)
+    assert.deepEqual(uids.sort(), [`garden-tc-${today}@casainordine`, `garden-tm-${today}@casainordine`], 'spazio personale e casa; niente colture finite né case di altri');
+  } finally { await fake.close(); }
+});

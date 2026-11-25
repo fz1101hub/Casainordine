@@ -135,6 +135,108 @@ try {
   await page.locator('.garden-plant').filter({ hasText: 'Limone in vaso' }).getByRole('button', { name: tr('garden.deletePlantAria', { name: 'Limone in vaso' }) }).click();
   await ui.confirm();
   check(!fake.rows('home_garden_plants').length, 'pianta eliminata');
+
+  // 6. Seconda parte (25 novembre 2026): clima, orto, prodotti e sicurezza, calendario.
+  // Nell'aiuola 1 l'anno scorso c'erano i pomodori; nelle Scorte c'è il rame.
+  fake.seed('home_garden_plants', [{ id: 'old-tomatoes', user_id: ANNA, home_id: null, name: 'Pomodori 2025', preset: 'tomato', kind: 'vegetable',
+    location: '', notes: '', planted_on: '2025-04-20', harvest_days: 75, bed: 'Aiuola 1', family: 'solanaceae', ended_on: '2025-09-30', created_at: '2025-04-20T10:00:00Z' }]);
+  fake.seed('home_stock_items', [{ id: 'stock-copper', user_id: ANNA, home_id: null, name: 'Rame in polvere', unit: 'kg', quantity: 0.2, threshold: 0.1, usual_buy: 1, location: '' }]);
+  // «−» delle Scorte come nel database (v46_adjust_stock): tra 0 e 100.000.
+  fake.state.rpc.v46_adjust_stock = ({ p_item, p_delta }, state) => {
+    const item = (state.tables.home_stock_items || []).find(s => s.id === p_item);
+    item.quantity = Math.min(100000, Math.max(0, Math.round((Number(item.quantity) + Number(p_delta)) * 100) / 100));
+    return item.quantity;
+  };
+  await ui.go(tr('nav.dashboard'));
+  await ui.go(tr('nav.garden'));
+  // Clima rigido: le proposte si spostano (rame dell'olivo aprile–maggio e settembre–ottobre).
+  await main.getByLabel(tr('garden.climate')).selectOption('cold');
+  await page.waitForTimeout(800);
+  check(fake.rows('home_seasonal_settings').some(r => r.climate === 'cold'), 'il clima della zona si salva (lo stesso del Programma stagionale)');
+  await main.getByLabel(tr('garden.preset')).selectOption('olive');
+  const oliveCopper = main.locator('.garden-proposal li').filter({ hasText: 'Rame' });
+  check(/apr–mag, set–ott/.test(await oliveCopper.innerText()), `con inverni rigidi il rame dell'olivo è ad aprile–maggio e settembre–ottobre (${(await oliveCopper.innerText()).split('\n')[1] || ''})`);
+  // Pomodori nella stessa aiuola: avviso di rotazione; raccolta prevista.
+  await main.getByLabel(tr('garden.preset')).selectOption('tomato');
+  await main.getByLabel(tr('garden.name'), { exact: true }).fill('Pomodori 2026');
+  check(await main.getByLabel(tr('garden.harvestDays'), { exact: true }).inputValue() === '75', 'giorni alla raccolta dalla proposta (75)');
+  await main.getByLabel(tr('garden.plantedOn'), { exact: true }).fill('2026-04-25');
+  await main.getByLabel(tr('garden.bed'), { exact: true }).fill('Aiuola 1');
+  const warning = main.locator('.garden-crop [role=status]');
+  check(/nel 2025 c’era la stessa famiglia \(Pomodori 2025\)/.test(await warning.innerText().catch(() => '')), `avviso di rotazione: ${await warning.innerText().catch(() => '—')}`);
+  check(/Raccolta prevista: 9 lug 2026/.test(await ui.main()), 'raccolta prevista dalla semina');
+  // Il trattamento con il rame: prodotto delle Scorte, quantità e giorni di attesa.
+  const tomatoCopper = main.locator('.garden-proposal li').filter({ hasText: 'peronospora' });
+  await tomatoCopper.getByRole('button', { name: tr('garden.change') }).click();
+  await tomatoCopper.getByLabel(tr('garden.stockItem')).selectOption('stock-copper');
+  await tomatoCopper.getByLabel(tr('garden.stockUse', { unit: 'kg' }), { exact: true }).fill('0,15');
+  await tomatoCopper.getByLabel(tr('garden.waitDays'), { exact: true }).fill('20');
+  // Da fare subito, per provare «Fatto»: novembre tra i mesi.
+  await tomatoCopper.getByRole('button', { name: 'nov', exact: true }).click();
+  await main.getByRole('button', { name: tr('garden.savePlantWith', { count: 4 }) }).click();
+  await page.waitForTimeout(1200);
+  const tomatoes = plantRow('Pomodori 2026');
+  const copperTask = tomatoes ? tasksOf(tomatoes.id).find(t => t.product?.startsWith('Rame')) : null;
+  check(tomatoes?.bed === 'Aiuola 1' && tomatoes?.family === 'solanaceae' && tomatoes?.planted_on === '2026-04-25' && tomatoes?.harvest_days === 75, 'pomodori salvati con aiuola, famiglia, semina e raccolta');
+  check(copperTask?.stock_item_id === 'stock-copper' && Number(copperTask?.stock_use) === 0.15 && copperTask?.wait_days === 20 && copperTask?.next_on === '2026-11-25',
+    `trattamento collegato al rame delle Scorte, 0,15 kg ogni volta, 20 giorni di attesa (${copperTask?.next_on}, mesi ${copperTask?.months}, scorta ${copperTask?.stock_item_id}, ${copperTask?.stock_use}, attesa ${copperTask?.wait_days})`);
+  await main.getByRole('button', { name: tr('garden.doneAria', { title: copperTask?.title || '—', plant: 'Pomodori 2026' }) }).first().click();
+  await page.waitForTimeout(1200);
+  const stockAfter = fake.rows('home_stock_items').find(s => s.id === 'stock-copper');
+  const message = await ui.toast();
+  check(fake.state.requests.some(r => r.path === '/rest/v1/rpc/v46_adjust_stock'), 'con «Fatto» il rame si scala dalle Scorte (v46_adjust_stock)');
+  check(/Non raccogliere prima del 15 dic 2026/.test(message) && /Rame in polvere: ne restano 0,05 kg, è da ricomprare/.test(message), `avviso dopo «Fatto»: ${message}`);
+  check(fake.rows('home_garden_log').some(l => l.task_id === copperTask?.id && l.wait_days === 20), 'il registro ricorda i giorni di attesa');
+  check(Number(stockAfter?.quantity) === 0.05, `nelle Scorte restano 0,05 kg (${stockAfter?.quantity})`);
+  check(await main.locator('.garden-safe').filter({ hasText: 'Non raccogliere prima del 15 dic 2026' }).count() >= 1, 'sulla pianta: non raccogliere prima del 15 dicembre');
+  check(await main.locator('.garden-tobuy').filter({ hasText: 'Rame in polvere' }).count() === 1, 'il rame compare tra i prodotti da ricomprare');
+  // Calendario dell'anno e aiuole.
+  const calendar = page.locator('.garden-calendar');
+  check(await calendar.locator('details').count() === 12, 'calendario dell\'anno: dodici mesi');
+  check(await calendar.locator('details').filter({ hasText: 'luglio 2027' }).locator('li').count() >= 3, 'a luglio 2027 ci sono gli interventi dei pomodori (con inverni rigidi da luglio)');
+  const bedsBox = page.locator('.garden-beds');
+  check(/Aiuola 1/.test(await bedsBox.innerText()) && /2025: Pomodori 2025 \(Solanacee\)/.test(await bedsBox.innerText()) && /Adesso: Pomodori 2026/.test(await bedsBox.innerText()), 'aiuole: adesso e l\'anno scorso');
+  // Coltura finita: esce dalle piante e dai promemoria, resta nella storia; si rimette.
+  const tomatoBox = page.locator('.garden-plant').filter({ hasText: 'Pomodori 2026' });
+  if (!(await tomatoBox.getAttribute('open').then(v => v !== null).catch(() => false))) await tomatoBox.locator('summary').click();
+  await tomatoBox.getByRole('button', { name: tr('garden.endCropAria', { name: 'Pomodori 2026' }) }).click();
+  await page.waitForTimeout(800);
+  check(plantRow('Pomodori 2026')?.ended_on === '2026-11-25' && await page.locator('.garden-ended').filter({ hasText: 'Pomodori 2026' }).count() === 1, 'coltura finita: nell\'elenco delle colture finite');
+  check(await main.locator('.garden-due').filter({ hasText: 'Pomodori 2026' }).count() === 0, 'le colture finite non sono in «Da fare»');
+  await page.locator('.garden-ended summary').click();
+  await page.getByRole('button', { name: tr('garden.restoreAria', { name: 'Pomodori 2026' }) }).click();
+  await page.waitForTimeout(800);
+  check(plantRow('Pomodori 2026')?.ended_on === null, 'rimessa tra le piante');
+  // Telefono con calendario, aiuole e moduli dell'orto.
+  await page.setViewportSize({ width: 360, height: 780 });
+  await main.getByLabel(tr('garden.preset')).selectOption('zucchini');
+  await page.waitForTimeout(400);
+  check(await overflow() <= 1, `sul telefono, con calendario e aiuole, niente esce dallo schermo (${await overflow()} px)`);
+  const violations2 = await ui.axe();
+  check(!violations2.length, `accessibilità con le parti nuove (${violations2.join(', ')})`);
   check(!ui.errors.length, `nessun errore nella pagina ${ui.errors.slice(0, 3).join(' | ')}`);
-} finally { await ui.context.close(); await browser.close(); fake.close(); }
+} finally { await ui.context.close(); await browser.close(); await fake.close(); }
+
+// 7. Prima della migrazione v58: le colonne nuove non ci sono; la sezione le nasconde e non le scrive.
+{
+  const { V58_FIELDS } = await import('../lib/garden.mjs');
+  const old = await startScenario({ tokenTtl: 3 * 86400, missingColumns: V58_FIELDS });
+  const carla = old.person('carla', '33333333-3333-4333-8333-333333333333', 'carla@example.org');
+  const browser2 = await launch();
+  const ui2 = await openPage(browser2);
+  await ui2.page.clock.setFixedTime(new Date('2026-11-25T09:00:00Z'));
+  try {
+    check(await ui2.login(carla), 'senza v58: Carla entra');
+    await ui2.go(tr('nav.garden'));
+    const main2 = ui2.page.locator('main');
+    await main2.getByLabel(tr('garden.preset')).selectOption('tomato');
+    check(await main2.locator('.garden-crop').count() === 0, 'senza v58: i campi dell\'orto non compaiono');
+    await main2.getByRole('button', { name: tr('garden.savePlantWith', { count: 4 }) }).click();
+    await ui2.page.waitForTimeout(1200);
+    const plant = old.fake.rows('home_garden_plants').find(p => p.preset === 'tomato');
+    check(Boolean(plant) && !('bed' in plant) && old.fake.rows('home_garden_tasks').filter(t => t.plant_id === plant?.id).length === 4, 'senza v58: pianta e piano salvati senza le colonne nuove');
+    check(!/Could not find|does not exist/.test(await ui2.toast()), `senza v58: nessun errore del database (${await ui2.toast()})`);
+    check(!ui2.errors.length, `senza v58: nessun errore nella pagina ${ui2.errors.slice(0, 3).join(' | ')}`);
+  } finally { await ui2.context.close(); await browser2.close(); await old.fake.close(); }
+}
 finish();

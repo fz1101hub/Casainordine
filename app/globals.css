@@ -611,3 +611,32 @@ select{min-height:24px}
 .garden-log li small{display:block;color:var(--muted);font-size:.75rem;margin-top:.15rem}
 @media (max-width:900px){.garden .extra-layout{grid-template-columns:1fr}}
 @media (max-width:600px){.garden-months>div{grid-template-columns:repeat(4,minmax(0,1fr))}.garden-due .extra-buttons,.garden-task-head .extra-buttons{width:100%}.garden-plant-actions .btn{flex:1 1 100%}}
+/* Giardino e orto: clima, orto, prodotti, calendario e aiuole */
+.garden-climate{display:flex;flex-direction:column;gap:.35rem;padding:.7rem .8rem;border-radius:10px;background:#f6faf8;border:1px solid #dcece4}
+.garden-crop{border:1px solid #e3ece7;border-radius:10px;padding:.7rem .8rem;margin:0;display:flex;flex-direction:column;gap:.7rem;min-width:0}
+.garden-crop legend{font-size:.83rem;font-weight:700;padding:0 .3rem}
+.garden-warning{color:#8a5a10!important;background:#fdf6e7;border:1px solid #f0dcae;border-radius:8px;padding:.45rem .6rem;margin:0;font-size:.8rem;line-height:1.45}
+.garden-ok{color:#2e5d52!important;font-size:.8rem;margin:0;line-height:1.45}
+.garden-safe{display:inline-flex;align-items:center;gap:.3rem;color:#9b2c1f!important;font-weight:600}
+.garden-tobuy{margin-top:1rem;border:1px solid #f0dcae;background:#fffaf0;border-radius:10px;padding:.7rem .85rem}
+.garden-tobuy h3{display:flex;align-items:center;gap:.4rem;margin:0 0 .4rem}
+.garden-tobuy ul{list-style:none;margin:0 0 .3rem;padding:0;display:flex;flex-direction:column;gap:.4rem}
+.garden-tobuy li{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:.4rem;font-size:.84rem}
+.garden-ended{margin-top:.9rem}
+.garden-ended>summary{cursor:pointer;font-weight:600;color:var(--muted);padding:.3rem 0}
+.garden-ended ul{list-style:none;margin:.3rem 0 0;padding:0}
+.garden-ended li{display:flex;justify-content:space-between;align-items:center;gap:.6rem;padding:.45rem 0;border-bottom:1px solid #f0f2f0;overflow-wrap:anywhere}
+.garden-ended li>span:first-child{display:flex;flex-direction:column;gap:.15rem;min-width:0}
+.garden-ended small,.garden-bed small,.garden-months-grid small{color:var(--muted);font-size:.76rem;line-height:1.45}
+.garden-months-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.6rem}
+.garden-months-grid details{border:1px solid #e3e7e4;border-radius:10px;padding:.55rem .7rem;background:#fff;min-width:0}
+.garden-months-grid summary{cursor:pointer;display:flex;flex-direction:column;gap:.1rem}
+.garden-months-grid summary b{text-transform:capitalize}
+.garden-months-grid ul{list-style:none;margin:.5rem 0 0;padding:0;display:flex;flex-direction:column;gap:.45rem}
+.garden-months-grid li{display:flex;gap:.55rem;align-items:flex-start;font-size:.82rem;overflow-wrap:anywhere}
+.garden-months-grid li>span:last-child{display:flex;flex-direction:column;gap:.1rem;min-width:0}
+.garden-days{flex:0 0 auto;min-width:2.2rem;font-weight:700;color:#2e7d55;font-variant-numeric:tabular-nums}
+.garden-beds-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.6rem}
+.garden-bed{border:1px solid #e3e7e4;border-radius:10px;padding:.6rem .75rem;display:flex;flex-direction:column;gap:.25rem;min-width:0;overflow-wrap:anywhere}
+@media (max-width:900px){.garden-months-grid,.garden-beds-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:600px){.garden-months-grid,.garden-beds-grid{grid-template-columns:1fr}.garden-tobuy li .btn{flex:1 1 100%}}
