@@ -102,7 +102,7 @@ const EMBED = { homes: 'home_id', bills: 'bill_id' };
 // chiederle o scriverle dà l'errore di PostgREST, con select=* non tornano.
 // tokenTtl: durata dei token in secondi (le prove con l'orologio del browser spostato in avanti ne usano una più lunga).
 export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = false, latency = 0, maxRows = Infinity, maxUrl = Infinity, tokenTtl = 3600, missingColumns = {} } = {}) {
-  const state = { tables: {}, tokens: new Map(), users: new Map(), passwords: new Map(), rpc: {}, removed: [], files: {}, uploads: [], requests: [], deletedUsers: [], rejectKeys: new Set() };
+  const state = { tables: {}, tokens: new Map(), users: new Map(), passwords: new Map(), rpc: {}, removed: [], files: {}, uploads: [], requests: [], deletedUsers: [], rejectKeys: new Set(), weather: {}, weatherCalls: [] };
   const table = name => (state.tables[name] ||= []);
   const isOwner = (user, homeId) => table('homes').some(h => h.id === homeId && h.owner_id === user.id);
   const memberOf = (user, homeId) => table('home_members').some(m => m.home_id === homeId && m.user_id === user.id);
@@ -230,6 +230,15 @@ export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = fa
         return send(200, {});
       }
       return user ? send(200, user) : send(404, { code: 404, msg: 'User not found' });
+    }
+    // Open-Meteo finto (OPEN_METEO_URL): previsioni e ricerca dei luoghi, dalle prove (state.weather).
+    if (path === '/open-meteo/v1/forecast') {
+      state.weatherCalls.push(String(req.url));
+      return state.weather.down ? send(503, { error: true }) : send(200, state.weather.forecast || { daily: { time: [], temperature_2m_min: [], temperature_2m_max: [] } });
+    }
+    if (path === '/open-meteo/v1/search') {
+      const name = new URL(req.url, 'http://x').searchParams.get('name') || '';
+      return send(200, { results: (state.weather.places || []).filter(p => p.name.toLowerCase().startsWith(name.toLowerCase())) });
     }
     // Storage: collegamenti temporanei (createSignedUrls) e scaricamento con il collegamento.
     const sign = path.match(/^\/storage\/v1\/object\/sign\/([^/]+)(?:\/(.+))?$/);

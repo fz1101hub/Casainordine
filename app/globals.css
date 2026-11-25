@@ -643,3 +643,13 @@ select{min-height:24px}
 /* Foto delle piante (v59): data e didascalia sotto la miniatura */
 .project-photo-row figcaption{max-width:120px;font-size:.72rem;color:var(--muted);line-height:1.3;margin-top:.2rem;overflow-wrap:anywhere}
 .garden-log .project-photo-row{margin-top:.35rem}
+/* Meteo per il giardino (v59) */
+.garden-weather{border:1px solid #e3e7e4;border-radius:11px;padding:.8rem .9rem;margin-bottom:1.1rem;background:#f8fbf8}
+.garden-weather h2{margin-top:0}
+.garden-weather-search{display:flex;flex-wrap:wrap;align-items:flex-end;gap:.5rem}
+.garden-weather-search .extra-field{flex:1 1 14rem}
+.garden-weather-places{list-style:none;margin:.5rem 0;padding:0;display:flex;flex-wrap:wrap;gap:.4rem}
+.garden-weather-days{list-style:none;margin:.4rem 0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(7.5rem,1fr));gap:.5rem}
+.garden-weather-days li{border:1px solid #e3e7e4;border-radius:9px;background:#fff;padding:.5rem .6rem;display:flex;flex-direction:column;gap:.15rem}
+.garden-weather-days small{color:var(--muted)}
+.garden-weather .extra-toggle{margin:.4rem 0}
