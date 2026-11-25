@@ -65,6 +65,7 @@ const NO_SINGULAR = {
   'extra.backup.zipDone': 'il numero è dopo i due punti: «File inclusi: 1» va bene',
   'extra.backup.zipMissing': 'il numero è dopo i due punti: «non inclusi: 1» va bene',
   'v32.import.bankAlreadyCount': 'il numero è dopo i due punti: «saltati: 1» va bene',
+  'garden.tasksAdded': 'il numero è dopo i due punti: «aggiunti al piano: 1» va bene',
 };
 test('nessun testo con un numero senza singolare', () => {
   const it = TRANSLATIONS.it;
