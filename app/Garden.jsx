@@ -4,16 +4,17 @@
 // cambiare prima di salvare; «Da fare» con fatto e rimanda; registro di quello che si è fatto.
 // I promemoria li manda il lavoro giornaliero (lib/garden-alerts.mjs).
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Sprout, CalendarCheck, CalendarDays, Clock, BellOff, Pencil, Trash2, Plus, Info, Check, NotebookPen, ShoppingBasket, ShieldAlert, LayoutGrid, Archive, RotateCcw, Camera } from 'lucide-react';
+import { Sprout, CalendarCheck, CalendarDays, Clock, BellOff, Pencil, Trash2, Plus, Info, Check, NotebookPen, ShoppingBasket, ShieldAlert, LayoutGrid, Archive, RotateCcw, Camera, CloudSun, Snowflake, CloudRain, Search } from 'lucide-react';
 import { useLanguage, useSection } from './LanguageProvider';
 import { askConfirm } from './ConfirmDialog';
-import { friendlyError } from '../lib/friendly-error.mjs';
+import { friendlyError, apiErrorText } from '../lib/friendly-error.mjs';
 import { todayRome } from '../lib/dates.mjs';
 import { selectAll, selectIn } from '../lib/select-all.mjs';
 import { stockStatus, titleKey } from '../lib/stock.mjs';
 import DecimalInput from './DecimalInput';
 import { uploadHouseDocument, IMAGE_MIME_TYPES } from '../lib/document-upload.mjs';
 import { preparePhoto } from '../lib/image-prepare.js';
+import { frostAhead, rainToday, WEATHER } from '../lib/weather.mjs';
 import {
   TASK_KINDS, LOG_KINDS, PLANT_KINDS, GARDEN_LIMITS, EVERY_CHOICES, PRESET_KEYS, ALL_MONTHS, CLIMATES, FAMILIES, EDIBLE_KINDS, monthWindows, normalizePlant, normalizeTask, normalizeLog,
   presetTasks, presetPlant, missingPresetTasks, gardenAgenda, taskState, deadlineOf, markDone, postpone, yearCalendar, expectedHarvest, safeHarvestFrom,
@@ -26,6 +27,7 @@ const blankPlant = () => ({ id: null, preset: '', name: '', kind: 'other', locat
 const blankTask = () => ({ id: null, kind: 'fertilize', title: '', product: '', dose: '', notes: '', months: [], every_days: 0, remind: true, wait_days: '', stock_item_id: '', stock_use: '' });
 const blankLog = today => ({ done_on: today, task_id: '', kind: 'other', title: '', product: '', dose: '', notes: '', wait_days: '', photo: null });
 const PHOTO_ACCEPT = 'image/jpeg,image/png,image/webp,.heic,.heif,image/heic,image/heif';
+const SETTINGS_COLUMNS = 'id,climate,weather_lat,weather_lon,weather_place,frost_alerts';
 const GARDEN_CROPS = ['vegetable', 'herb'];
 
 function Field({ label, children }) { return <label className="extra-field">{label}{children}</label>; }
@@ -90,6 +92,9 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
   const [v58, setV58] = useState(true); // colonne della migrate_v58_giardino_orto.sql presenti
   const [stock, setStock] = useState([]), [shopping, setShopping] = useState([]);
   // Foto delle piante (migrate_v59): foto, documenti con il collegamento temporaneo, modulo aperto.
+  // Meteo (migrate_v59): luogo nelle impostazioni stagionali, previsioni dal server dell'app.
+  const [weatherOn, setWeatherOn] = useState(true), [forecast, setForecast] = useState(null), [weatherState, setWeatherState] = useState('idle');
+  const [placeQuery, setPlaceQuery] = useState(''), [places, setPlaces] = useState(null), [placeEditing, setPlaceEditing] = useState(false);
   const [photos, setPhotos] = useState([]), [docs, setDocs] = useState({}), [photosOn, setPhotosOn] = useState(true), [photoForm, setPhotoForm] = useState(null), [photoBusy, setPhotoBusy] = useState(false);
   const today = todayRome();
   const writable = demo || canWrite;
@@ -118,11 +123,13 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
     const ids = (list.data || []).map(p => p.id);
     // Clima del Programma stagionale e scorte dello spazio: se mancano, il giardino funziona lo stesso.
     const [settings, items, list2] = await Promise.all([
-      scope(client.from('home_seasonal_settings').select('id,climate')).limit(1).maybeSingle(),
+      scope(client.from('home_seasonal_settings').select(SETTINGS_COLUMNS)).limit(1).maybeSingle()
+        .then(r => (r.error && ['42703', 'PGRST204'].includes(r.error.code) ? scope(client.from('home_seasonal_settings').select('id,climate')).limit(1).maybeSingle().then(old => ({ ...old, old: true })) : r)),
       scope(client.from('home_stock_items').select('id,name,unit,quantity,threshold,usual_buy')).order('name').limit(300),
       homeId ? client.from('home_shopping').select('title').eq('home_id', homeId).eq('checked', false).limit(300) : { data: [] },
     ]);
     if (!settings.error) { setClimateRow(settings.data || null); setClimate(CLIMATES.includes(settings.data?.climate) ? settings.data.climate : 'mild'); }
+    setWeatherOn(!settings.old);
     setStock(items.error ? [] : items.data || []);
     setShopping(list2.error ? [] : (list2.data || []).map(r => r.title));
     const [plan, done] = await Promise.all([
@@ -158,6 +165,8 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
   const tasksBy = useMemo(() => { const m = new Map(); for (const t of tasks) { if (!m.has(t.plant_id)) m.set(t.plant_id, []); m.get(t.plant_id).push(t); } return m; }, [tasks]);
   const logBy = useMemo(() => { const m = new Map(); for (const l of log) { if (!m.has(l.plant_id)) m.set(l.plant_id, []); m.get(l.plant_id).push(l); } return m; }, [log]);
   const agenda = useMemo(() => gardenAgenda(activeTasks, today), [activeTasks, today]);
+  const frost = useMemo(() => (forecast ? frostAhead(forecast, today) : null), [forecast, today]);
+  const rain = useMemo(() => (forecast ? rainToday(forecast, today) : null), [forecast, today]);
   const sortedPlants = useMemo(() => [...activePlants].sort((a, b) => a.name.localeCompare(b.name, locale)), [activePlants, locale]);
   const number = value => new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(Number(value) || 0);
   const amount = item => `${number(item.quantity)} ${tr('garden.unit.' + item.unit)}`;
@@ -195,11 +204,57 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
     if (form.preset && !form.id) setProposal(presetTasks(form.preset, tr, today, value).map(t => ({ ...t, use: true, open: false, wait_days: '', stock_item_id: '', stock_use: '' })));
     if (demo) { onNotify(tr('garden.climateSaved')); return; }
     const { data, error } = climateRow?.id
-      ? await client.from('home_seasonal_settings').update({ climate: value }).eq('id', climateRow.id).select('id,climate').maybeSingle()
-      : await client.from('home_seasonal_settings').insert({ climate: value, home_id: homeId || null }).select('id,climate').maybeSingle();
+      ? await client.from('home_seasonal_settings').update({ climate: value }).eq('id', climateRow.id).select(weatherOn ? SETTINGS_COLUMNS : 'id,climate').maybeSingle()
+      : await client.from('home_seasonal_settings').insert({ climate: value, home_id: homeId || null }).select(weatherOn ? SETTINGS_COLUMNS : 'id,climate').maybeSingle();
     if (error) { onNotify(friendlyError(error, tr)); return; }
     if (data) setClimateRow(data);
     onNotify(tr('garden.climateSaved'));
+  }
+
+  // Meteo: le richieste passano dal server dell'app (app/api/weather), con l'accesso di chi usa l'app.
+  async function weatherApi(path) {
+    const { data: { session } } = await client.auth.getSession();
+    if (!session?.access_token) throw new Error('weatherLogin');
+    const response = await fetch(path, { headers: { Authorization: `Bearer ${session.access_token}` } });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw Object.assign(new Error(body.error || 'weatherUnavailable'), { body });
+    return body;
+  }
+
+  const hasPlace = climateRow?.weather_lat !== null && climateRow?.weather_lat !== undefined;
+  useEffect(() => {
+    if (demo || !client || !weatherOn || !hasPlace) { setForecast(null); return; }
+    let live = true;
+    setWeatherState('loading');
+    weatherApi(`/api/weather?lat=${climateRow.weather_lat}&lon=${climateRow.weather_lon}`)
+      .then(body => { if (live) { setForecast(body.days || []); setWeatherState('idle'); } })
+      .catch(() => { if (live) { setForecast(null); setWeatherState('error'); } });
+    return () => { live = false; };
+  }, [client, demo, weatherOn, hasPlace, climateRow?.weather_lat, climateRow?.weather_lon]);
+
+  async function searchPlaces(event) {
+    event.preventDefault();
+    const q = placeQuery.trim();
+    if (q.length < WEATHER.queryMin) return;
+    setWeatherState('searching');
+    try { setPlaces((await weatherApi(`/api/weather/places?q=${encodeURIComponent(q)}&lang=${String(locale).slice(0, 2)}`)).places || []); setWeatherState('idle'); }
+    catch (error) { setPlaces(null); setWeatherState('idle'); onNotify(apiErrorText(error.body || { error: error.message }, tr, 'api.weatherUnavailable')); }
+  }
+
+  async function saveWeather(patch, message) {
+    const { data, error } = climateRow?.id
+      ? await client.from('home_seasonal_settings').update(patch).eq('id', climateRow.id).select(SETTINGS_COLUMNS).maybeSingle()
+      : await client.from('home_seasonal_settings').insert({ climate, home_id: homeId || null, ...patch }).select(SETTINGS_COLUMNS).maybeSingle();
+    if (error) { onNotify(friendlyError(error, tr)); return false; }
+    if (data) setClimateRow(data);
+    onNotify(message);
+    return true;
+  }
+
+  async function choosePlace(place) {
+    if (await saveWeather({ weather_lat: place.lat, weather_lon: place.lon, weather_place: place.label }, tr('garden.weather.saved', { place: place.label }))) {
+      setPlaces(null); setPlaceQuery(''); setPlaceEditing(false);
+    }
   }
 
   async function insertTasks(plantId, list) {
@@ -487,6 +542,33 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
     {!demo && !missing && !canWrite && <div className="informative"><Info size={17} /><p>{tr('garden.readOnly')}</p></div>}
     {!missing && <div className="extra-layout">
       <section className="panel extra-panel">
+        {weatherOn && !missing && <div className="garden-weather">
+          <h2><CloudSun size={19} /> {tr('garden.weather.title')}</h2>
+          {demo ? <p className="muted">{tr('garden.weather.demo')}</p> : (!hasPlace || placeEditing) ? <>
+            <p className="muted">{tr('garden.weather.help')}</p>
+            {writable ? <form className="garden-weather-search" onSubmit={searchPlaces}>
+              <Field label={tr('garden.weather.place')}><input value={placeQuery} minLength={WEATHER.queryMin} maxLength={WEATHER.queryMax} placeholder={tr('garden.weather.placePlaceholder')} onChange={e => setPlaceQuery(e.target.value)} /></Field>
+              <button className="btn btn-soft" disabled={weatherState === 'searching' || placeQuery.trim().length < WEATHER.queryMin}><Search size={15} /> {tr(weatherState === 'searching' ? 'garden.weather.searching' : 'garden.weather.search')}</button>
+              {hasPlace && <button type="button" className="btn btn-soft" onClick={() => { setPlaceEditing(false); setPlaces(null); }}>{tr('garden.cancel')}</button>}
+            </form> : <p className="muted">{tr('garden.readOnly')}</p>}
+            {places && (places.length ? <ul className="garden-weather-places">{places.map(place => <li key={`${place.lat},${place.lon},${place.label}`}>
+              <button className="btn btn-soft" onClick={() => choosePlace(place)}>{place.label}</button></li>)}</ul> : <p className="muted">{tr('garden.weather.noResults')}</p>)}
+            <small className="muted">{tr('garden.weather.privacy')}</small>
+          </> : <>
+            <p className="muted">{tr('garden.weather.at', { place: climateRow.weather_place || '—' })} {writable && <button className="btn btn-soft" onClick={() => setPlaceEditing(true)}>{tr('garden.weather.change')}</button>}</p>
+            {weatherState === 'loading' ? <p className="muted">{tr('general.loading')}</p> : weatherState === 'error' || !forecast ? <p className="muted">{tr('api.weatherUnavailable')}</p> : <>
+              <ul className="garden-weather-days">{forecast.filter(d => d.date >= today).slice(0, 3).map(d => <li key={d.date}>
+                <b>{d.date === today ? tr('garden.weather.today') : date(d.date, { weekday: 'short', day: 'numeric', month: 'short' })}</b>
+                <span>{tr('garden.weather.minMax', { min: number(Math.round(d.min)), max: number(Math.round(d.max)) })}</span>
+                <small>{tr('garden.weather.rain', { mm: number(d.rain || 0) })}{d.chance !== null ? ` · ${d.chance}%` : ''}</small>
+              </li>)}</ul>
+              {frost && <p className="garden-warning" role="status"><Snowflake size={15} /> {tr('garden.weather.frost', { date: day(frost.date), min: number(frost.min) })}</p>}
+              {rain?.skip && <p className="garden-ok"><CloudRain size={15} /> {tr('garden.weather.rainSkip', { mm: number(rain.mm) })}</p>}
+            </>}
+            {writable && <label className="extra-toggle"><input type="checkbox" checked={climateRow?.frost_alerts !== false} onChange={async e => { const on = e.target.checked; setClimateRow(r => ({ ...r, frost_alerts: on })); if (!(await saveWeather({ frost_alerts: on }, tr(on ? 'garden.weather.frostOn' : 'garden.weather.frostOff')))) setClimateRow(r => ({ ...r, frost_alerts: !on })); }} />{tr('garden.weather.frostToggle')}</label>}
+            <small className="muted">{tr('garden.weather.source')} <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo.com</a></small>
+          </>}
+        </div>}
         <h2><CalendarCheck size={19} /> {tr('garden.agenda')}</h2>
         <p className="muted">{tr('garden.agendaHelp')}</p>
         {loading ? <p className="muted">{tr('general.loading')}</p> : !agenda.length ? <p className="muted">{tr('garden.agendaEmpty')}</p> :
@@ -494,7 +576,8 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
           const plant = plantsById.get(task.plant_id);
           return <div key={task.id} className={`garden-due ${state}`}>
             <div><b>{task.title}</b><small>{plant.name}{task.product ? ' · ' + task.product : ''}{task.dose ? ' · ' + task.dose : ''}</small>
-              <small className="garden-when"><span className={`extra-pill garden-${state}`}>{tr('garden.state.' + state)}</span> {when(task)}</small></div>
+              <small className="garden-when"><span className={`extra-pill garden-${state}`}>{tr('garden.state.' + state)}</span> {when(task)}</small>
+              {task.kind === 'watering' && rain?.skip && <small className="garden-ok"><CloudRain size={13} /> {tr('garden.weather.wateringSkip', { mm: number(rain.mm) })}</small>}</div>
             {writable && <div className="extra-buttons">
               <button className="btn btn-primary" aria-label={tr('garden.doneAria', { title: task.title, plant: plant.name })} onClick={() => done(task)}><Check size={15} /> {tr('garden.done')}</button>
               <button className="icon-button" aria-label={tr('garden.postponeAria', { title: task.title, plant: plant.name })} title={tr('garden.postpone')} onClick={() => later(task)}><Clock size={16} /></button>

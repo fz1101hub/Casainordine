@@ -35,6 +35,7 @@
     "test:original-files": "node scripts/prove-file-originali.mjs",
     "test:garden": "node scripts/prove-giardino.mjs",
     "test:plant-photos": "node scripts/prove-foto-piante.mjs",
+    "test:garden-weather": "node scripts/prove-meteo-giardino.mjs",
     "test:pets": "node scripts/prove-animali.mjs"
   },
   "dependencies": {
