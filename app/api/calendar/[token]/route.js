@@ -3,6 +3,7 @@ import {getAdmin,hashToken} from '../../../../lib/server.mjs';
 import {calendarText} from '../../../../lib/calendar.mjs';
 import {todayRome,addDaysISO} from '../../../../lib/dates.mjs';
 import {gardenCalendarEvents} from '../../../../lib/garden.mjs';
+import {petCalendarEvents} from '../../../../lib/pets.mjs';
 
 // Interventi del giardino e dell'orto dello spazio personale e delle case: se le tabelle non ci sono
 // ancora (migrazione v57 non eseguita) il calendario resta quello delle bollette.
@@ -17,6 +18,17 @@ async function gardenEvents(admin,userId,homes,today){
  if(!active.length)return [];
  const tasks=await readIn(admin,'home_garden_tasks','id,plant_id,title,product,months,every_days,next_on,last_done_on','plant_id',active.map(p=>p.id),q=>q.not('next_on','is',null).order('id'));
  return gardenCalendarEvents(active,tasks,today);
+}
+// Voci del piano degli animali (vaccini, antiparassitari…): senza la migrazione v59 nessun evento.
+async function petEvents(admin,userId,homes,today){
+ const columns='id,name,ended_on',pets=[];
+ try{
+  pets.push(...await readAll(admin,'home_pets',columns,q=>q.eq('user_id',userId).is('home_id',null).is('ended_on',null).order('id')));
+  if(homes.length)pets.push(...await readIn(admin,'home_pets',columns,'home_id',homes,q=>q.is('ended_on',null).order('id')));
+ }catch(error){if(['42P01','PGRST205'].includes(error?.code))return [];throw error;}
+ if(!pets.length)return [];
+ const tasks=await readIn(admin,'home_pet_tasks','id,pet_id,title,product,every_days,next_on','pet_id',pets.map(p=>p.id),q=>q.not('next_on','is',null).order('id'));
+ return petCalendarEvents(pets,tasks,today);
 }
 export const runtime='nodejs';
 export async function GET(_request,{params}){
@@ -37,7 +49,11 @@ export async function GET(_request,{params}){
   if(members?.length){try{shared=await readIn(admin,'bills','id,title,supplier,amount,due_date,paid_at','home_id',members.map(m=>m.home_id),period);}catch{throw new Error('calendar unavailable');}}
   const bills=[...new Map([...(personal||[]),...shared].map(b=>[b.id,b])).values()];
   let garden=[];
-  try{garden=await gardenEvents(admin,feed.user_id,(members||[]).map(m=>m.home_id),today);}catch{throw new Error('calendar unavailable');}
+  try{
+   const homes=(members||[]).map(m=>m.home_id);
+   const [plants,animals]=await Promise.all([gardenEvents(admin,feed.user_id,homes,today),petEvents(admin,feed.user_id,homes,today)]);
+   garden=[...plants,...animals].sort((a,b)=>a.date.localeCompare(b.date)||a.uid.localeCompare(b.uid)).slice(0,3000);
+  }catch{throw new Error('calendar unavailable');}
   // Testi del calendario nella lingua scelta da chi lo ha creato (italiano se non l'ha mai scelta).
   const {data:preference}=await admin.from('user_language_preferences').select('language').eq('user_id',feed.user_id).maybeSingle();
   return new Response(calendarText(bills,undefined,preference?.language||'it',garden),{status:200,headers:{'Content-Type':'text/calendar; charset=utf-8','Content-Disposition':'inline; filename="casa-in-ordine.ics"','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
