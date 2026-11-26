@@ -14,6 +14,8 @@ import { TRANSLATIONS } from '../lib/i18n.mjs';
 
 const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 const sql = read('supabase/migrate_v63_documenti_home.sql');
+// Tipi e riquadri aggiunti dopo (v65: certificato medico sportivo, riquadro delle rate).
+const sql65 = read('supabase/migrate_v65_scadenze_prevenzione.sql');
 const LANGS = ['it', 'en', 'es', 'fr', 'de', 'pt'];
 const TODAY = '2026-11-26';
 
@@ -25,7 +27,7 @@ test('documento controllato: chi, tipo, scadenza (o nessuna), preavviso di parte
   assert.deepEqual([value.holder, value.kind, value.expires_on, value.notice_days], ['Luca', 'passport', '2027-05-12', 180]);
   assert.equal(normalizeDocument({ holder: 'Gino', kind: 'identity_card', expires_on: '2030-01-01', no_expiry: true }).value.expires_on, null);
   assert.equal(normalizeDocument({ holder: 'Gino', kind: 'boh' }).value.kind, 'other');
-  for (const kind of DOC_KINDS) { assert.match(sql, new RegExp(`'${kind}'`)); assert.ok(DOC_NOTICE[kind] >= 7 && DOC_NOTICE[kind] <= 365); }
+  for (const kind of DOC_KINDS) { assert.match(sql65, new RegExp(`'${kind}'`)); assert.ok(DOC_NOTICE[kind] >= 7 && DOC_NOTICE[kind] <= 365); }
   assert.equal(DOC_NOTICE.residence_permit > 60, true, 'il permesso si rinnova almeno 60 giorni prima: l’avviso arriva prima');
 });
 
@@ -103,11 +105,11 @@ test('lavoro giornaliero: un avviso «document» per documento e data, una volta
 
 test('Home: cinque riquadri nuovi, spenti di partenza, accettati dal database', () => {
   const ids = HOME_WIDGETS.map(w => w.id);
-  assert.deepEqual(ids, ['bills', 'shopping', 'tasks', 'five_minutes', 'medicines', 'health', 'pets', 'garden', 'documents']);
+  assert.deepEqual(ids, ['bills', 'shopping', 'tasks', 'five_minutes', 'medicines', 'health', 'pets', 'garden', 'documents', 'installments']);
   assert.deepEqual(normalizeHomePreferences(null).widgets, ['bills', 'shopping', 'tasks', 'five_minutes']);
   assert.deepEqual(toggleHomeWidget(null, 'medicines').widgets.slice(-1), ['medicines']);
-  assert.match(sql, new RegExp(`array\\[${ids.map(i => `'${i}'`).join(',')}\\]`));
-  assert.match(sql, /cardinality\(widget_order\) between 1 and 9/);
+  assert.match(sql65, new RegExp(`array\\[${ids.map(i => `'${i}'`).join(',')}\\]`));
+  assert.match(sql65, /cardinality\(widget_order\) between 1 and 10/);
   for (const lang of LANGS) for (const id of ids.slice(4)) assert.ok(TRANSLATIONS[lang]['home.widget.' + id] && TRANSLATIONS[lang]['home.widget.' + id + '.empty'], `${lang} ${id}`);
 });
 

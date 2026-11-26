@@ -45,6 +45,28 @@ async function healthEvents(admin,userId,homes,today){
  const details=pref?.health_push_details===true;
  return healthCalendarEvents(people,appointments,today).map(e=>({...e,what:details?e.title:'',place:details?e.place:''}));
 }
+// Rate non pagate (migrate_v64) e documenti con la scadenza (migrate_v63): senza le tabelle nessun evento.
+async function deadlineEvents(admin,userId,homes,today){
+ const scoped=async(table,columns,refine)=>{
+  const rows=[...await readAll(admin,table,columns,q=>refine(q.eq('user_id',userId).is('home_id',null)).order('id'))];
+  if(homes.length)rows.push(...await readIn(admin,table,columns,'home_id',homes,q=>refine(q).order('id')));
+  return rows;
+ };
+ const out=[];
+ try{
+  const plans=await scoped('payment_plans','id,title,ended_on',q=>q.is('ended_on',null));
+  if(plans.length){
+   const titles=new Map(plans.map(p=>[p.id,p.title]));
+   const items=await readIn(admin,'payment_installments','id,plan_id,label,due_on','plan_id',plans.map(p=>p.id),q=>q.is('paid_on',null).gte('due_on',addDaysISO(today,-7)).lte('due_on',addDaysISO(today,400)).order('id'));
+   for(const i of items)out.push({uid:`installment-${i.id}`,date:i.due_on,key:'installment',params:{plan:titles.get(i.plan_id),label:i.label}});
+  }
+ }catch(error){if(!['42P01','PGRST205'].includes(error?.code))throw error;}
+ try{
+  const docs=await scoped('family_documents','id,holder,kind,label,expires_on',q=>q.not('expires_on','is',null).gte('expires_on',addDaysISO(today,-7)).lte('expires_on',addDaysISO(today,4000)));
+  for(const d of docs)out.push({uid:`document-${d.id}`,date:d.expires_on,key:'document',params:{holder:d.holder,what:d.label,kind:d.kind}});
+ }catch(error){if(!['42P01','PGRST205'].includes(error?.code))throw error;}
+ return out.sort((a,b)=>a.date.localeCompare(b.date)).slice(0,3000);
+}
 export const runtime='nodejs';
 export async function GET(_request,{params}){
  try{
@@ -63,15 +85,16 @@ export async function GET(_request,{params}){
   let shared=[];
   if(members?.length){try{shared=await readIn(admin,'bills','id,title,supplier,amount,due_date,paid_at','home_id',members.map(m=>m.home_id),period);}catch{throw new Error('calendar unavailable');}}
   const bills=[...new Map([...(personal||[]),...shared].map(b=>[b.id,b])).values()];
-  let garden=[],health=[];
+  let garden=[],health=[],extra=[];
   try{
    const homes=(members||[]).map(m=>m.home_id);
    const [plants,animals]=await Promise.all([gardenEvents(admin,feed.user_id,homes,today),petEvents(admin,feed.user_id,homes,today)]);
    garden=[...plants,...animals].sort((a,b)=>a.date.localeCompare(b.date)||a.uid.localeCompare(b.uid)).slice(0,3000);
    health=await healthEvents(admin,feed.user_id,homes,today);
+   extra=await deadlineEvents(admin,feed.user_id,homes,today);
   }catch{throw new Error('calendar unavailable');}
   // Testi del calendario nella lingua scelta da chi lo ha creato (italiano se non l'ha mai scelta).
   const {data:preference}=await admin.from('user_language_preferences').select('language').eq('user_id',feed.user_id).maybeSingle();
-  return new Response(calendarText(bills,undefined,preference?.language||'it',garden,health),{status:200,headers:{'Content-Type':'text/calendar; charset=utf-8','Content-Disposition':'inline; filename="casa-in-ordine.ics"','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
+  return new Response(calendarText(bills,undefined,preference?.language||'it',garden,health,extra),{status:200,headers:{'Content-Type':'text/calendar; charset=utf-8','Content-Disposition':'inline; filename="casa-in-ordine.ics"','Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'}});
  }catch{return Response.json({error:'calendarUnavailable'}, {status:503});}
 }
