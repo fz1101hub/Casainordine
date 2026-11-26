@@ -3,7 +3,8 @@
 // Dati: un'utenza della luce mensile (bolletta stimata di dicembre già creata), il condominio ogni
 // tre mesi senza utenza, internet pagato a novembre, la retta della scuola da dicembre e una gita
 // senza importo a gennaio. Controlla totali, mese più caro, voci del mese scelto, che nulla sia
-// contato due volte, la tabella, l'orizzonte di 6 mesi, il telefono e l'accessibilità.
+// contato due volte, la tabella, l'orizzonte di 6 mesi, il telefono, l'accessibilità e il riquadro
+// «Uscite del mese» nella Home.
 // Uso: node scripts/prove-previsione.mjs [http://localhost:3000]
 import { checker, startScenario, openPage, launch } from './accesso-comune.mjs';
 import { translate } from '../lib/i18n.mjs';
@@ -98,6 +99,32 @@ try {
   if (process.env.SHOT) await panel.screenshot({ path: `${process.env.SHOT}-telefono.png` });
   const box = await bars.nth(0).boundingBox();
   check(box && box.width >= 20, `telefono: barre larghe almeno 20 px (${box && Math.round(box.width)})`);
+  // 8. Riquadro «Uscite del mese» nella Home (sul computer, poi sul telefono): questo mese e il prossimo, salvato nelle preferenze.
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await ui.go(tr('nav.dashboard'));
+  await page.waitForTimeout(800);
+  await main.getByRole('button', { name: tr('home.personalize') }).click();
+  await main.locator('.home3-editor-row', { hasText: tr('home.widget.spending') }).getByRole('checkbox').check();
+  await main.getByRole('button', { name: tr('home.editor.save') }).click();
+  await page.waitForTimeout(900);
+  check((fake.rows('user_home_preferences').find(r => r.user_id === ANNA)?.widget_order || []).includes('spending'), 'riquadro salvato nelle preferenze');
+  const card = main.locator('.home3-card', { hasText: tr('home.widget.spending') });
+  await card.locator('.home3-item').first().waitFor({ timeout: 8000 }).catch(() => {});
+  const home = await text(card);
+  check(home.includes('349,90 € questo mese'), `Home: totale di novembre (${home.slice(0, 200)})`);
+  check(/Questo mese \(novembre\) Bollette registrate 29,90 € · Stima dallo storico 320,00 € 349,90 €/.test(home), 'Home: novembre con le parti');
+  check(/Il prossimo \(dicembre\) Bollette registrate 80,00 € · Rate 450,00 € 530,00 €/.test(home), 'Home: dicembre con le parti');
+  await card.getByRole('button', { name: tr('home.widget.spending.open') }).click();
+  await panel.locator('.forecast-chart').waitFor({ timeout: 10000 });
+  check(true, 'dal riquadro si apre la previsione');
+  await ui.go(tr('nav.dashboard'));
+  await card.locator('.home3-item').first().waitFor({ timeout: 8000 }).catch(() => {});
+
+  const homeViolations = await ui.axe();
+  check(!homeViolations.length, `Home: accessibilità (${homeViolations.join(', ')})`);
+  await page.setViewportSize({ width: 360, height: 780 });
+  await page.waitForTimeout(300);
+  check(await overflow() <= 1, 'Home sul telefono: niente scorrimento orizzontale');
   check(!ui.errors.length, `nessun errore nella pagina ${ui.errors.slice(0, 3).join(' | ')}`);
 } finally { await ui.context.close(); await browser.close(); await fake.close(); }
 finish();

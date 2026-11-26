@@ -16,6 +16,8 @@ const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8'
 const sql = read('supabase/migrate_v63_documenti_home.sql');
 // Tipi e riquadri aggiunti dopo (v65: certificato medico sportivo, riquadro delle rate).
 const sql65 = read('supabase/migrate_v65_scadenze_prevenzione.sql');
+// L'elenco dei riquadri accettati è nell'ultima migrazione che lo cambia.
+const sqlWidgets = read('supabase/migrate_v66_uscite_home.sql');
 const LANGS = ['it', 'en', 'es', 'fr', 'de', 'pt'];
 const TODAY = '2026-11-26';
 
@@ -105,11 +107,11 @@ test('lavoro giornaliero: un avviso «document» per documento e data, una volta
 
 test('Home: cinque riquadri nuovi, spenti di partenza, accettati dal database', () => {
   const ids = HOME_WIDGETS.map(w => w.id);
-  assert.deepEqual(ids, ['bills', 'shopping', 'tasks', 'five_minutes', 'medicines', 'health', 'pets', 'garden', 'documents', 'installments']);
+  assert.deepEqual(ids, ['bills', 'shopping', 'tasks', 'five_minutes', 'medicines', 'health', 'pets', 'garden', 'documents', 'installments', 'spending']);
   assert.deepEqual(normalizeHomePreferences(null).widgets, ['bills', 'shopping', 'tasks', 'five_minutes']);
   assert.deepEqual(toggleHomeWidget(null, 'medicines').widgets.slice(-1), ['medicines']);
-  assert.match(sql65, new RegExp(`array\\[${ids.map(i => `'${i}'`).join(',')}\\]`));
-  assert.match(sql65, /cardinality\(widget_order\) between 1 and 10/);
+  assert.match(sqlWidgets, new RegExp(`array\\[${ids.map(i => `'${i}'`).join(',')}\\]`));
+  assert.match(sqlWidgets, /cardinality\(widget_order\) between 1 and 11/);
   for (const lang of LANGS) for (const id of ids.slice(4)) assert.ok(TRANSLATIONS[lang]['home.widget.' + id] && TRANSLATIONS[lang]['home.widget.' + id + '.empty'], `${lang} ${id}`);
 });
 

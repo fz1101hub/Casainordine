@@ -29,7 +29,7 @@ function HomeWidget({title,icon:Icon,count,actionLabel,onAction,children}){
 }
 
 export default function PersonalizedHome({
- client,demo,user,homeId,canWrite,bills=[],tasks=[],displayName='',
+ client,demo,user,homeId,canWrite,bills=[],utilities=[],tasks=[],displayName='',
  sampleExtras=null,onSampleShoppingChange=()=>{},onNavigate,onNewBill,onNewTask,onPay,onToggleTask,onRefresh,onNotify=()=>{},loaded=true
 }){
  const {t:tr,money,date,language}=useLanguage();
@@ -141,7 +141,7 @@ export default function PersonalizedHome({
   finally{setShoppingBusy(false);}
  };
  // Riquadri delle sezioni nuove (HomeExtraCards.jsx): dati letti solo per quelli scelti.
- const extraCards=useExtraCards({ids:selected,client,demo,user,homeId,canWrite,limit,refreshKey,onNavigate,onNotify,HomeWidget});
+ const extraCards=useExtraCards({ids:selected,client,demo,user,homeId,canWrite,limit,refreshKey,onNavigate,onNotify,HomeWidget,bills,utilities});
  const cards={
   ...extraCards,
   bills:<HomeWidget key="bills" icon={ReceiptText} title={tr('home.widget.bills')}
