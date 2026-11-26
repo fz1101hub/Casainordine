@@ -55,22 +55,24 @@ function TaxesSection({ client, demo, user, homeId, canWrite, onNotify = () => {
     if (demo || !client || !user?.id) return;
     const from = `${year}-01-01`, to = `${year}-12-31`;
     const safe = result => (result?.error ? [] : result?.data || []);
-    const [bills, expenses, projects, pets, people] = await Promise.all([
+    const [bills, expenses, projects, pets, people, plans] = await Promise.all([
       selectAll(count => scope(client.from('bills').select('id,title,supplier,amount,paid_at', count ? { count: 'exact' } : undefined)).gte('paid_at', from).lte('paid_at', `${to}T23:59:59Z`).order('id')),
       homeId ? selectAll(count => client.from('home_expenses').select('id,title,amount,incurred_on', count ? { count: 'exact' } : undefined).eq('home_id', homeId).gte('incurred_on', from).lte('incurred_on', to).order('id')) : { data: [] },
       scope(client.from('home_projects').select('id,title')).limit(300),
       scope(client.from('home_pets').select('id,name')).limit(100),
       scope(client.from('health_people').select('id,name')).limit(100),
+      scope(client.from('payment_plans').select('id,title,payee,tax_category')).not('tax_category', 'is', null).limit(300),
     ]);
-    const projectIds = safe(projects).map(p => p.id), petIds = safe(pets).map(p => p.id), billIds = safe(bills).map(b => b.id), personIds = safe(people).map(p => p.id);
-    const [projectExpenses, petLog, billDocuments, healthExpenses] = await Promise.all([
+    const projectIds = safe(projects).map(p => p.id), petIds = safe(pets).map(p => p.id), billIds = safe(bills).map(b => b.id), personIds = safe(people).map(p => p.id), planIds = safe(plans).map(p => p.id);
+    const [projectExpenses, petLog, billDocuments, healthExpenses, installments] = await Promise.all([
       projectIds.length ? selectIn((part, count) => client.from('home_project_expenses').select('id,project_id,description,amount,paid_on,document_id', count ? { count: 'exact' } : undefined).in('project_id', part).gte('paid_on', from).lte('paid_on', to).order('id'), projectIds) : { data: [] },
       petIds.length ? selectIn((part, count) => client.from('home_pet_log').select('id,pet_id,title,cost_cents,done_on,document_id', count ? { count: 'exact' } : undefined).in('pet_id', part).gt('cost_cents', 0).gte('done_on', from).lte('done_on', to).order('id'), petIds) : { data: [] },
       billIds.length ? selectIn((part, count) => client.from('home_documents').select('id,bill_id', count ? { count: 'exact' } : undefined).in('bill_id', part).order('id'), billIds) : { data: [] },
       personIds.length ? selectIn((part, count) => client.from('health_expenses').select('id,person_id,kind,description,amount_cents,spent_on,payment_method', count ? { count: 'exact' } : undefined).in('person_id', part).gte('spent_on', from).lte('spent_on', to).order('id'), personIds) : { data: [] },
+      planIds.length ? selectIn((part, count) => client.from('payment_installments').select('id,plan_id,label,amount_cents,paid_on,paid_cents', count ? { count: 'exact' } : undefined).in('plan_id', part).gte('paid_on', from).lte('paid_on', to).order('id'), planIds) : { data: [] },
     ]);
     setSources({ year, bills: safe(bills), expenses: safe(expenses), projects: safe(projects), projectExpenses: safe(projectExpenses), pets: safe(pets), petLog: safe(petLog), billDocuments: safe(billDocuments),
-      healthPeople: safe(people), healthExpenses: safe(healthExpenses) });
+      healthPeople: safe(people), healthExpenses: safe(healthExpenses), plans: safe(plans), installments: safe(installments) });
   }, [client, demo, homeId, scope, user?.id, year]);
   useEffect(() => { if (showCandidates && sources.year !== year) loadSources(); }, [showCandidates, year, sources.year, loadSources]);
 
