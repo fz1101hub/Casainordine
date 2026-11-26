@@ -257,9 +257,11 @@ function HealthSection({ client, demo, user, homeId, canWrite, onNotify = () => 
 
   // ===== Calendario vaccinale e bilanci di salute =====
   const stepTitle = key => (isCheckup(key) ? tr('health.checkup', { number: Number(key.slice(4)) }) : tr('health.vaccine.' + key));
+  // La casella cambia subito; se il salvataggio non riesce torna com'era.
   async function saveCheckups(p, on) {
-    if (!demo) { const { error } = await client.from('health_people').update({ checkup_plan: on }).eq('id', p.id); if (error) { onNotify(friendlyError(error, tr)); return; } }
-    setPeople(list => list.map(x => (x.id === p.id ? { ...x, checkup_plan: on } : x)));
+    const put = value => setPeople(list => list.map(x => (x.id === p.id ? { ...x, checkup_plan: value } : x)));
+    put(on);
+    if (!demo) { const { error } = await client.from('health_people').update({ checkup_plan: on }).eq('id', p.id); if (error) { put(!on); onNotify(friendlyError(error, tr)); return; } }
     onNotify(tr(on ? 'health.checkupsOn' : 'health.checkupsOff', { name: p.name }));
   }
   async function savePlan(p, plan) {

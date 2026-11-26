@@ -3,6 +3,7 @@
 // 1. io: terapia alle 8 e alle 20 con la confezione delle Scorte; «Oggi»: presa, annulla, saltata;
 // 2. terapia in alcuni giorni della settimana; la confezione che finisce tra le medicine da ricomprare;
 // 3. la mamma: vaccinazione con l'ora e i promemoria, che si ripete ogni anno; «Fatto» → la prossima;
+// 3b-3e. neonato: vaccini, bilanci di salute, scheda d'emergenza, spese sanitarie nel 730;
 // 4. nomi nelle notifiche (di partenza no); sul telefono niente esce dallo schermo; accessibilità.
 // Uso: node scripts/prove-salute.mjs [http://localhost:3000]
 import { checker, startScenario, openPage, launch } from './accesso-comune.mjs';
@@ -141,6 +142,108 @@ try {
   check(rows('health_appointments').some(a => a.schedule_key === 'hexa_2' && a.done_on === '2026-11-24'), '«già fatta» segnata con la sua data');
   check(/Fatta il mar 24 nov/.test(await steps.nth(1).innerText()), 'la tappa risulta fatta');
 
+  // 3c. Bilanci di salute dal pediatra: accesi, «già fatto» e «prenota».
+  await main.getByRole('checkbox', { name: tr('health.checkupsFollow') }).check();
+  await page.waitForTimeout(800);
+  check(rows('health_people').find(p => p.id === luca.id)?.checkup_plan === true, 'bilanci di salute accesi');
+  const checkups = main.locator('.health-checkup-list li');
+  check(await checkups.count() === 10, `dieci bilanci di salute (${await checkups.count()})`);
+  check(/Bilancio di salute 1[\s\S]*Tra il 1° e il 45° giorno di vita[\s\S]*Oltre il periodo previsto: chiedi al pediatra/.test(await checkups.nth(0).innerText()), 'primo bilancio: periodo passato, chiedi al pediatra');
+  check(/Bilancio di salute 2[\s\S]*dal gio 19 nov[\s\S]*Da fare ora/.test(await checkups.nth(1).innerText()), 'secondo bilancio: da fare ora');
+  await main.getByRole('button', { name: tr('health.alreadyDoneCheckupAria', { name: tr('health.checkup', { number: 1 }) }), exact: true }).click();
+  await main.getByLabel(tr('health.doneDate'), { exact: true }).fill('2026-10-02');
+  await main.locator('.health-done-form').getByRole('button', { name: tr('health.save') }).click();
+  await page.waitForTimeout(800);
+  check(rows('health_appointments').some(a => a.schedule_key === 'bds_1' && a.done_on === '2026-10-02' && a.kind === 'visit'), 'primo bilancio segnato come fatto');
+  check(/Fatto il ven 2 ott/.test(await checkups.nth(0).innerText()), 'il primo bilancio risulta fatto');
+  await main.getByRole('button', { name: tr('health.bookAria', { name: tr('health.checkup', { number: 2 }) }), exact: true }).click();
+  check(await main.getByLabel(tr('health.appointmentTitle'), { exact: true }).inputValue() === 'Bilancio di salute 2' && await main.getByLabel(tr('health.appointmentKind')).inputValue() === 'visit', 'prenota: visita già compilata');
+  await main.getByLabel(tr('health.onDate'), { exact: true }).fill('2026-11-30');
+  await main.getByRole('button', { name: tr('health.save') }).click();
+  await page.waitForTimeout(800);
+  check(rows('health_appointments').some(a => a.schedule_key === 'bds_2' && a.on_date === '2026-11-30' && a.person_id === luca.id), 'secondo bilancio prenotato');
+  check(/Prenotato: lun 30 nov/.test(await checkups.nth(1).innerText()), 'il secondo bilancio risulta prenotato');
+
+  // 3d. Scheda d'emergenza: dati di Luca, telefono sbagliato rifiutato, anteprima e stampa.
+  await main.getByRole('button', { name: tr('health.editPersonAria', { name: 'Luca' }) }).click();
+  await main.getByLabel(tr('health.card.bloodType')).selectOption('0+');
+  await main.getByLabel(tr('health.card.allergies'), { exact: true }).fill('Penicillina');
+  await main.getByLabel(tr('health.card.conditions'), { exact: true }).fill('Asma lieve: inalatore nello zaino');
+  await main.getByLabel(tr('health.card.doctorName'), { exact: true }).fill('Dott.ssa Bianchi');
+  await main.getByLabel(tr('health.card.doctorPhone'), { exact: true }).fill('chiamami');
+  await main.getByLabel(tr('health.card.contactName'), { exact: true }).fill('Nonna Pia');
+  await main.getByLabel(tr('health.card.contactPhone'), { exact: true }).fill('333 1234567');
+  await main.getByRole('button', { name: tr('health.save') }).click();
+  check((await ui.toast()).includes(tr('health.error.phone').slice(0, 30)), 'telefono con lettere rifiutato');
+  await main.getByLabel(tr('health.card.doctorPhone'), { exact: true }).fill('+39 02 1234567');
+  await main.getByRole('button', { name: tr('health.save') }).click();
+  await page.waitForTimeout(800);
+  const lucaCard = rows('health_people').find(p => p.id === luca.id);
+  check(lucaCard?.blood_type === '0+' && lucaCard?.allergies === 'Penicillina' && lucaCard?.doctor_phone === '+39 02 1234567' && lucaCard?.emergency_name === 'Nonna Pia' && lucaCard?.vaccine_plan === 'mandatory', 'dati della scheda salvati (il piano vaccini resta)');
+  check(/Allergie: Penicillina/.test(await main.locator('.health-card-summary').innerText()), 'le allergie si vedono subito nella pagina della persona');
+  await page.evaluate(() => { window.__printed = 0; window.print = () => { window.__printed += 1; }; });
+  await main.getByRole('button', { name: tr('health.card.printFor', { name: 'Luca' }) }).click();
+  const panel = main.locator('.health-card-panel');
+  check(await panel.locator('.health-card').count() === 1, 'scheda di Luca soltanto');
+  const cardText = await panel.locator('.health-card').first().innerText();
+  check(/Luca[\s\S]*2 mesi[\s\S]*0\+[\s\S]*Penicillina[\s\S]*Asma lieve[\s\S]*Dott\.ssa Bianchi[\s\S]*\+39 02 1234567[\s\S]*Nonna Pia[\s\S]*333 1234567[\s\S]*Esavalente – 2ª dose · 24 nov 2026[\s\S]*112/.test(cardText), 'scheda con età, gruppo, allergie, medico, chi chiamare, vaccini fatti e 112');
+  check(!/Bilancio di salute 1/.test(cardText), 'tra le vaccinazioni non finiscono i bilanci');
+  check(await panel.locator('a[href="tel:+39021234567"]').count() === 1, 'il numero del medico si chiama con un tocco');
+  await panel.getByRole('button', { name: tr('health.card.print') }).click();
+  check(await page.evaluate(() => window.__printed) === 1, '«Stampa la scheda» apre la stampa');
+  await page.emulateMedia({ media: 'print' });
+  check(await main.locator('.health-card-print .health-card').first().isVisible() && !(await panel.isVisible()) && !(await main.locator('.extra-layout').isVisible()), 'in stampa solo le schede');
+  await page.emulateMedia({ media: 'screen' });
+  await panel.getByRole('checkbox', { name: 'Anna', exact: true }).check();
+  check(await panel.locator('.health-card').count() === 2 && /Anna/.test(await panel.locator('.garden-warning').innerText()), 'con Anna: due schede e l’avviso che la sua è vuota');
+  await panel.getByRole('button', { name: tr('health.card.close') }).click();
+  check(!(await panel.count()), 'scheda chiusa');
+
+  // 3e. Spese sanitarie: farmaci in contanti nel 730, visita privata fuori dal 730 e poi dentro.
+  await main.getByRole('button', { name: tr('health.addExpense') }).click();
+  await main.getByLabel(tr('health.expenseDescription'), { exact: true }).fill('Sciroppo per la tosse');
+  await main.getByLabel(tr('health.expenseAmount'), { exact: true }).fill('8,50');
+  await main.getByLabel(tr('health.paymentLabel')).selectOption('cash');
+  check(await main.getByText(tr('health.expenseCashOk')).isVisible(), 'farmaci in contanti: detraibili lo stesso');
+  await main.getByRole('button', { name: tr('health.save') }).click();
+  await page.waitForTimeout(900);
+  const syrup = rows('health_expenses').find(e => e.description === 'Sciroppo per la tosse');
+  check(syrup?.amount_cents === 850 && syrup?.kind === 'pharmacy' && syrup?.payment_method === 'cash' && syrup?.spent_on === '2026-11-25' && syrup?.person_id === luca.id, 'spesa in farmacia salvata');
+  const syrupTax = rows('home_tax_items').find(t => t.source === 'health_expense' && t.source_id === syrup?.id);
+  check(syrupTax?.description === 'Luca · Sciroppo per la tosse' && syrupTax?.cash_ok === true && syrupTax?.category === 'medical' && syrupTax?.tax_year === 2026 && syrupTax?.amount_cents === 850 && syrupTax?.user_id === ANNA, 'ed è già tra le spese detraibili');
+  check((await ui.toast()).includes(tr('health.expenseIn730')), 'il messaggio lo dice');
+  check((await main.locator('.health-expense-total').innerText()).replace(/\s+/g, ' ').includes('2026: 8,50 € in 1 spesa'), 'totale dell’anno');
+  await main.getByRole('button', { name: tr('health.addExpense') }).click();
+  await main.getByLabel(tr('health.expenseKind')).selectOption('visit');
+  await main.getByLabel(tr('health.expenseDescription'), { exact: true }).fill('Visita dermatologica privata');
+  await main.getByLabel(tr('health.expenseAmount'), { exact: true }).fill('90');
+  await main.getByLabel(tr('health.paymentLabel')).selectOption('cash');
+  check(await main.locator('form .garden-warning', { hasText: tr('health.expenseTraceable') }).isVisible(), 'visita privata in contanti: avvisa del pagamento tracciabile');
+  await main.getByRole('checkbox', { name: tr('health.expenseTo730') }).uncheck();
+  await main.getByRole('button', { name: tr('health.save') }).click();
+  await page.waitForTimeout(900);
+  const derma = rows('health_expenses').find(e => e.description === 'Visita dermatologica privata');
+  check(derma?.kind === 'visit' && !rows('home_tax_items').some(t => t.source_id === derma?.id), 'senza la casella non va nel 730');
+  await main.getByRole('button', { name: tr('health.add730Aria', { description: 'Visita dermatologica privata' }) }).click();
+  await page.waitForTimeout(800);
+  check(rows('home_tax_items').some(t => t.source_id === derma?.id && t.cash_ok === false && t.payment_method === 'cash'), '«Metti nel 730»: aggiunta, senza «anche in contanti»');
+  check((await main.locator('.health-expense-total').innerText()).replace(/\s+/g, ' ').includes('98,50 € in 2 spese'), 'totale aggiornato');
+  await main.locator('details.garden-ended summary').click();
+  await main.getByRole('button', { name: tr('health.expenseForAria', { title: 'Bilancio di salute 1' }), exact: true }).click();
+  check(await main.getByLabel(tr('health.expenseDescription'), { exact: true }).inputValue() === 'Bilancio di salute 1' && await main.getByLabel(tr('health.spentOn'), { exact: true }).inputValue() === '2026-10-02'
+    && await main.getByLabel(tr('health.expenseKind')).inputValue() === 'visit', '«Spesa» su una visita fatta: modulo già compilato');
+  await main.locator('.health-expenses form').getByRole('button', { name: tr('health.cancel') }).click();
+  await main.getByRole('button', { name: tr('health.deleteExpenseAria', { description: 'Visita dermatologica privata' }) }).click();
+  await ui.confirm();
+  await page.waitForTimeout(800);
+  check(!rows('health_expenses').some(e => e.description === 'Visita dermatologica privata') && (await ui.toast()).includes(tr('health.expenseDeleted')), 'spesa eliminata');
+  await ui.go(tr('nav.taxes'));
+  await page.waitForTimeout(800);
+  const taxRow = main.locator('li', { hasText: 'Luca · Sciroppo per la tosse' });
+  check(await taxRow.count() === 1 && (await taxRow.innerText()).includes(tr('taxes.source.health_expense')) && !(await taxRow.innerText()).includes(tr('taxes.warning.traceable')), 'nelle Spese detraibili, «Da Salute», senza avviso sui contanti');
+  await ui.go(tr('nav.health'));
+  await page.waitForTimeout(800);
+
   // 4. Nomi nelle notifiche: di partenza spento.
   const detailsBox = main.getByRole('checkbox', { name: tr('health.details') });
   check(!(await detailsBox.isChecked()), 'di partenza le notifiche non mostrano i nomi');
@@ -151,6 +254,9 @@ try {
   await main.getByRole('button', { name: tr('health.addTherapy') }).click();
   await page.waitForTimeout(300);
   check(await overflow() <= 1, `sul telefono, con il modulo aperto, niente esce dallo schermo (${await overflow()} px)`);
+  await main.getByRole('button', { name: tr('health.card.open'), exact: true }).click();
+  await page.waitForTimeout(300);
+  check(await overflow() <= 1, `sul telefono, con le schede d'emergenza, niente esce dallo schermo (${await overflow()} px)`);
   const violations = await ui.axe();
   check(!violations.length, `accessibilità (${violations.join(', ')})`);
   check(!ui.errors.length, `nessun errore nella pagina ${ui.errors.slice(0, 3).join(' | ')}`);
