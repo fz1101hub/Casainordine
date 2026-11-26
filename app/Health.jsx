@@ -17,6 +17,7 @@ import { titleKey } from '../lib/stock.mjs';
 import DecimalInput from './DecimalInput';
 import HealthCards from './HealthCard';
 import HealthExpenses, { blankExpense } from './HealthExpenses';
+import { saveDose } from '../lib/health-doses.mjs';
 import {
   RELATIONS, THERAPY_KINDS, APPOINTMENT_KINDS, REMINDER_CODES, HEALTH_LIMITS, EVERY_CHOICES, REPEAT_CHOICES, normalizePerson, normalizeTherapy, normalizeAppointment,
   dosesOnDate, doseState, stockEstimates, upcomingAppointments, addMonths, addDays, hhmm, romeInstant, vaccinePlan, VACCINE_PLANS, checkupPlan, BLOOD_TYPES,
@@ -179,29 +180,17 @@ function HealthSection({ client, demo, user, homeId, canWrite, onNotify = () => 
   // Presa o saltata: la dose «in attesa» scritta dal promemoria si aggiorna; se non c'è si crea.
   async function markDose(dose, status) {
     const { row } = doseState(dose, doses, now);
-    const patch = { status, done_at: status === 'pending' ? null : new Date().toISOString() };
-    let saved;
-    if (demo) saved = { ...(row || { id: uid(), therapy_id: dose.therapy.id, due_at: dose.due_at }), ...patch };
-    else if (row) {
-      const { data, error } = await client.from('health_doses').update(patch).eq('id', row.id).select('*').single();
-      if (error) { onNotify(friendlyError(error, tr)); return; }
-      saved = data;
-    } else {
-      const { data, error } = await client.from('health_doses').insert({ therapy_id: dose.therapy.id, due_at: dose.due_at, ...patch }).select('*').single();
-      if (error) { onNotify(friendlyError(error, tr)); await load(); return; }
-      saved = data;
-    }
-    setDoses(list => [...list.filter(d => d.id !== saved.id && !(d.therapy_id === saved.therapy_id && Date.parse(d.due_at) === Date.parse(saved.due_at))), saved]);
-    // Confezione delle Scorte: una dose presa la scala, annullare la rimette.
     const item = dose.therapy.stock_item_id ? stockById.get(dose.therapy.stock_item_id) : null;
-    const use = Number(dose.therapy.stock_use) || 0;
-    const delta = item && use ? (status === 'taken' ? -use : row?.status === 'taken' ? use : 0) : 0;
+    const result = await saveDose(client, { dose, status, row, stockItem: item, demo, newId: uid });
+    if (result.error) { onNotify(friendlyError(result.error, tr)); if (result.reload) await load(); return; }
+    const { saved } = result;
+    setDoses(list => [...list.filter(d => d.id !== saved.id && !(d.therapy_id === saved.therapy_id && Date.parse(d.due_at) === Date.parse(saved.due_at))), saved]);
+    // Confezione delle Scorte: una dose presa la scala, annullare la rimette (lib/health-doses.mjs).
     const messages = [tr(status === 'taken' ? 'health.doseTaken' : status === 'skipped' ? 'health.doseSkipped' : 'health.doseUndone', { name: dose.therapy.name, time: dose.time })];
-    if (delta) {
-      let quantity = Math.max(0, Math.round((Number(item.quantity) + delta) * 100) / 100);
-      if (!demo) { const { data, error } = await client.rpc('v46_adjust_stock', { p_item: item.id, p_delta: delta }); if (error) messages.push(friendlyError(error, tr)); else quantity = Number(data); }
-      setStock(list => list.map(s => (s.id === item.id ? { ...s, quantity } : s)));
-      if (delta < 0) messages.push(tr('health.stockLeft', { name: item.name, amount: number(quantity) }));
+    if (result.delta) {
+      if (result.stockError) messages.push(friendlyError(result.stockError, tr));
+      setStock(list => list.map(s => (s.id === item.id ? { ...s, quantity: result.quantity } : s)));
+      if (result.delta < 0) messages.push(tr('health.stockLeft', { name: item.name, amount: number(result.quantity) }));
     }
     onNotify(messages.join(' '));
   }

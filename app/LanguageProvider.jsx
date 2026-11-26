@@ -124,17 +124,18 @@ export function LanguageProvider({children}){
  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }
 // Scarica i testi di una sezione (oggi solo v20) nella lingua scelta; restituisce true quando ci sono.
+// section vuota (null): niente da caricare (per i riquadri della Home che servono solo a volte).
 export function useSection(section){
  const {language}=useLanguage();
  const id=language+'.'+section;
  const [,setLoaded]=useState(0);
  useEffect(()=>{
-  if(sections[id])return;
+  if(!section||sections[id])return;
   let active=true;
   loadSection(language,section).then(()=>{if(active)setLoaded(n=>n+1);}).catch(()=>{});
   return()=>{active=false;};
  },[id,language,section]);
- return Boolean(sections[id]);
+ return !section||Boolean(sections[id]);
 }
 export function useLanguage(){
  const value=useContext(LanguageContext);

@@ -710,3 +710,6 @@ select{min-height:24px}
 .health-expense-total{font-weight:600;margin:.3rem 0}.health-expense-help{font-size:.85rem}
 @media print{.health-card-panel{display:none!important}.health-card-print{padding:0!important}.health-card-print .health-card{border:1px solid #000;border-radius:0;break-inside:avoid;page-break-after:always;margin:0 0 12px;color:#000;background:#fff}
 .health-card-print .health-card:last-child{page-break-after:auto}.health-card-print .health-card dd a{color:#000;text-decoration:none}.health-card-print .muted{color:#333}.health-card-print .health-card-alert dd{color:#000;text-decoration:underline}}
+/* Documenti di famiglia (v63) */
+.iddocs-list li.iddocs-expired b{color:#9b2c1f}.iddocs-pill-expired{background:#fbe3e0;color:#8a2a1c}.iddocs-pill-renew{background:#fbeee0;color:#8a5210}
+.iddocs-pill-ok{background:#e7f3e5;color:#2f6b2c}.iddocs-pill-none{background:#eef1f5;color:#47586b}.iddocs-rules{margin:0;padding-left:1.1rem;display:grid;gap:.45rem}
