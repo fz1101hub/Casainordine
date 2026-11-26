@@ -63,7 +63,7 @@ test('Nessun link di ripiego verso http://localhost:3000 nel codice dell’app',
   assert.match(cron, /processBillReminders\(admin,[^;]*\{today,appUrl,counts,/);
   assert.match(readFileSync(join(root, 'lib/reminder-run.mjs'), 'utf8'), /email\.send\(w\.address, w\.bill, languageOf\(w\.userId\), appUrl, w\.userId\)/);
   assert.match(cron, /processSummaries\(admin,[^;]*\{today,appUrl,counts,/);
-  assert.match(readFileSync(join(root, 'lib/summary-run.mjs'), 'utf8'), /email\.send\(profile\.email, items, today, languageOf\(profile\.id\), appUrl, profile\.id\)/);
+  assert.match(readFileSync(join(root, 'lib/summary-run.mjs'), 'utf8'), /email\.send\(profile\.email, items, today, languageOf\(profile\.id\), appUrl, profile\.id(, extra)?\)/);
   const callback = readFileSync(join(root, 'app/api/mail/callback/route.js'), 'utf8');
   assert.doesNotMatch(callback, /redirect\('[a-z_]+'\)/, 'ogni ritorno usa l’indirizzo della richiesta');
 });
