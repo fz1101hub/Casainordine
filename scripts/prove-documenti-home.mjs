@@ -15,7 +15,8 @@ const ANNA = '11111111-1111-4111-8111-111111111111';
 
 const { fake, person } = await startScenario({ tokenTtl: 3 * 86400 });
 const anna = person('anna', ANNA, 'anna@example.org');
-fake.seed('health_people', [{ id: 'p-anna', user_id: ANNA, home_id: null, name: 'Anna', relation: 'self', birth_on: null, vaccine_plan: 'off', checkup_plan: false }]);
+fake.seed('health_people', [{ id: 'p-anna', user_id: ANNA, home_id: null, name: 'Anna', relation: 'self', birth_on: null, vaccine_plan: 'off', checkup_plan: false },
+  { id: 'p-luca', user_id: ANNA, home_id: null, name: 'Luca', relation: 'child', birth_on: '2023-05-02', vaccine_plan: 'off', checkup_plan: false }]);
 fake.seed('health_therapies', [{ id: 't-asp', person_id: 'p-anna', created_by: ANNA, kind: 'medicine', name: 'Cardioaspirina', dose: '1 compressa', instructions: '', times: ['08:00:00', '20:00:00'], every_days: 1, weekdays: null, start_on: '2026-11-01', end_on: null, remind: true, stock_item_id: null, stock_use: null, notes: '' }]);
 const browser = await launch();
 const ui = await openPage(browser);
@@ -70,6 +71,14 @@ try {
   await page.waitForTimeout(600);
   check(!rows('family_documents').some(d => d.holder === 'Nonno Gino'), 'documento eliminato');
 
+  // 1b. Certificato medico sportivo: «Rinnovato» propone un anno dopo; iscrizioni dei figli di Salute.
+  await addDoc({ holder: 'Luca', kind: 'sport_certificate', expires: '2026-12-15' });
+  check(rows('family_documents').find(d => d.kind === 'sport_certificate')?.notice_days === 30, 'certificato sportivo: avviso un mese prima');
+  await main.getByRole('button', { name: tr('iddocs.renewAria', { what: 'Certificato medico sportivo', holder: 'Luca' }) }).click();
+  check(await field(tr('iddocs.newExpiry')).inputValue() === '2027-12-15', '«Rinnovato»: un anno dopo già proposto');
+  await main.locator('.health-done-form').getByRole('button', { name: tr('iddocs.cancel') }).click();
+  check(/Luca · Scuola primaria[\s\S]*gennaio–febbraio 2029, per l'anno scolastico 2029\/2030/.test(await main.locator('.iddocs-enrollments').innerText()), 'iscrizione di Luca alla primaria nel 2029');
+
   // 2. Home: riquadri nuovi.
   await ui.go(tr('nav.dashboard'));
   await page.waitForTimeout(800);
@@ -88,7 +97,7 @@ try {
   check(dose?.status === 'taken' && Date.parse(dose?.due_at) === Date.parse('2026-11-26T07:00:00Z'), 'presa dal riquadro: dose delle 8 di Roma segnata');
   check(/08:00 · Cardioaspirina[\s\S]*Presa/.test(await meds.innerText()) && (await ui.toast()).includes('Cardioaspirina delle 08:00: presa.'), 'il riquadro e il messaggio lo dicono');
   const docsCard = main.locator('.home3-card', { hasText: tr('home.widget.documents') });
-  check(/1 da rinnovare/.test(await docsCard.innerText()) && /Passaporto · Luca[\s\S]*scade il mer 12 mag \(tra 167 giorni\)/.test(await docsCard.innerText()), 'documenti in scadenza nella Home');
+  check(/2 da rinnovare/.test(await docsCard.innerText()) && /Certificato medico sportivo · Luca/.test(await docsCard.innerText()) && /Passaporto · Luca[\s\S]*scade il mer 12 mag \(tra 167 giorni\)/.test(await docsCard.innerText()), 'documenti in scadenza nella Home');
   await docsCard.getByRole('button', { name: tr('home.openAll') }).click();
   await page.waitForTimeout(600);
   check((await ui.main()).includes(tr('iddocs.help').slice(0, 30)), '«Vedi tutto» apre i Documenti di famiglia');

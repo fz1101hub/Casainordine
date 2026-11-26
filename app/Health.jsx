@@ -48,6 +48,8 @@ function HealthSection({ client, demo, user, homeId, canWrite, onNotify = () => 
   const today = todayRome(now);
   const writable = demo || canWrite;
   const day = iso => (iso ? date(iso, { weekday: 'short', day: 'numeric', month: 'short' }) : '—');
+  // Screening: anni di distanza, con l'anno.
+  const dayYear = iso => (iso ? date(iso, { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
   const number = value => new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(Number(value) || 0);
   const weekdayName = useCallback(n => new Intl.DateTimeFormat(locale, { weekday: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2026, 10, 22 + n))), [locale]);
   const scope = useCallback(query => (homeId ? query.eq('home_id', homeId) : query.eq('user_id', user?.id).is('home_id', null)), [homeId, user?.id]);
@@ -577,8 +579,8 @@ function HealthSection({ client, demo, user, homeId, canWrite, onNotify = () => 
             {!person.screening_plan ? <p className="muted">{tr('health.screeningsHelp')}</p> : !screenings.length ? <p className="muted">{tr('health.screeningsNone')}</p> : <>
               <ul className="health-list health-screening-list">{screenings.map(item => <li key={item.key} className={`vaccine-${item.state}`}>
                 <span><b>{tr('health.screening.' + item.key)}</b>
-                  <small>{tr('health.screeningEvery.' + item.key)}{item.last ? ' · ' + tr('health.screeningLast', { date: day(item.last.done_on) }) : ''}</small>
-                  <small><span className={`extra-pill ${item.organized ? 'health-mandatory' : 'health-recommended'}`}>{tr(item.organized ? 'health.screeningFree' : 'health.recommended')}</span> <span className={`extra-pill health-v-${item.state === 'ok' ? 'later' : item.state}`}>{item.state === 'booked' ? tr('health.cState.booked', { date: day(item.booked.on_date) }) : item.state === 'ok' || item.state === 'soon' ? tr('health.screeningNext', { date: day(item.next) }) : tr('health.cState.due')}</span></small></span>
+                  <small>{tr('health.screeningEvery.' + item.key)}{item.last ? ' · ' + tr('health.screeningLast', { date: dayYear(item.last.done_on) }) : ''}</small>
+                  <small><span className={`extra-pill ${item.organized ? 'health-mandatory' : 'health-recommended'}`}>{tr(item.organized ? 'health.screeningFree' : 'health.screeningAdvised')}</span> <span className={`extra-pill health-v-${item.state === 'ok' ? 'later' : item.state}`}>{item.state === 'booked' ? tr('health.cState.booked', { date: dayYear(item.booked.on_date) }) : item.state === 'ok' || item.state === 'soon' ? tr('health.screeningNext', { date: dayYear(item.next) }) : tr('health.cState.due')}</span></small></span>
                 {writable && item.state !== 'booked' && <span className="extra-buttons">
                   <button className="btn btn-soft" aria-label={tr('health.bookAria', { name: tr('health.screening.' + item.key) })} onClick={() => bookScreening(item)}><CalendarClock size={15} /> {tr('health.book')}</button>
                   <button className="btn btn-soft" aria-label={tr('health.alreadyDoneCheckupAria', { name: tr('health.screening.' + item.key) })} onClick={() => setDoneForm({ key: item.key, screening: item.kind, date: today })}><Check size={15} /> {tr('health.alreadyDoneCheckup')}</button>

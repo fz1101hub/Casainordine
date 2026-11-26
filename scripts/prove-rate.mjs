@@ -102,6 +102,17 @@ try {
   check((await page.locator('.search-dialog').innerText()).toLowerCase().includes(tr('nav.installments').toLowerCase()), 'la ricerca trova l’impegno');
   await page.keyboard.press('Escape');
 
+  // 4b. Riquadro «Rate in scadenza» nella Home.
+  await ui.go(tr('nav.dashboard'));
+  await page.waitForTimeout(800);
+  await main.getByRole('button', { name: tr('home.personalize') }).click();
+  await main.locator('.home3-editor-row', { hasText: tr('home.widget.installments') }).getByRole('checkbox').check();
+  await main.getByRole('button', { name: tr('home.editor.save') }).click();
+  await page.waitForTimeout(900);
+  const instCard = main.locator('.home3-card', { hasText: tr('home.widget.installments') });
+  await instCard.locator('.home3-item').first().waitFor({ timeout: 8000 }).catch(() => {});
+  check(/2 nei prossimi 30 giorni/.test(await instCard.innerText()) && /2° acconto 2026[\s\S]*Imposte e contributi · lun 30 nov[\s\S]*Retta di dicembre 2026/.test(await instCard.innerText()), 'nella Home: secondo acconto e retta di dicembre');
+
   // 5. Telefono e accessibilità.
   await ui.go(tr('nav.installments'));
   await page.setViewportSize({ width: 360, height: 780 });

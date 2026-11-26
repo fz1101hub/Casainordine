@@ -244,6 +244,32 @@ try {
   await ui.go(tr('nav.health'));
   await page.waitForTimeout(800);
 
+  // 3f. Prevenzione: Anna (adulta), sesso e screening; mammografia già fatta, HPV prenotato.
+  await main.getByRole('button', { name: 'Anna', exact: true }).click();
+  await main.getByRole('button', { name: tr('health.editPersonAria', { name: 'Anna' }) }).click();
+  await main.getByLabel(tr('health.birthOn'), { exact: true }).fill('1972-03-04');
+  await main.getByRole('combobox', { name: new RegExp('^' + tr('health.sex').replace(/[()]/g, '\\$&')) }).selectOption('female');
+  await main.getByRole('button', { name: tr('health.save') }).click();
+  await page.waitForTimeout(700);
+  check(rows('health_people').find(p => p.name === 'Anna')?.sex === 'female', 'sesso salvato');
+  await main.getByRole('checkbox', { name: tr('health.screeningsFollow') }).check();
+  await page.waitForTimeout(700);
+  check(rows('health_people').find(p => p.name === 'Anna')?.screening_plan === true, 'prevenzione accesa');
+  const screenings = main.locator('.health-screening-list li');
+  check(/Test HPV[\s\S]*Mammografia[\s\S]*Sangue occulto[\s\S]*Controllo dal dentista/.test(await main.locator('.health-screening-list').innerText()) && await screenings.count() === 4, 'a 54 anni: HPV, mammografia, colon-retto, dentista');
+  await main.getByRole('button', { name: tr('health.alreadyDoneCheckupAria', { name: 'Mammografia' }), exact: true }).click();
+  await main.locator('.health-screenings .health-done-form').getByLabel(tr('health.doneDate'), { exact: true }).fill('2025-03-10');
+  await main.locator('.health-screenings .health-done-form').getByRole('button', { name: tr('health.save') }).click();
+  await page.waitForTimeout(700);
+  check(rows('health_appointments').some(a => a.schedule_key === 'scr_breast_2025' && a.done_on === '2025-03-10' && a.kind === 'exam'), 'mammografia fatta nel 2025');
+  check(/Mammografia[\s\S]*ultimo il 10 mar 2025[\s\S]*Prossimo: 10 mar 2027/.test(await screenings.filter({ hasText: 'Mammografia' }).innerText()), 'la prossima tra due anni');
+  await main.getByRole('button', { name: tr('health.bookAria', { name: 'Test HPV' }), exact: true }).click();
+  check(await main.getByLabel(tr('health.appointmentTitle'), { exact: true }).inputValue() === 'Test HPV', 'prenota: modulo compilato');
+  await main.getByLabel(tr('health.onDate'), { exact: true }).fill('2027-01-20');
+  await main.getByRole('button', { name: tr('health.save') }).click();
+  await page.waitForTimeout(700);
+  check(rows('health_appointments').some(a => a.schedule_key === 'scr_cervix_hpv_2027' && a.on_date === '2027-01-20'), 'HPV prenotato, chiave con l’anno della data scelta');
+
   // 4. Nomi nelle notifiche: di partenza spento.
   const detailsBox = main.getByRole('checkbox', { name: tr('health.details') });
   check(!(await detailsBox.isChecked()), 'di partenza le notifiche non mostrano i nomi');
