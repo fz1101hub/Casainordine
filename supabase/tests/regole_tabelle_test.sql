@@ -53,8 +53,10 @@ select 'guardia contro lo spostamento tra case: public.' || c.relname,
                and (g.tgtype & 2) = 2 and (g.tgtype & 16) = 16)
 from pg_class c join pg_namespace n on n.oid = c.relnamespace
 where n.nspname = 'public' and c.relkind = 'r'
-  and exists (select 1 from information_schema.columns col where col.table_schema = 'public' and col.table_name = c.relname and col.column_name = 'home_id'
-              and has_column_privilege('authenticated', c.oid, 'home_id', 'UPDATE'))
+  -- Con il numero di colonna (attnum) has_column_privilege non dà errore se il piano lo valuta
+  -- prima degli altri filtri (succedeva a volte con le tabelle pg_toast, senza home_id).
+  and exists (select 1 from pg_attribute a where a.attrelid = c.oid and a.attname = 'home_id' and a.attnum > 0 and not a.attisdropped
+              and has_column_privilege('authenticated', a.attrelid, a.attnum, 'UPDATE'))
   and exists (select 1 from pg_policies p where p.schemaname = 'public' and p.tablename = c.relname and p.cmd in ('UPDATE', 'ALL'));
 
 -- ---------------------------------------------------------------------------------------
