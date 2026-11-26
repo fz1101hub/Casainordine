@@ -182,14 +182,15 @@ function InstallmentsSection({ client, demo, user, homeId, canWrite, onNotify = 
     setItems(list => list.filter(i => i.id !== inst.id));
     onNotify(tr('inst.itemDeleted'));
   }
-  const openPay = inst => { setItemForm(null); setGen(null); setPayForm({ id: inst.id, date: inst.due_on <= today ? inst.due_on : today, amount: inst.amount_cents ? (inst.amount_cents / 100).toFixed(2) : '' }); };
+  // where: «agenda» o «plan»: il modulo si apre solo dove si è premuto.
+  const openPay = (inst, where) => { setItemForm(null); setGen(null); setPayForm({ id: inst.id, where, date: inst.due_on <= today ? inst.due_on : today, amount: inst.amount_cents ? (inst.amount_cents / 100).toFixed(2) : '' }); };
 
-  const payFormFor = inst => payForm?.id === inst.id && <form className="health-done-form" onSubmit={pay}>
+  const payFormFor = (inst, where) => payForm?.id === inst.id && payForm.where === where && <form className="health-done-form" onSubmit={pay}>
     <Field label={tr('inst.paidOn')}><input type="date" required max={today} value={payForm.date} onChange={e => setPayForm(f => ({ ...f, date: e.target.value }))} /></Field>
     <Field label={tr('inst.paidAmount')}><DecimalInput decimals={2} min="0" max={INST_LIMITS.maxCents / 100} value={payForm.amount} onChange={e => setPayForm(f => ({ ...f, amount: e.target.value }))} /></Field>
     <span className="extra-buttons"><button className="btn btn-primary" disabled={working}>{tr('inst.save')}</button><button type="button" className="btn btn-soft" onClick={() => setPayForm(null)}>{tr('inst.cancel')}</button></span>
   </form>;
-  const payButton = inst => <button className="btn btn-soft" aria-label={tr('inst.payAria', { label: inst.label })} onClick={() => openPay(inst)}><Check size={15} /> {tr('inst.pay')}</button>;
+  const payButton = (inst, where) => <button className="btn btn-soft" aria-label={tr('inst.payAria', { label: inst.label })} onClick={() => openPay(inst, where)}><Check size={15} /> {tr('inst.pay')}</button>;
   const amountText = inst => (inst.amount_cents ? money(inst.amount_cents) : tr('inst.amountUnknown'));
 
   const planCard = plan => {
@@ -249,11 +250,11 @@ function InstallmentsSection({ client, demo, user, homeId, canWrite, onNotify = 
           return <li key={inst.id} className={`inst-${s}`}>
             <span><b>{inst.label} · {amountText(inst)}</b><small>{day(inst.due_on)} · <span className={`extra-pill inst-pill-${s}`}>{stateText(inst, plan)}</span></small></span>
             {writable && <span className="extra-buttons">
-              {inst.paid_on ? <button className="icon-button" aria-label={tr('inst.unpayAria', { label: inst.label })} title={tr('inst.unpay')} onClick={() => unpay(inst)}><Undo2 size={15} /></button> : payButton(inst)}
+              {inst.paid_on ? <button className="icon-button" aria-label={tr('inst.unpayAria', { label: inst.label })} title={tr('inst.unpay')} onClick={() => unpay(inst)}><Undo2 size={15} /></button> : payButton(inst, 'plan')}
               <button className="icon-button" aria-label={tr('inst.editItemAria', { label: inst.label })} title={tr('inst.edit')} onClick={() => { setGen(null); setPayForm(null); setItemForm({ id: inst.id, planId: plan.id, label: inst.label, due_on: inst.due_on, amount: inst.amount_cents ? (inst.amount_cents / 100).toFixed(2) : '' }); }}><Pencil size={15} /></button>
               <button className="icon-button danger" aria-label={tr('inst.deleteItemAria', { label: inst.label })} title={tr('inst.delete')} onClick={() => deleteItem(inst)}><Trash2 size={15} /></button>
             </span>}
-            {payFormFor(inst)}
+            {payFormFor(inst, 'plan')}
           </li>;
         })}</ul>}
       </div>}
@@ -275,8 +276,8 @@ function InstallmentsSection({ client, demo, user, homeId, canWrite, onNotify = 
         {loading ? <p className="muted">{tr('general.loading')}</p> : !agenda.length ? <p className="muted">{tr('inst.upcomingEmpty')}</p> : <>
           <ul className="health-list inst-agenda">{agenda.slice(0, agendaShown).map(({ inst, plan, state }) => <li key={inst.id} className={`inst-${state}`}>
             <span><b>{inst.label} · {amountText(inst)}</b><small>{plan.title} · {day(inst.due_on)} · <span className={`extra-pill inst-pill-${state}`}>{tr('inst.state.' + state)}</span></small></span>
-            {writable && !payForm && <span className="extra-buttons">{payButton(inst)}</span>}
-            {payFormFor(inst)}
+            {writable && !payForm && <span className="extra-buttons">{payButton(inst, 'agenda')}</span>}
+            {payFormFor(inst, 'agenda')}
           </li>)}</ul>
           <ShowMore shown={Math.min(agendaShown, agenda.length)} total={agenda.length} onMore={setAgendaShown} /></>}
       </section>
