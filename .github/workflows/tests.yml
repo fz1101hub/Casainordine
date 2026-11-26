@@ -154,6 +154,9 @@ jobs:
       - name: Rate e scadenze
         timeout-minutes: 4
         run: node scripts/prove-rate.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
+      - name: Previsione delle uscite
+        timeout-minutes: 4
+        run: node scripts/prove-previsione.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
       - name: Tanti dati nelle sezioni nuove (telefono lento)
         timeout-minutes: 6
         run: node scripts/prove-molti-dati-sezioni.mjs http://localhost:3000 || (tail -50 next.log; exit 1)
