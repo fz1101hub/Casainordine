@@ -118,3 +118,16 @@ test('backup, menu e ricerca conoscono i documenti di famiglia', () => {
   for (const tab of ['health', 'pets', 'garden', 'taxes', 'projects', 'iddocs']) assert.ok(SEARCH_SOURCES.some(s => s.tab === tab), tab);
   for (const s of SEARCH_SOURCES.filter(x => x.parent)) assert.ok(SEARCH_SOURCES.some(p => p.table === s.parent.table), `${s.table} cerca tra ${s.parent.table}`);
 });
+
+test('ricerca: «passaporto» trova i passaporti anche se il tipo è salvato come codice', async () => {
+  const { searchQuery, rowMatches } = await import('../lib/search.mjs');
+  const source = SEARCH_SOURCES.find(s => s.type === 'iddocs');
+  const steps = [];
+  const builder = { select() { return builder; }, eq() { return builder; }, is() { return builder; }, or(f) { steps.push(f); return builder; }, order() { return builder; }, limit() { return Promise.resolve({ data: [] }); } };
+  const categories = { Luce: 'Luce', iddocs: { Passaporto: 'passport', "Carta d'identità": 'identity_card' } };
+  await searchQuery({ from: () => builder }, source, { words: ['passap'], userId: 'u1', categories });
+  assert.match(steps[0], /kind\.eq\."passport"/);
+  assert.doesNotMatch(steps[0], /category\.eq/);
+  assert.ok(rowMatches({ holder: 'Luca', label: '', notes: '', kind: 'passport' }, source, ['passap'], categories));
+  assert.ok(!rowMatches({ holder: 'Luca', label: '', notes: '', kind: 'driving_license' }, source, ['passap'], categories));
+});

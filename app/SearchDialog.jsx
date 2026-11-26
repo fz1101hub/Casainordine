@@ -4,13 +4,16 @@ import {Search,X} from 'lucide-react';
 import {useLanguage} from './LanguageProvider';
 import {searchEverything,searchLocal,searchFuzzy,searchWords} from '../lib/search.mjs';
 import {BILL_CATEGORIES} from '../lib/bill-categories.mjs';
+import {DOC_KINDS} from '../lib/family-documents.mjs';
 
 // Finestra della ricerca universale (Fase 2). Cerca solo nello spazio attivo; scegliere un
 // risultato apre la sezione che lo contiene.
 export default function SearchDialog({client,userId,homeId,spaceName,demoData,localData,onOpen,onClose}){
  const {t,date,language}=useLanguage();
  // Categorie scritte nella lingua dell'app («Electricity», «Strom») → codice salvato («Luce»).
- const categories=useMemo(()=>Object.fromEntries(BILL_CATEGORIES.flatMap(code=>[[t('billCategory.'+code),code],[code,code]])),[t,language]);
+ // Tipi di documento («Passaporto» → passport) per la ricerca nei Documenti di famiglia.
+ const categories=useMemo(()=>({...Object.fromEntries(BILL_CATEGORIES.flatMap(code=>[[t('billCategory.'+code),code],[code,code]])),
+  iddocs:Object.fromEntries(DOC_KINDS.map(code=>[t('home.docKind.'+code),code]))}),[t,language]);
  // Bollette, attività e utenze già caricate: per i suggerimenti con un errore di battitura.
  const localRef=useRef(localData);localRef.current=localData;
  const [text,setText]=useState(''),[state,setState]=useState({results:[],failed:0,busy:false});
