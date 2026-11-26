@@ -152,3 +152,24 @@ test('API: solo con l\'accesso, coordinate arrotondate, codici d\'errore tradott
   assert.match(garden, /href="https:\/\/open-meteo\.com\/"/, 'la fonte dei dati è citata');
   assert.doesNotMatch(garden, /api\.open-meteo\.com/, 'il browser non chiama Open-Meteo direttamente');
 });
+
+test('meteo: le stesse richieste non ripartono prima della scadenza, gli errori non si ricordano (revisione)', async () => {
+  const { cachedJson, WEATHER_CACHE } = await import('../lib/weather.mjs');
+  let calls = 0;
+  const ok = async () => { calls++; return { ok: true, json: async () => ({ n: calls }) }; };
+  const url = 'https://example.test/v1/forecast?latitude=45.70&longitude=9.67';
+  assert.deepEqual(await cachedJson(url, 1000, { fetchImpl: ok }, 0), { n: 1 });
+  assert.deepEqual(await cachedJson(url, 1000, { fetchImpl: ok }, 999), { n: 1 }, 'ancora valida');
+  assert.deepEqual(await cachedJson(url, 1000, { fetchImpl: ok }, 1000), { n: 2 }, 'scaduta: si richiede');
+  let failures = 0;
+  const bad = async () => { failures++; return { ok: false, status: 429 }; };
+  await assert.rejects(cachedJson(url + '&x=1', 1000, { fetchImpl: bad }, 0), /weather 429/);
+  await assert.rejects(cachedJson(url + '&x=1', 1000, { fetchImpl: bad }, 1), /weather 429/);
+  assert.equal(failures, 2, 'un errore non resta in memoria');
+  for (let i = 0; i < WEATHER_CACHE.max + 20; i++) await cachedJson(`${url}&i=${i}`, 1000, { fetchImpl: ok }, 0);
+  const before = calls;
+  await cachedJson(`${url}&i=0`, 1000, { fetchImpl: ok }, 1);
+  assert.equal(calls, before + 1, 'oltre il limite le più vecchie si tolgono');
+  await cachedJson(`${url}&i=${WEATHER_CACHE.max + 19}`, 1000, { fetchImpl: ok }, 1);
+  assert.equal(calls, before + 1, 'le più recenti restano');
+});
