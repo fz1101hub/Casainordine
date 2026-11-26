@@ -29,6 +29,8 @@ try {
   await ui.go(tr('nav.garden'));
   const box = page.locator('.garden-plant').filter({ hasText: 'Limone' }).first();
   if (!(await box.getAttribute('open').then(v => v !== null).catch(() => false))) await box.locator('summary').click();
+  // Il contenuto della scheda si disegna quando la si apre.
+  await box.locator('.garden-plant-body').waitFor({ timeout: 5000 }).catch(() => {});
   check((await box.innerText()).includes(tr('garden.photosEmpty').slice(0, 20)), 'senza foto la scheda spiega a cosa servono');
 
   // 1. Foto con data e didascalia.

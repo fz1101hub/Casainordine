@@ -39,6 +39,7 @@
     "test:taxes": "node scripts/prove-spese-detraibili.mjs",
     "test:health": "node scripts/prove-salute.mjs",
     "test:documents": "node scripts/prove-documenti-home.mjs",
+    "test:many-sections": "node scripts/prove-molti-dati-sezioni.mjs",
     "test:pets": "node scripts/prove-animali.mjs"
   },
   "dependencies": {

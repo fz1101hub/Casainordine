@@ -713,3 +713,4 @@ select{min-height:24px}
 /* Documenti di famiglia (v63) */
 .iddocs-list li.iddocs-expired b{color:#9b2c1f}.iddocs-pill-expired{background:#fbe3e0;color:#8a2a1c}.iddocs-pill-renew{background:#fbeee0;color:#8a5210}
 .iddocs-pill-ok{background:#e7f3e5;color:#2f6b2c}.iddocs-pill-none{background:#eef1f5;color:#47586b}.iddocs-rules{margin:0;padding-left:1.1rem;display:grid;gap:.45rem}
+.show-more{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem .8rem;margin:.6rem 0}

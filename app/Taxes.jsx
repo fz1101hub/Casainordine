@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Receipt, Plus, Pencil, Trash2, Info, Download, Printer, AlertTriangle, FileText, Inbox } from 'lucide-react';
 import { useLanguage, useSection } from './LanguageProvider';
+import ShowMore from './ShowMore';
 import { askConfirm } from './ConfirmDialog';
 import { friendlyError } from '../lib/friendly-error.mjs';
 import { todayRome } from '../lib/dates.mjs';
@@ -29,6 +30,8 @@ function TaxesSection({ client, demo, user, homeId, canWrite, onNotify = () => {
   const [loading, setLoading] = useState(!demo), [missing, setMissing] = useState(false), [working, setWorking] = useState(false);
   const [year, setYear] = useState(Number(today.slice(0, 4)));
   const [form, setForm] = useState(null), [showCandidates, setShowCandidates] = useState(false), [picked, setPicked] = useState({});
+  // Elenchi lunghi a pagine (prova con tanti dati): si riparte da capo cambiando anno.
+  const [itemsShown, setItemsShown] = useState(100), [candidatesShown, setCandidatesShown] = useState(50);
   const writable = demo || canWrite;
   const money = cents => new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR' }).format((Number(cents) || 0) / 100);
   const day = iso => (iso ? date(iso, { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
@@ -162,7 +165,7 @@ function TaxesSection({ client, demo, user, homeId, canWrite, onNotify = () => {
     {!missing && <div className="extra-layout">
       <section className="panel extra-panel">
         <div className="taxes-year">
-          <Field label={tr('taxes.year')}><select value={year} onChange={e => { setYear(Number(e.target.value)); setForm(null); }}>{years.map(y => <option key={y} value={y}>{y}</option>)}</select></Field>
+          <Field label={tr('taxes.year')}><select value={year} onChange={e => { setYear(Number(e.target.value)); setForm(null); setItemsShown(100); setCandidatesShown(50); }}>{years.map(y => <option key={y} value={y}>{y}</option>)}</select></Field>
           <small className="muted">{tr('taxes.yearHelp', { year, next: year + 1 })}</small>
         </div>
         <h2><Receipt size={19} /> {tr('taxes.summary', { year })}</h2>
@@ -210,20 +213,21 @@ function TaxesSection({ client, demo, user, homeId, canWrite, onNotify = () => {
           <h3>{tr('taxes.candidatesTitle', { year })}</h3>
           <p className="muted">{tr('taxes.candidatesHelp')}</p>
           {sources.year !== year ? <p className="muted">{tr('general.loading')}</p> : !candidates.length ? <p className="muted">{tr('taxes.candidatesEmpty')}</p> :
-          <ul>{candidates.map(c => { const key = `${c.source}:${c.source_id}`; return <li key={key}>
+          <ul>{candidates.slice(0, candidatesShown).map(c => { const key = `${c.source}:${c.source_id}`; return <li key={key}>
             <span><b>{c.description}</b><small>{day(c.paid_on)} · {money(c.amount_cents)} · {tr('taxes.source.' + c.source)}</small></span>
             <span className="extra-buttons">
               <select aria-label={tr('taxes.categoryFor', { description: c.description })} value={picked[key] || c.category} onChange={e => setPicked(p => ({ ...p, [key]: e.target.value }))}>{TAX_CATEGORIES.map(cat => <option key={cat} value={cat}>{tr('taxes.category.' + cat)}</option>)}</select>
               <button className="btn btn-soft" disabled={working} aria-label={tr('taxes.addCandidateAria', { description: c.description })} onClick={() => addCandidate(c)}><Plus size={15} /> {tr('taxes.addCandidate')}</button>
             </span>
           </li>; })}</ul>}
+          <ShowMore shown={Math.min(candidatesShown, candidates.length)} total={candidates.length} onMore={setCandidatesShown} />
         </div>}
       </section>
 
       <section className="panel extra-panel">
         <h2><FileText size={19} /> {tr('taxes.list', { year })}</h2>
         {loading ? <p className="muted">{tr('general.loading')}</p> : !yearItems.length ? <p className="muted">{tr('taxes.listEmpty')}</p> :
-        <ul className="taxes-items">{yearItems.map(item => { const warn = itemWarnings(item); return <li key={item.id}>
+        <><ul className="taxes-items">{yearItems.slice(0, itemsShown).map(item => { const warn = itemWarnings(item); return <li key={item.id}>
           <span>
             <b>{item.description}</b>
             <small>{[day(item.paid_on), tr('taxes.category.' + item.category), item.payment_method ? tr('taxes.payment.' + item.payment_method) : '', item.supplier, item.supplier_tax_code, sourceLabel(item)].filter(Boolean).join(' · ')}</small>
@@ -235,7 +239,8 @@ function TaxesSection({ client, demo, user, homeId, canWrite, onNotify = () => {
             <button className="icon-button" aria-label={tr('taxes.editAria', { description: item.description })} title={tr('taxes.edit')} onClick={() => setForm({ ...item, amount: (Number(item.amount_cents) / 100).toFixed(2), file: null, supplier: item.supplier || '', supplier_tax_code: item.supplier_tax_code || '', notes: item.notes || '' })}><Pencil size={16} /></button>
             <button className="icon-button danger" aria-label={tr('taxes.deleteAria', { description: item.description })} title={tr('taxes.delete')} onClick={() => deleteItem(item)}><Trash2 size={16} /></button>
           </span>}
-        </li>; })}</ul>}
+        </li>; })}</ul>
+        <ShowMore shown={Math.min(itemsShown, yearItems.length)} total={yearItems.length} step={100} onMore={setItemsShown} /></>}
       </section>
     </div>}
   </div>;
