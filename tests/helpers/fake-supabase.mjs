@@ -102,7 +102,7 @@ const EMBED = { homes: 'home_id', bills: 'bill_id' };
 // chiederle o scriverle dà l'errore di PostgREST, con select=* non tornano.
 // tokenTtl: durata dei token in secondi (le prove con l'orologio del browser spostato in avanti ne usano una più lunga).
 export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = false, latency = 0, maxRows = Infinity, maxUrl = Infinity, tokenTtl = 3600, missingColumns = {} } = {}) {
-  const state = { tables: {}, tokens: new Map(), users: new Map(), passwords: new Map(), rpc: {}, removed: [], files: {}, uploads: [], requests: [], deletedUsers: [], rejectKeys: new Set(), weather: {}, weatherCalls: [] };
+  const state = { tables: {}, tokens: new Map(), users: new Map(), passwords: new Map(), rpc: {}, removed: [], files: {}, uploads: [], requests: [], deletedUsers: [], rejectKeys: new Set(), weather: {}, weatherCalls: [], nextId: {} };
   const table = name => (state.tables[name] ||= []);
   const isOwner = (user, homeId) => table('homes').some(h => h.id === homeId && h.owner_id === user.id);
   const memberOf = (user, homeId) => table('home_members').some(m => m.home_id === homeId && m.user_id === user.id);
@@ -346,7 +346,9 @@ export async function startFakeSupabase({ port = 0, lenientRpc = false, rls = fa
           if (prefer.includes('resolution=ignore-duplicates')) continue;
           return send(409, { code: '23505', message: 'duplicate key value violates unique constraint' });
         }
-        const row = { id: item.id || `${name}-${rows.length + 1}`, created_at: new Date().toISOString(), ...item };
+        // Un contatore per tabella: dopo una cancellazione «length + 1» poteva ripetere l'id di una riga esistente.
+        state.nextId[name] = Math.max(state.nextId[name] || 0, rows.length) + 1;
+        const row = { id: item.id || `${name}-${state.nextId[name]}`, created_at: new Date().toISOString(), ...item };
         rows.push(row); out.push(row);
       }
       return reply(out, 201);

@@ -3,7 +3,7 @@
 // medicine di oggi (con «Presa»), visite, vaccini e bilanci da prenotare, animali, giardino e
 // documenti in scadenza. Si leggono solo i dati dei riquadri scelti, nello spazio attivo.
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pill, Stethoscope, PawPrint, Sprout, IdCard, Check } from 'lucide-react';
+import { Pill, Stethoscope, PawPrint, Sprout, IdCard, Check, CalendarRange } from 'lucide-react';
 import { useLanguage, useSection } from './LanguageProvider';
 import { friendlyError } from '../lib/friendly-error.mjs';
 import { todayRome } from '../lib/dates.mjs';
@@ -13,13 +13,14 @@ import { saveDose } from '../lib/health-doses.mjs';
 import { petAgenda } from '../lib/pets.mjs';
 import { gardenAgenda } from '../lib/garden.mjs';
 import { documentAgenda } from '../lib/family-documents.mjs';
+import { installmentAgenda } from '../lib/installments.mjs';
 
-export const EXTRA_WIDGETS = Object.freeze(['medicines', 'health', 'pets', 'garden', 'documents']);
-const EMPTY = Object.freeze({ people: [], therapies: [], doses: [], stock: [], appointments: [], pets: [], petTasks: [], plants: [], gardenTasks: [], documents: [] });
+export const EXTRA_WIDGETS = Object.freeze(['medicines', 'health', 'pets', 'garden', 'documents', 'installments']);
+const EMPTY = Object.freeze({ people: [], therapies: [], doses: [], stock: [], appointments: [], pets: [], petTasks: [], plants: [], gardenTasks: [], documents: [], plans: [], installments: [] });
 const safe = result => (result?.error ? [] : result?.data || []);
 
 export function useExtraCards({ ids, client, demo, user, homeId, canWrite, limit, refreshKey, onNavigate, onNotify, HomeWidget }) {
-  const { t: tr, date } = useLanguage();
+  const { t: tr, date, money } = useLanguage();
   const wanted = useMemo(() => EXTRA_WIDGETS.filter(id => ids.includes(id)), [ids.join('|')]);
   // Nomi dei vaccini, dei bilanci e stati delle dosi: testi della sezione Salute, caricati solo se servono.
   const healthTexts = useSection(wanted.includes('medicines') || wanted.includes('health') ? 'health' : null);
@@ -36,20 +37,23 @@ export function useExtraCards({ ids, client, demo, user, homeId, canWrite, limit
     const scope = q => (homeId ? q.eq('home_id', homeId) : q.eq('user_id', user.id).is('home_id', null));
     const has = id => wanted.includes(id);
     const healthNeeded = has('medicines') || has('health');
-    const [people, pets, plants, documents] = await Promise.all([
+    const [people, pets, plants, documents, plans] = await Promise.all([
       healthNeeded ? scope(client.from('health_people').select('id,name,birth_on,relation,vaccine_plan,checkup_plan')).limit(100) : null,
       has('pets') ? scope(client.from('home_pets').select('id,name,ended_on')).is('ended_on', null).limit(200) : null,
       has('garden') ? scope(client.from('home_garden_plants').select('id,name,ended_on')).limit(500) : null,
       has('documents') ? scope(client.from('family_documents').select('id,holder,kind,label,expires_on,notice_days')).not('expires_on', 'is', null).lte('expires_on', addDays(todayRome(), 365)).limit(300) : null,
+      has('installments') ? scope(client.from('payment_plans').select('id,title,remind_days,ended_on')).is('ended_on', null).limit(200) : null,
     ]);
     const personIds = safe(people).map(p => p.id), petIds = safe(pets).map(p => p.id), plantIds = safe(plants).filter(p => !p.ended_on).map(p => p.id);
     const soon = addDays(todayRome(), 30);
-    const [therapies, appointments, steps, petTasks, gardenTasks] = await Promise.all([
+    const planIds = safe(plans).map(p => p.id);
+    const [therapies, appointments, steps, petTasks, gardenTasks, installments] = await Promise.all([
       has('medicines') && personIds.length ? selectIn((part, count) => client.from('health_therapies').select('*', count ? { count: 'exact' } : undefined).in('person_id', part).lte('start_on', todayRome()).order('id'), personIds) : null,
       has('health') && personIds.length ? selectIn((part, count) => client.from('health_appointments').select('id,person_id,kind,title,on_date,at_time,place,done_on,schedule_key', count ? { count: 'exact' } : undefined).in('person_id', part).is('done_on', null).lte('on_date', soon).order('on_date').order('id'), personIds) : null,
       has('health') && personIds.length ? selectIn((part, count) => client.from('health_appointments').select('id,person_id,schedule_key,on_date,done_on', count ? { count: 'exact' } : undefined).in('person_id', part).not('schedule_key', 'is', null).order('id'), personIds) : null,
       has('pets') && petIds.length ? selectIn((part, count) => client.from('home_pet_tasks').select('id,pet_id,title,next_on', count ? { count: 'exact' } : undefined).in('pet_id', part).not('next_on', 'is', null).lte('next_on', addDays(todayRome(), 14)).order('id'), petIds) : null,
       has('garden') && plantIds.length ? selectIn((part, count) => client.from('home_garden_tasks').select('id,plant_id,title,next_on,months,every_days', count ? { count: 'exact' } : undefined).in('plant_id', part).not('next_on', 'is', null).lte('next_on', addDays(todayRome(), 7)).order('id'), plantIds) : null,
+      planIds.length ? selectIn((part, count) => client.from('payment_installments').select('id,plan_id,label,due_on,amount_cents,paid_on', count ? { count: 'exact' } : undefined).in('plan_id', part).is('paid_on', null).lte('due_on', addDays(todayRome(), 30)).order('id'), planIds) : null,
     ]);
     const therapyList = safe(therapies).filter(t => !t.end_on || t.end_on >= todayRome());
     const stockIds = [...new Set(therapyList.map(t => t.stock_item_id).filter(Boolean))];
@@ -58,7 +62,7 @@ export function useExtraCards({ ids, client, demo, user, homeId, canWrite, limit
       stockIds.length ? client.from('home_stock_items').select('id,name,quantity').in('id', stockIds) : null,
     ]);
     setData({ people: safe(people), therapies: therapyList, doses: safe(doses), stock: safe(stock), appointments: [...safe(appointments), ...safe(steps)],
-      pets: safe(pets), petTasks: safe(petTasks), plants: safe(plants), gardenTasks: safe(gardenTasks), documents: safe(documents) });
+      pets: safe(pets), petTasks: safe(petTasks), plants: safe(plants), gardenTasks: safe(gardenTasks), documents: safe(documents), plans: safe(plans), installments: safe(installments) });
     setLoading(false);
   }, [client, demo, homeId, user?.id, wanted.join('|')]);
   useEffect(() => { load(); }, [load, refreshKey]);
@@ -73,6 +77,7 @@ export function useExtraCards({ ids, client, demo, user, homeId, canWrite, limit
   const plantName = useMemo(() => new Map(data.plants.map(p => [p.id, p.name])), [data.plants]);
   const petItems = useMemo(() => petAgenda(data.petTasks.filter(t => petName.has(t.pet_id)), today, 14), [data.petTasks, petName, today]);
   const gardenItems = useMemo(() => gardenAgenda(data.gardenTasks.filter(t => plantName.has(t.plant_id)), today, 7), [data.gardenTasks, plantName, today]);
+  const instItems = useMemo(() => installmentAgenda(data.installments, data.plans, today, 30), [data.installments, data.plans, today]);
   const docItems = useMemo(() => documentAgenda(data.documents, today).filter(a => a.state === 'expired' || a.state === 'renew'), [data.documents, today]);
 
   async function take(entry) {
@@ -119,6 +124,12 @@ export function useExtraCards({ ids, client, demo, user, homeId, canWrite, limit
       actionLabel={tr('home.openAll')} onAction={() => onNavigate('garden')}>
       {gardenItems.length ? <div className="home3-rows">{gardenItems.slice(0, limit).map(({ task, state }) => <div className="home3-item" key={task.id}><div>
         <b>{task.title}</b><small>{[plantName.get(task.plant_id), tr(stateKey(state), { date: day(task.next_on) })].join(' · ')}</small></div></div>)}</div> : empty(tr('home.widget.garden.empty'))}
+    </HomeWidget>,
+    installments: <HomeWidget key="installments" icon={CalendarRange} title={tr('home.widget.installments')} count={tr('home.widget.installments.count', { count: instItems.length })}
+      actionLabel={tr('home.openAll')} onAction={() => onNavigate('installments')}>
+      {instItems.length ? <div className="home3-rows">{instItems.slice(0, limit).map(({ inst, plan, state }) => <div className="home3-item" key={inst.id}><div>
+        <b>{inst.label}</b><small className={state === 'late' ? 'home3-alert' : ''}>{[plan.title, day(inst.due_on), inst.amount_cents ? money(inst.amount_cents / 100) : tr('home.installments.unknown')].join(' · ')}</small></div></div>)}</div>
+        : empty(tr('home.widget.installments.empty'))}
     </HomeWidget>,
     documents: <HomeWidget key="documents" icon={IdCard} title={tr('home.widget.documents')} count={tr('home.widget.documents.count', { count: docItems.length })}
       actionLabel={tr('home.openAll')} onAction={() => onNavigate('iddocs')}>

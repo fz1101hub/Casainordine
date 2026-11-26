@@ -4,13 +4,13 @@
 // con la scadenza e il preavviso. «Rinnovato» chiede solo la nuova scadenza. Niente numeri né
 // scansioni dei documenti. Gli avvisi li manda il lavoro giornaliero (lib/document-alerts.mjs).
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { IdCard, Plus, Pencil, Trash2, Info, RefreshCw } from 'lucide-react';
+import { IdCard, Plus, Pencil, Trash2, Info, RefreshCw, School } from 'lucide-react';
 import { useLanguage, useSection } from './LanguageProvider';
 import { askConfirm } from './ConfirmDialog';
 import { friendlyError } from '../lib/friendly-error.mjs';
 import { todayRome } from '../lib/dates.mjs';
 import { selectAll } from '../lib/select-all.mjs';
-import { DOC_KINDS, DOC_NOTICE, NOTICE_CHOICES, DOC_LIMITS, normalizeDocument, documentAgenda, holderSuggestions } from '../lib/family-documents.mjs';
+import { DOC_KINDS, DOC_NOTICE, NOTICE_CHOICES, DOC_LIMITS, normalizeDocument, documentAgenda, holderSuggestions, suggestedRenewal, schoolEnrollments } from '../lib/family-documents.mjs';
 
 const MISSING_TABLE = new Set(['42P01', 'PGRST205', 'PGRST202']);
 const DEMO_KEY = 'casainordine-iddocs-demo';
@@ -34,7 +34,7 @@ function DocumentsSection({ client, demo, user, homeId, canWrite, onNotify = () 
     setLoading(true);
     const [list, names] = await Promise.all([
       selectAll(count => scope(client.from('family_documents').select('*', count ? { count: 'exact' } : undefined)).order('expires_on', { nullsFirst: false }).order('id')),
-      scope(client.from('health_people').select('name')).limit(100),
+      scope(client.from('health_people').select('name,birth_on,relation')).limit(100),
     ]);
     setLoading(false);
     if (list.error) { if (MISSING_TABLE.has(list.error.code)) setMissing(true); else onNotify(friendlyError(list.error, tr)); return; }
@@ -47,6 +47,8 @@ function DocumentsSection({ client, demo, user, homeId, canWrite, onNotify = () 
   const agenda = useMemo(() => documentAgenda(docs, today), [docs, today]);
   const suggestions = useMemo(() => holderSuggestions(docs, people), [docs, people]);
   const attention = agenda.filter(a => a.state === 'expired' || a.state === 'renew').length;
+  // Iscrizioni scolastiche dei bambini e ragazzi scritti in Salute (con la data di nascita).
+  const enrollments = useMemo(() => schoolEnrollments(people.filter(p => p.birth_on && p.birth_on > `${Number(today.slice(0, 4)) - 15}-01-01`), today), [people, today]);
   const what = doc => doc.label || tr('iddocs.kind.' + doc.kind);
   const stateText = a => (a.state === 'none' ? tr('iddocs.state.none') : a.state === 'expired' ? tr('iddocs.state.expired', { date: day(a.doc.expires_on) })
     : a.state === 'renew' ? tr('iddocs.state.renew', { days: a.days, date: day(a.doc.expires_on) }) : tr('iddocs.state.ok', { date: day(a.doc.expires_on) }));
@@ -115,7 +117,7 @@ function DocumentsSection({ client, demo, user, homeId, canWrite, onNotify = () 
             <small><span className={`extra-pill iddocs-pill-${a.state}`}>{stateText(a)}</span>{a.doc.expires_on ? ' · ' + tr('iddocs.noticeShort', { days: a.doc.notice_days }) : ''}</small>
             {a.doc.notes && <small>{a.doc.notes}</small>}</span>
           {writable && <span className="extra-buttons">
-            {a.doc.expires_on && <button className="btn btn-soft" aria-label={tr('iddocs.renewAria', { what: what(a.doc), holder: a.doc.holder })} onClick={() => { setForm(null); setRenew({ id: a.doc.id, expires_on: '' }); }}><RefreshCw size={15} /> {tr('iddocs.renew')}</button>}
+            {a.doc.expires_on && <button className="btn btn-soft" aria-label={tr('iddocs.renewAria', { what: what(a.doc), holder: a.doc.holder })} onClick={() => { setForm(null); setRenew({ id: a.doc.id, expires_on: suggestedRenewal(a.doc, today) }); }}><RefreshCw size={15} /> {tr('iddocs.renew')}</button>}
             <button className="icon-button" aria-label={tr('iddocs.editAria', { what: what(a.doc), holder: a.doc.holder })} title={tr('iddocs.edit')} onClick={() => { setRenew(null); setForm({ ...a.doc, expires_on: a.doc.expires_on || '', no_expiry: !a.doc.expires_on }); }}><Pencil size={16} /></button>
             <button className="icon-button danger" aria-label={tr('iddocs.deleteAria', { what: what(a.doc), holder: a.doc.holder })} title={tr('iddocs.delete')} onClick={() => remove(a.doc)}><Trash2 size={16} /></button>
           </span>}
@@ -146,8 +148,12 @@ function DocumentsSection({ client, demo, user, homeId, canWrite, onNotify = () 
       </section>
       <section className="panel extra-panel">
         <h2><Info size={19} /> {tr('iddocs.rulesTitle')}</h2>
-        <ul className="iddocs-rules">{['identity_card', 'passport', 'driving_license', 'residence_permit', 'health_card'].map(k => <li key={k}><b>{tr('iddocs.kind.' + k)}</b> — {tr('iddocs.rule.' + k)}</li>)}</ul>
+        <ul className="iddocs-rules">{['identity_card', 'passport', 'driving_license', 'residence_permit', 'health_card', 'sport_certificate'].map(k => <li key={k}><b>{tr('iddocs.kind.' + k)}</b> — {tr('iddocs.rule.' + k)}</li>)}</ul>
         <p className="muted">{tr('iddocs.rulesNote')}</p>
+        <h2><School size={19} /> {tr('iddocs.enrollments')}</h2>
+        {!enrollments.length ? <p className="muted">{tr('iddocs.enrollmentsEmpty')}</p> : <ul className="health-list iddocs-enrollments">{enrollments.map(e => <li key={e.person.name + e.grade}>
+          <span><b>{e.person.name} · {tr('iddocs.grade.' + e.grade)}</b><small>{tr('iddocs.enrollmentWhen', { year: e.year, schoolYear: e.schoolYear })}</small></span></li>)}</ul>}
+        <p className="muted">{tr('iddocs.enrollmentsHelp')}</p>
       </section>
     </div>}
   </div>;
