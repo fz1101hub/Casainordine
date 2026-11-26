@@ -111,3 +111,18 @@ test('avvisi dei bilanci di salute: titolo giusto, senza nomi se i dettagli sono
     assert.ok(!/\{|undefined/.test(c.title + c.body), `${lang} ${keys} ${details}`);
   }
 });
+
+test('vaccino e screening lo stesso giorno: un avviso solo con i due testi (revisione)', async () => {
+  const { processVaccinePlan } = await import('../lib/health-reminders.mjs');
+  const { screeningKey } = await import('../lib/health.mjs');
+  // Richiamo dei 5 anni dal 20 novembre e dentista fatto il 20 novembre dell'anno prima.
+  const sofia = { id: 'sofia', name: 'Sofia', birth_on: '2021-11-20', vaccine_plan: 'mandatory', checkup_plan: false, screening_plan: true, sex: 'female', user_id: 'anna', home_id: null };
+  const tables = { health_people: [sofia], health_appointments: [{ id: 'd1', person_id: 'sofia', schedule_key: screeningKey('dentist', '2025-11-20'), done_on: '2025-11-20' }],
+    user_alerts: [], user_alert_preferences: [{ user_id: 'anna', health_push_details: true }] };
+  const counts = { errors: [] };
+  await processVaccinePlan(fakeAdmin(tables), '2026-11-25', counts);
+  assert.deepEqual(counts.errors, []);
+  assert.deepEqual(tables.user_alerts.map(a => [a.kind, a.reference_id, a.event_date]), [['health', 'sofia', '2026-11-20']]);
+  assert.match(tables.user_alerts[0].body, /richiamo|Difterite|MPRV/i);
+  assert.match(tables.user_alerts[0].body, /Da prenotare: .*dentista/i, 'anche lo screening nello stesso avviso');
+});
