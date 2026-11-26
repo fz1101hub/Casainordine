@@ -12,7 +12,8 @@ const LANGS = ['it', 'en', 'es', 'fr', 'de', 'pt'];
 const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 
 test('la migrazione accetta quello che il modulo produce', () => {
-  const sql = read('supabase/migrate_v59_animali_foto_meteo_730.sql');
+  // Le fonti nuove arrivano con le migrazioni successive (v62: spese sanitarie).
+  const sql = read('supabase/migrate_v59_animali_foto_meteo_730.sql') + read('supabase/migrate_v62_scheda_spese_bilanci.sql');
   for (const m of PAYMENT_METHODS) assert.match(sql, new RegExp(`'${m}'`), m);
   for (const s of TAX_SOURCES) assert.match(sql, new RegExp(`'${s}'`), s);
   for (const c of TAX_CATEGORIES) assert.match(c, /^[a-z][a-z_]{1,29}$/);
