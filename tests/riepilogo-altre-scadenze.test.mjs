@@ -94,7 +94,7 @@ test('altre scadenze: personali e della casa, a ciascuno le sue', async () => {
   assert.equal(anna.details, true);
   assert.equal(bruno.details, false);
   assert.equal(summaryExtraCount(extras.get('carla')), 0);
-  assert.ok(admin.reads.length <= 13, `una lettura per tipo di dato (${admin.reads.length})`);
+  assert.ok(admin.reads.length <= 15, `una lettura per tipo di dato (${admin.reads.length})`);
 });
 
 test('senza le tabelle nuove: nessuna altra scadenza, nessun errore', async () => {

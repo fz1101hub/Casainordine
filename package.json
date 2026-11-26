@@ -41,6 +41,7 @@
     "test:documents": "node scripts/prove-documenti-home.mjs",
     "test:installments": "node scripts/prove-rate.mjs",
     "test:forecast": "node scripts/prove-previsione.mjs",
+    "test:taxcal": "node scripts/prove-scadenze-fiscali.mjs",
     "test:many-sections": "node scripts/prove-molti-dati-sezioni.mjs",
     "test:pets": "node scripts/prove-animali.mjs"
   },

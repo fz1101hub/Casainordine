@@ -15,6 +15,7 @@ import { uploadHouseDocument } from '../lib/document-upload.mjs';
 import { saveBlob } from '../lib/file-download.js';
 import { preparePhoto, looksHeic } from '../lib/image-prepare.js';
 import DecimalInput from './DecimalInput';
+import TaxCalendar from './TaxCalendar';
 import { TAX_CATEGORIES, PAYMENT_METHODS, TAX_LIMITS, PAYMENT_NEEDED, taxRuleKey, normalizeTaxItem, itemWarnings, yearSummary, taxYears, taxCandidates, taxCsv, validTaxCode } from '../lib/taxes.mjs';
 
 const MISSING_TABLE = new Set(['42P01', 'PGRST205', 'PGRST202']);
@@ -164,6 +165,7 @@ function TaxesSection({ client, demo, user, homeId, canWrite, onNotify = () => {
     {missing && <div className="informative"><Info size={17} /><p>{tr('taxes.migration')}</p></div>}
     {demo && <div className="informative"><Info size={17} /><p>{tr('taxes.demo')}</p></div>}
     {!demo && !missing && !canWrite && <div className="informative"><Info size={17} /><p>{tr('taxes.readOnly')}</p></div>}
+    {!missing && <TaxCalendar client={client} demo={demo} user={user} homeId={homeId} canWrite={canWrite} items={items} onNotify={onNotify} />}
     {!missing && <div className="extra-layout">
       <section className="panel extra-panel">
         <div className="taxes-year">

@@ -758,3 +758,19 @@ select{min-height:24px}
 @media(max-width:550px){.forecast-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem}.forecast-stats div{padding:.6rem .7rem}.forecast-stats div:last-child{grid-column:1/-1}.forecast-plot{height:120px}}
 @media print{.extra-panel .forecast-chart .forecast-col{display:flex!important}.forecast-tip{display:none}}
 .forecast-table .table-scroll{overflow-x:auto}
+/* Scadenze fiscali di famiglia (Spese detraibili). */
+.taxcal{margin-bottom:1.1rem}
+.taxcal h3{font-size:1rem;margin:1.1rem 0 .5rem}
+.taxcal-choices{display:flex;flex-wrap:wrap;gap:1rem 2rem;align-items:flex-start}
+.taxcal-choices fieldset{border:0;padding:0;margin:0;display:flex;flex-direction:column;gap:.35rem}
+.taxcal-choices legend{font-weight:600;margin-bottom:.3rem}
+.taxcal-list,.taxcal-docs{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:.45rem}
+.taxcal-docs{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:.55rem 1.4rem}
+.taxcal-list li{display:flex;align-items:center;justify-content:space-between;gap:.8rem;padding:.6rem .75rem;border:1px solid var(--line);border-radius:10px}
+.taxcal-list li>div{min-width:0;overflow-wrap:anywhere}
+.taxcal-list li small,.taxcal-docs small{display:block;margin:.15rem 0 0}
+.taxcal-list li.done b{text-decoration:line-through;color:var(--muted)}
+.taxcal-list li.late{border-color:#e7b4a8}
+.taxcal-docs label{display:flex;gap:.5rem;align-items:flex-start}
+@media(max-width:550px){.taxcal-list li{flex-wrap:wrap}.taxcal-list li .btn{width:100%;justify-content:center}}
+.taxcal>p.muted:last-child{margin-top:1rem}

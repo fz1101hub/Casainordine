@@ -5,6 +5,7 @@ import {todayRome,addDaysISO} from '../../../../lib/dates.mjs';
 import {gardenCalendarEvents} from '../../../../lib/garden.mjs';
 import {petCalendarEvents} from '../../../../lib/pets.mjs';
 import {healthCalendarEvents} from '../../../../lib/health.mjs';
+import {taxAgenda} from '../../../../lib/tax-calendar.mjs';
 
 // Interventi del giardino e dell'orto dello spazio personale e delle case: se le tabelle non ci sono
 // ancora (migrazione v57 non eseguita) il calendario resta quello delle bollette.
@@ -64,6 +65,11 @@ async function deadlineEvents(admin,userId,homes,today){
  try{
   const docs=await scoped('family_documents','id,holder,kind,label,expires_on',q=>q.not('expires_on','is',null).gte('expires_on',addDaysISO(today,-7)).lte('expires_on',addDaysISO(today,4000)));
   for(const d of docs)out.push({uid:`document-${d.id}`,date:d.expires_on,key:'document',params:{holder:d.holder,what:d.label,kind:d.kind}});
+ }catch(error){if(!['42P01','PGRST205'].includes(error?.code))throw error;}
+ // Scadenze fiscali seguite (migrate_v67), non ancora segnate come fatte.
+ try{
+  const settings=await scoped('tax_calendar_settings','id,groups,remind_days,done',q=>q);
+  for(const s of settings)for(const a of taxAgenda(s,today))if(!a.done)out.push({uid:`tax-${s.id}-${a.key}-${a.year}`,date:a.date,key:'tax',params:{taxKey:a.key,year:a.year}});
  }catch(error){if(!['42P01','PGRST205'].includes(error?.code))throw error;}
  return out.sort((a,b)=>a.date.localeCompare(b.date)).slice(0,3000);
 }
