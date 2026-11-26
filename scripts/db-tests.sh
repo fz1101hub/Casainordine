@@ -28,7 +28,7 @@ MIGRATIONS=(
   migrate_v49_affitti.sql migrate_v50_email_promemoria.sql migrate_v51_sicurezza_funzioni.sql
   migrate_v52_ripristino_scadenze.sql migrate_v53_push_rinviate.sql migrate_v54_inviti_account.sql
   migrate_v55_autoletture_giorno.sql migrate_v56_account_cleanup.sql migrate_v57_giardino.sql migrate_v58_giardino_orto.sql
-  migrate_v59_animali_foto_meteo_730.sql migrate_v60_salute.sql migrate_v61_vaccini_bambini.sql migrate_v62_scheda_spese_bilanci.sql migrate_v63_documenti_home.sql migrate_v64_rate_scadenze.sql migrate_v65_scadenze_prevenzione.sql migrate_v66_uscite_home.sql
+  migrate_v59_animali_foto_meteo_730.sql migrate_v60_salute.sql migrate_v61_vaccini_bambini.sql migrate_v62_scheda_spese_bilanci.sql migrate_v63_documenti_home.sql migrate_v64_rate_scadenze.sql migrate_v65_scadenze_prevenzione.sql migrate_v66_uscite_home.sql migrate_v67_scadenze_fiscali.sql
 )
 PSQL=(psql -X -q -v ON_ERROR_STOP=0)
 failed=0
