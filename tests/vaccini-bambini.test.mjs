@@ -60,6 +60,12 @@ function fakeAdmin(tables) {
         eq(c, v) { filters.push(r => r[c] === v); return builder; }, neq(c, v) { filters.push(r => r[c] !== v); return builder; },
         is(c, v) { filters.push(r => (r[c] ?? null) === v); return builder; }, not(c, op, v) { filters.push(r => (r[c] ?? null) !== v); return builder; },
         in(c, vs) { filters.push(r => vs.includes(r[c])); return builder; },
+        // «col.op.valore,col.op.valore»: basta una condizione vera (neq, eq, is).
+        or(expr) {
+          const parts = expr.split(',').map(p => { const [c, op, ...v] = p.split('.'); const value = v.join('.'); return { c, op, value: value === 'true' ? true : value === 'null' ? null : value }; });
+          filters.push(r => parts.some(({ c, op, value }) => (op === 'neq' ? r[c] !== value : op === 'is' || op === 'eq' ? (r[c] ?? null) === value : false)));
+          return builder;
+        },
         upsert(rows, options) { upsert = { rows, options }; return builder; },
         then(resolve, reject) { return Promise.resolve({ data: (tables[name] || []).filter(r => filters.every(f => f(r))), error: null }).then(resolve, reject); },
       };
@@ -87,4 +93,21 @@ test('lavoro giornaliero: avviso ai genitori, senza nomi dei vaccini se non li v
   }
   assert.match(read('lib/daily-jobs.mjs'), /await processVaccinePlan\(admin,today,counts,/);
   assert.match(translate('it', 'health.vaccinesSource'), /10 vaccinazioni obbligatorie/);
+});
+
+test('avvisi dei bilanci di salute: titolo giusto, senza nomi se i dettagli sono spenti', async () => {
+  const { processVaccinePlan, vaccineAlertCopy } = await import('../lib/health-reminders.mjs');
+  const only = { ...baby, id: 'mia', name: 'Mia', vaccine_plan: 'off', checkup_plan: true };
+  const tables = { health_people: [only], health_appointments: [], user_alerts: [], user_alert_preferences: [] };
+  await processVaccinePlan(fakeAdmin(tables), '2026-11-05', { errors: [] });
+  assert.deepEqual(tables.user_alerts.map(a => [a.reference_id, a.event_date, a.title]), [['mia', '2026-11-19', 'Bilancio di salute: Mia']]);
+  assert.match(tables.user_alerts[0].body, /^Dal 19 nov 2026 c’è un bilancio di salute/);
+  const mixed = vaccineAlertCopy({ person: 'Luca', date: '2026-11-19', keys: ['hexa_1', 'bds_2'] }, 'it', true);
+  assert.equal(mixed.title, 'Vaccinazioni e pediatra: Luca');
+  assert.match(mixed.body, /Esavalente – 1ª dose, Bilancio di salute 2/);
+  assert.doesNotMatch(vaccineAlertCopy({ person: 'Luca', date: '2026-11-19', keys: ['hexa_1', 'bds_2'] }, 'it', false).body, /Esavalente|Bilancio di salute 2/);
+  for (const lang of LANGS) for (const keys of [['bds_2'], ['hexa_1', 'bds_2']]) for (const details of [true, false]) {
+    const c = vaccineAlertCopy({ person: 'Luca', date: '2026-11-19', keys }, lang, details);
+    assert.ok(!/\{|undefined/.test(c.title + c.body), `${lang} ${keys} ${details}`);
+  }
 });

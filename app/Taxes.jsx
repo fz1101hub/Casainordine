@@ -18,7 +18,7 @@ import { TAX_CATEGORIES, PAYMENT_METHODS, TAX_LIMITS, PAYMENT_NEEDED, taxRuleKey
 
 const MISSING_TABLE = new Set(['42P01', 'PGRST205', 'PGRST202']);
 const uid = () => (globalThis.crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
-const blankItem = (year, today) => ({ id: null, category: 'renovation', description: '', amount: '', paid_on: String(year) === today.slice(0, 4) ? today : `${year}-12-31`, payment_method: 'tax_transfer', supplier: '', supplier_tax_code: '', notes: '', file: null });
+const blankItem = (year, today) => ({ id: null, category: 'renovation', description: '', amount: '', paid_on: String(year) === today.slice(0, 4) ? today : `${year}-12-31`, payment_method: 'tax_transfer', supplier: '', supplier_tax_code: '', notes: '', cash_ok: false, file: null });
 
 function Field({ label, children }) { return <label className="extra-field">{label}{children}</label>; }
 
@@ -52,19 +52,22 @@ function TaxesSection({ client, demo, user, homeId, canWrite, onNotify = () => {
     if (demo || !client || !user?.id) return;
     const from = `${year}-01-01`, to = `${year}-12-31`;
     const safe = result => (result?.error ? [] : result?.data || []);
-    const [bills, expenses, projects, pets] = await Promise.all([
+    const [bills, expenses, projects, pets, people] = await Promise.all([
       selectAll(count => scope(client.from('bills').select('id,title,supplier,amount,paid_at', count ? { count: 'exact' } : undefined)).gte('paid_at', from).lte('paid_at', `${to}T23:59:59Z`).order('id')),
       homeId ? selectAll(count => client.from('home_expenses').select('id,title,amount,incurred_on', count ? { count: 'exact' } : undefined).eq('home_id', homeId).gte('incurred_on', from).lte('incurred_on', to).order('id')) : { data: [] },
       scope(client.from('home_projects').select('id,title')).limit(300),
       scope(client.from('home_pets').select('id,name')).limit(100),
+      scope(client.from('health_people').select('id,name')).limit(100),
     ]);
-    const projectIds = safe(projects).map(p => p.id), petIds = safe(pets).map(p => p.id), billIds = safe(bills).map(b => b.id);
-    const [projectExpenses, petLog, billDocuments] = await Promise.all([
+    const projectIds = safe(projects).map(p => p.id), petIds = safe(pets).map(p => p.id), billIds = safe(bills).map(b => b.id), personIds = safe(people).map(p => p.id);
+    const [projectExpenses, petLog, billDocuments, healthExpenses] = await Promise.all([
       projectIds.length ? selectIn((part, count) => client.from('home_project_expenses').select('id,project_id,description,amount,paid_on,document_id', count ? { count: 'exact' } : undefined).in('project_id', part).gte('paid_on', from).lte('paid_on', to).order('id'), projectIds) : { data: [] },
       petIds.length ? selectIn((part, count) => client.from('home_pet_log').select('id,pet_id,title,cost_cents,done_on,document_id', count ? { count: 'exact' } : undefined).in('pet_id', part).gt('cost_cents', 0).gte('done_on', from).lte('done_on', to).order('id'), petIds) : { data: [] },
       billIds.length ? selectIn((part, count) => client.from('home_documents').select('id,bill_id', count ? { count: 'exact' } : undefined).in('bill_id', part).order('id'), billIds) : { data: [] },
+      personIds.length ? selectIn((part, count) => client.from('health_expenses').select('id,person_id,kind,description,amount_cents,spent_on,payment_method', count ? { count: 'exact' } : undefined).in('person_id', part).gte('spent_on', from).lte('spent_on', to).order('id'), personIds) : { data: [] },
     ]);
-    setSources({ year, bills: safe(bills), expenses: safe(expenses), projects: safe(projects), projectExpenses: safe(projectExpenses), pets: safe(pets), petLog: safe(petLog), billDocuments: safe(billDocuments) });
+    setSources({ year, bills: safe(bills), expenses: safe(expenses), projects: safe(projects), projectExpenses: safe(projectExpenses), pets: safe(pets), petLog: safe(petLog), billDocuments: safe(billDocuments),
+      healthPeople: safe(people), healthExpenses: safe(healthExpenses) });
   }, [client, demo, homeId, scope, user?.id, year]);
   useEffect(() => { if (showCandidates && sources.year !== year) loadSources(); }, [showCandidates, year, sources.year, loadSources]);
 
@@ -124,7 +127,8 @@ function TaxesSection({ client, demo, user, homeId, canWrite, onNotify = () => {
   // Una spesa dell'elenco diventa una voce detraibile (una volta sola: il database lo controlla).
   async function addCandidate(candidate) {
     const category = picked[`${candidate.source}:${candidate.source_id}`] || candidate.category;
-    const result = normalizeTaxItem({ ...candidate, category, tax_year: year, payment_method: candidate.source === 'pet_log' || candidate.source === 'bill' ? 'traceable' : PAYMENT_NEEDED[category] || null });
+    const payment = candidate.source === 'health_expense' ? candidate.payment_method : candidate.source === 'pet_log' || candidate.source === 'bill' ? 'traceable' : PAYMENT_NEEDED[category] || null;
+    const result = normalizeTaxItem({ ...candidate, category, tax_year: year, payment_method: payment });
     if (result.error) { onNotify(tr(result.error)); return; }
     setWorking(true);
     try {
@@ -190,6 +194,7 @@ function TaxesSection({ client, demo, user, homeId, canWrite, onNotify = () => {
             <Field label={tr('taxes.paidOn')}><input type="date" value={form.paid_on || ''} onChange={e => set({ paid_on: e.target.value })} /></Field>
             <Field label={tr('taxes.paymentLabel')}><select value={form.payment_method || ''} onChange={e => set({ payment_method: e.target.value || null })}><option value="">{tr('taxes.paymentNone')}</option>{PAYMENT_METHODS.map(m => <option key={m} value={m}>{tr('taxes.payment.' + m)}</option>)}</select></Field>
           </div>
+          {form.category === 'medical' && <label className="extra-toggle"><input type="checkbox" checked={form.cash_ok === true} onChange={e => set({ cash_ok: e.target.checked })} />{tr('taxes.cashOk')}</label>}
           <div className="extra-row">
             <Field label={tr('taxes.supplier')}><input maxLength={TAX_LIMITS.supplier} value={form.supplier} onChange={e => set({ supplier: e.target.value })} /></Field>
             <Field label={tr('taxes.taxCode')}><input maxLength={TAX_LIMITS.taxCode} autoCapitalize="characters" value={form.supplier_tax_code} onChange={e => set({ supplier_tax_code: e.target.value })} /></Field>

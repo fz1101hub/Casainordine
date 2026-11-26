@@ -695,3 +695,18 @@ select{min-height:24px}
 .health-done-form{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:flex-end;gap:.5rem}
 .health-mandatory{background:#e8eefb;color:#2b4a8b}.health-recommended{background:#f2f0ec;color:#6b6257}
 .health-v-done{background:#e7f3e5;color:#2f6b2c}.health-v-booked{background:#eef1f5;color:#47586b}.health-v-due,.health-v-soon{background:#fbeee0;color:#9a5b12}.health-v-late{background:#fbe3e0;color:#9b2c22}.health-v-later{background:#f4f5f4;color:#5d655f}
+/* Scheda d'emergenza, spese sanitarie e bilanci di salute (v62) */
+.health-card-panel{margin-bottom:1rem}.health-card-people{display:flex;flex-wrap:wrap;gap:.4rem 1rem;border:0;padding:0;margin:.4rem 0}.health-card-people legend{font-weight:600;margin-bottom:.3rem}
+.health-card-preview{display:grid;gap:1rem;grid-template-columns:repeat(auto-fill,minmax(min(100%,22rem),1fr));margin-top:1rem}
+.health-card{border:1px solid var(--line);border-radius:12px;padding:1rem;background:var(--card,#fff)}
+.health-card header h3{margin:0;font-size:1.25rem}.health-card header p{margin:.15rem 0 .6rem;color:var(--muted)}
+.health-card dl{margin:0;display:grid;gap:.35rem}.health-card dl>div{display:grid;grid-template-columns:minmax(7rem,38%) 1fr;gap:.5rem}
+.health-card dt{font-weight:600}.health-card dd{margin:0;overflow-wrap:anywhere}.health-card dd a{white-space:nowrap}
+.health-card-alert dd{font-weight:700;color:#9b2c1f}.health-card h4{margin:.8rem 0 .25rem;font-size:.95rem}.health-card ul{margin:0;padding-left:1.1rem}
+.health-card footer{margin-top:.8rem;border-top:1px solid var(--line);padding-top:.5rem}.health-card footer p{margin:.15rem 0}
+.health-card-fields{border:1px solid var(--line);border-radius:10px;padding:.6rem .8rem;display:grid;gap:.5rem}.health-card-fields legend{font-weight:600;padding:0 .3rem}
+.health-card-summary{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem .8rem;margin:.3rem 0 .6rem}.health-card-summary p{margin:0;flex:1 1 14rem}
+.health-expenses{margin-top:1rem;border-top:1px solid var(--line);padding-top:.6rem}.health-expense-years{display:flex;flex-wrap:wrap;gap:.4rem;margin:.3rem 0}
+.health-expense-total{font-weight:600;margin:.3rem 0}.health-expense-help{font-size:.85rem}
+@media print{.health-card-panel{display:none!important}.health-card-print{padding:0!important}.health-card-print .health-card{border:1px solid #000;border-radius:0;break-inside:avoid;page-break-after:always;margin:0 0 12px;color:#000;background:#fff}
+.health-card-print .health-card:last-child{page-break-after:auto}.health-card-print .health-card dd a{color:#000;text-decoration:none}.health-card-print .muted{color:#333}.health-card-print .health-card-alert dd{color:#000;text-decoration:underline}}
