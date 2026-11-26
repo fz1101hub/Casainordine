@@ -9,6 +9,7 @@ import { useLanguage } from './LanguageProvider';
 import { askConfirm } from './ConfirmDialog';
 import { friendlyError } from '../lib/friendly-error.mjs';
 import DecimalInput from './DecimalInput';
+import ShowMore from './ShowMore';
 import { EXPENSE_KINDS, EXPENSE_PAYMENTS, CASH_OK_KINDS, HEALTH_LIMITS, normalizeExpense, expenseTaxItem, expenseNeedsTraceable, expenseYear } from '../lib/health.mjs';
 
 const uid = () => (globalThis.crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
@@ -20,6 +21,7 @@ export default function HealthExpenses({ client, demo, user, homeId, person, app
   const [working, setWorking] = useState(false);
   const thisYear = Number(today.slice(0, 4));
   const [year, setYear] = useState(thisYear);
+  const [listed, setListed] = useState(50); // spese mostrate dell'anno scelto
   const money = cents => new Intl.NumberFormat(locale, { style: 'currency', currency: 'EUR' }).format((Number(cents) || 0) / 100);
   const day = iso => date(iso, { day: 'numeric', month: 'short', year: 'numeric' });
   const mine = useMemo(() => expenses.filter(e => e.person_id === person.id).sort((a, b) => b.spent_on.localeCompare(a.spent_on) || String(b.id).localeCompare(String(a.id))), [expenses, person.id]);
@@ -100,10 +102,10 @@ export default function HealthExpenses({ client, demo, user, homeId, person, app
   return <div className="health-expenses">
     <h3><Receipt size={16} /> {tr('health.expenses')}</h3>
     <div className="health-expense-years" role="group" aria-label={tr('health.expenseYears')}>
-      {years.map(y => <button key={y} className={`btn ${y === year ? 'btn-primary' : 'btn-soft'}`} aria-pressed={y === year} onClick={() => setYear(y)}>{y}</button>)}
+      {years.map(y => <button key={y} className={`btn ${y === year ? 'btn-primary' : 'btn-soft'}`} aria-pressed={y === year} onClick={() => { setYear(y); setListed(50); }}>{y}</button>)}
     </div>
     <p className="health-expense-total">{tr('health.expenseTotal', { year, amount: money(summary.total_cents), count: summary.count })}</p>
-    {!shown.length ? <p className="muted">{tr('health.expensesEmpty')}</p> : <ul className="health-list">{shown.map(e => {
+    {!shown.length ? <p className="muted">{tr('health.expensesEmpty')}</p> : <><ul className="health-list">{shown.slice(0, listed).map(e => {
       const linked = taxLinks.has(e.id);
       return <li key={e.id}>
         <span><b>{e.description} · {money(e.amount_cents)}</b>
@@ -116,7 +118,8 @@ export default function HealthExpenses({ client, demo, user, homeId, person, app
           <button className="icon-button danger" aria-label={tr('health.deleteExpenseAria', { description: e.description })} title={tr('health.delete')} onClick={() => remove(e)}><Trash2 size={16} /></button>
         </span>}
       </li>;
-    })}</ul>}
+    })}</ul>
+    <ShowMore shown={Math.min(listed, shown.length)} total={shown.length} onMore={setListed} /></>}
     {writable && !form && <button className="btn btn-soft" onClick={() => setForm(blankExpense(today))}><Plus size={15} /> {tr('health.addExpense')}</button>}
     {form && <form className="extra-form garden-inline" onSubmit={save}>
       <h3>{tr(form.id ? 'health.editExpense' : 'health.addExpense')}</h3>

@@ -193,7 +193,11 @@ try {
   // Calendario dell'anno e aiuole.
   const calendar = page.locator('.garden-calendar');
   check(await calendar.locator('details').count() === 12, 'calendario dell\'anno: dodici mesi');
-  check(await calendar.locator('details').filter({ hasText: 'luglio 2027' }).locator('li').count() >= 3, 'a luglio 2027 ci sono gli interventi dei pomodori (con inverni rigidi da luglio)');
+  // I mesi chiusi non disegnano le voci (prova con tanti dati): si apre luglio.
+  const july = calendar.locator('details').filter({ hasText: 'luglio 2027' });
+  await july.locator('summary').click();
+  await page.waitForTimeout(300);
+  check(await july.locator('li').count() >= 3, 'a luglio 2027 ci sono gli interventi dei pomodori (con inverni rigidi da luglio)');
   const bedsBox = page.locator('.garden-beds');
   check(/Aiuola 1/.test(await bedsBox.innerText()) && /2025: Pomodori 2025 \(Solanacee\)/.test(await bedsBox.innerText()) && /Adesso: Pomodori 2026/.test(await bedsBox.innerText()), 'aiuole: adesso e l\'anno scorso');
   // Coltura finita: esce dalle piante e dai promemoria, resta nella storia; si rimette.

@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { PawPrint, CalendarCheck, Clock, Pencil, Trash2, Plus, Info, Check, NotebookPen, ShoppingBasket, Archive, RotateCcw, Phone, Scale } from 'lucide-react';
 import { useLanguage, useSection } from './LanguageProvider';
+import ShowMore from './ShowMore';
 import { askConfirm } from './ConfirmDialog';
 import { friendlyError } from '../lib/friendly-error.mjs';
 import { todayRome } from '../lib/dates.mjs';
@@ -70,6 +71,7 @@ function PetsSection({ client, demo, user, homeId, canWrite, onNotify = () => {}
   const [loading, setLoading] = useState(!demo), [missing, setMissing] = useState(false), [working, setWorking] = useState(false);
   const [form, setForm] = useState(blankPet()), [proposal, setProposal] = useState([]);
   const [open, setOpen] = useState({}), [taskForm, setTaskForm] = useState(null), [extra, setExtra] = useState(null), [logForm, setLogForm] = useState(null), [fullLog, setFullLog] = useState({});
+  const [agendaShown, setAgendaShown] = useState(40); // voci dell'agenda mostrate
   const today = todayRome();
   const writable = demo || canWrite;
   const day = iso => (iso ? date(iso, { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
@@ -366,11 +368,13 @@ function PetsSection({ client, demo, user, homeId, canWrite, onNotify = () => {}
     const series = weightSeries(pet, entries);
     const change = weightChange(series);
     const costs = vetCosts(entries, year);
-    const missingTasks = pet.preset ? missingPetPresetTasks(pet.preset, plan, tr, today) : [];
+    // Dentro la scheda chiusa non si disegna niente (con tanti animali e anni di registro la pagina restava ferma).
+    const isOpen = !!open[pet.id];
+    const missingTasks = isOpen && pet.preset ? missingPetPresetTasks(pet.preset, plan, tr, today) : [];
     const estimate = pet.food_stock_item_id ? food.find(f => f.item.id === pet.food_stock_item_id) : null;
     return <details key={pet.id} className="garden-plant" open={!!open[pet.id]} onToggle={e => { const isOpen = e.currentTarget.open; setOpen(o => (o[pet.id] === isOpen ? o : { ...o, [pet.id]: isOpen })); }}>
       <summary><b>{pet.name}</b> <small>{[tr('pets.species.' + pet.species), pet.breed, ageText(pet), Number(pet.weight_kg) > 0 ? tr('pets.kg', { value: number(pet.weight_kg) }) : ''].filter(Boolean).join(' · ')}</small></summary>
-      <div className="garden-plant-body">
+      {isOpen && <div className="garden-plant-body">
         <div className="extra-buttons">
           {writable && !pet.ended_on && <button className="btn btn-soft" onClick={() => editPet(pet)}><Pencil size={15} /> {tr('pets.edit')}</button>}
           {writable && (pet.ended_on ? <button className="btn btn-soft" onClick={() => setEnded(pet, null)}><RotateCcw size={15} /> {tr('pets.restore')}</button>
@@ -438,7 +442,7 @@ function PetsSection({ client, demo, user, homeId, canWrite, onNotify = () => {}
           <Field label={tr('pets.notes')}><textarea rows={2} maxLength={PET_LIMITS.notes} value={logForm.notes} onChange={e => setLogForm(f => ({ ...f, notes: e.target.value }))} /></Field>
           <div className="extra-buttons"><button className="btn btn-primary" disabled={working}>{tr('pets.saveLog')}</button><button type="button" className="btn btn-soft" onClick={() => setLogForm(null)}>{tr('pets.cancel')}</button></div>
         </form>}
-      </div>
+      </div>}
     </details>;
   };
 
@@ -454,7 +458,7 @@ function PetsSection({ client, demo, user, homeId, canWrite, onNotify = () => {}
         <h2><CalendarCheck size={19} /> {tr('pets.agenda')}</h2>
         <p className="muted">{tr('pets.agendaHelp')}</p>
         {loading ? <p className="muted">{tr('general.loading')}</p> : !agenda.length ? <p className="muted">{tr('pets.agendaEmpty')}</p> :
-        <div className="garden-agenda">{agenda.map(({ task, state }) => {
+        <><div className="garden-agenda">{agenda.slice(0, agendaShown).map(({ task, state }) => {
           const pet = petsById.get(task.pet_id);
           return <div key={task.id} className={`garden-due ${state}`}>
             <div><b>{task.title}</b><small>{pet.name}{task.product ? ' · ' + task.product : ''}{task.dose ? ' · ' + task.dose : ''}</small>
@@ -464,7 +468,8 @@ function PetsSection({ client, demo, user, homeId, canWrite, onNotify = () => {}
               <button className="icon-button" aria-label={tr('pets.postponeAria', { title: task.title, pet: pet.name })} title={tr('pets.postpone')} onClick={() => later(task)}><Clock size={16} /></button>
             </div>}
           </div>;
-        })}</div>}
+        })}</div>
+        <ShowMore shown={Math.min(agendaShown, agenda.length)} total={agenda.length} onMore={setAgendaShown} /></>}
         {lowFood.length > 0 && <div className="garden-tobuy">
           <h3><ShoppingBasket size={16} /> {tr('pets.toBuy')}</h3>
           <ul>{lowFood.map(f => <li key={f.item.id}><span><b>{f.item.name}</b> · {tr('pets.foodLine', { food: f.item.name, days: f.days, date: day(f.runs_out_on) })}</span>

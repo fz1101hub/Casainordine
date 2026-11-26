@@ -16,6 +16,7 @@ import { selectAll, selectIn } from '../lib/select-all.mjs';
 import { titleKey } from '../lib/stock.mjs';
 import DecimalInput from './DecimalInput';
 import HealthCards from './HealthCard';
+import ShowMore from './ShowMore';
 import HealthExpenses, { blankExpense } from './HealthExpenses';
 import { saveDose } from '../lib/health-doses.mjs';
 import {
@@ -42,6 +43,7 @@ function HealthSection({ client, demo, user, homeId, canWrite, onNotify = () => 
   const [selected, setSelected] = useState(null), [personForm, setPersonForm] = useState(null), [therapyForm, setTherapyForm] = useState(null), [appointmentForm, setAppointmentForm] = useState(null), [showDone, setShowDone] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [doneForm, setDoneForm] = useState(null);
+  const [dosesShown, setDosesShown] = useState(40); // dosi di oggi mostrate (con tante terapie la pagina restava ferma)
   const [expenses, setExpenses] = useState([]), [taxLinks, setTaxLinks] = useState(() => new Map()), [expenseForm, setExpenseForm] = useState(null), [cardFor, setCardFor] = useState(null);
   const today = todayRome(now);
   const writable = demo || canWrite;
@@ -334,7 +336,7 @@ function HealthSection({ client, demo, user, homeId, canWrite, onNotify = () => 
       <section className="panel extra-panel">
         <h2><Pill size={19} /> {tr('health.today')}</h2>
         {loading ? <p className="muted">{tr('general.loading')}</p> : !todayDoses.length ? <p className="muted">{tr(people.length ? 'health.todayEmpty' : 'health.start')}</p> :
-        <ul className="health-doses">{todayDoses.map(dose => {
+        <><ul className="health-doses">{todayDoses.slice(0, dosesShown).map(dose => {
           const { state } = doseState(dose, doses, now);
           const who = peopleById.get(dose.therapy.person_id);
           return <li key={`${dose.therapy.id}-${dose.due_at}`} className={`health-dose ${state}`}>
@@ -348,7 +350,8 @@ function HealthSection({ client, demo, user, homeId, canWrite, onNotify = () => 
               </> : <button className="icon-button" aria-label={tr('health.undoAria', { name: dose.therapy.name, time: dose.time })} title={tr('health.undo')} onClick={() => markDose(dose, 'pending')}><Undo2 size={16} /></button>}
             </span>}
           </li>;
-        })}</ul>}
+        })}</ul>
+        <ShowMore shown={Math.min(dosesShown, todayDoses.length)} total={todayDoses.length} onMore={setDosesShown} /></>}
 
         <h2><CalendarClock size={19} /> {tr('health.upcoming')}</h2>
         {loading ? null : !upcoming.length ? <p className="muted">{tr('health.upcomingEmpty')}</p> :
@@ -490,10 +493,10 @@ function HealthSection({ client, demo, user, homeId, canWrite, onNotify = () => 
                 </span>}
               </li>)}</ul>}
               {done.length > 0 && <details className="garden-ended" open={showDone} onToggle={e => { const isOpen = e.currentTarget.open; setShowDone(isOpen); }}><summary>{tr('health.doneList', { count: done.length })}</summary>
-                <ul className="health-list">{done.map(a => <li key={a.id}><span><b>{day(a.on_date)} · {a.title}</b><small>{kindLabel(a)} · {tr('health.doneOn', { date: day(a.done_on) })}</small></span>
+                {showDone && <ul className="health-list">{done.map(a => <li key={a.id}><span><b>{day(a.on_date)} · {a.title}</b><small>{kindLabel(a)} · {tr('health.doneOn', { date: day(a.done_on) })}</small></span>
                   {writable && <span className="extra-buttons">
                     {!expenses.some(e => e.appointment_id === a.id) && <button className="btn btn-soft" aria-label={tr('health.expenseForAria', { title: a.title })} onClick={() => expenseFor(a)}><Receipt size={15} /> {tr('health.expenseFor')}</button>}
-                    <button className="icon-button danger" aria-label={tr('health.deleteAppointmentAria', { title: a.title })} title={tr('health.delete')} onClick={() => deleteAppointment(a)}><Trash2 size={16} /></button></span>}</li>)}</ul>
+                    <button className="icon-button danger" aria-label={tr('health.deleteAppointmentAria', { title: a.title })} title={tr('health.delete')} onClick={() => deleteAppointment(a)}><Trash2 size={16} /></button></span>}</li>)}</ul>}
               </details>}
             </>;
           })()}

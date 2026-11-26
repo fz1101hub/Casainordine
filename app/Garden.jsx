@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Sprout, CalendarCheck, CalendarDays, Clock, BellOff, Pencil, Trash2, Plus, Info, Check, NotebookPen, ShoppingBasket, ShieldAlert, LayoutGrid, Archive, RotateCcw, Camera, CloudSun, Snowflake, CloudRain, Search } from 'lucide-react';
 import { useLanguage, useSection } from './LanguageProvider';
+import ShowMore from './ShowMore';
 import { askConfirm } from './ConfirmDialog';
 import { friendlyError, apiErrorText } from '../lib/friendly-error.mjs';
 import { todayRome } from '../lib/dates.mjs';
@@ -84,6 +85,9 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
   const [form, setForm] = useState(blankPlant());
   const [proposal, setProposal] = useState([]);
   const [open, setOpen] = useState({});              // piante aperte
+  const [monthOpen, setMonthOpen] = useState({});    // mesi del calendario aperti (di partenza i primi due)
+  const [agendaShown, setAgendaShown] = useState(40); // voci dell'agenda mostrate
+  const [monthShown, setMonthShown] = useState({});  // voci mostrate per mese del calendario
   const [taskForm, setTaskForm] = useState(null);    // {plantId, ...intervento}
   const [extra, setExtra] = useState(null);          // {plantId, items}: proposte che mancano a una pianta
   const [logForm, setLogForm] = useState(null);      // {plantId, ...voce}
@@ -572,7 +576,7 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
         <h2><CalendarCheck size={19} /> {tr('garden.agenda')}</h2>
         <p className="muted">{tr('garden.agendaHelp')}</p>
         {loading ? <p className="muted">{tr('general.loading')}</p> : !agenda.length ? <p className="muted">{tr('garden.agendaEmpty')}</p> :
-        <div className="garden-agenda">{agenda.map(({ task, state }) => {
+        <><div className="garden-agenda">{agenda.slice(0, agendaShown).map(({ task, state }) => {
           const plant = plantsById.get(task.plant_id);
           return <div key={task.id} className={`garden-due ${state}`}>
             <div><b>{task.title}</b><small>{plant.name}{task.product ? ' · ' + task.product : ''}{task.dose ? ' · ' + task.dose : ''}</small>
@@ -583,7 +587,8 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
               <button className="icon-button" aria-label={tr('garden.postponeAria', { title: task.title, plant: plant.name })} title={tr('garden.postpone')} onClick={() => later(task)}><Clock size={16} /></button>
             </div>}
           </div>;
-        })}</div>}
+        })}</div>
+        <ShowMore shown={Math.min(agendaShown, agenda.length)} total={agenda.length} onMore={setAgendaShown} /></>}
         {toBuy.length > 0 && <div className="garden-tobuy">
           <h3><ShoppingBasket size={16} /> {tr('garden.toBuy')}</h3>
           <ul>{toBuy.map(item => <li key={item.id}><span><b>{item.name}</b> · {tr('garden.toBuyLine', { amount: amount(item) })}</span>
@@ -643,9 +648,11 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
           const plan = [...(tasksBy.get(plant.id) || [])].sort((a, b) => String(a.next_on || '9999').localeCompare(String(b.next_on || '9999')) || a.title.localeCompare(b.title, locale));
           const entries = logBy.get(plant.id) || [];
           const next = plan.find(t => t.next_on);
-          const missingTasks = writable && plant.preset ? missingPresetTasks(plant, plan, tr, today, climate).map(t => ({ ...t, wait_days: '', stock_item_id: '', stock_use: '' })) : [];
+          // Dentro la scheda chiusa non si disegna niente (con centinaia di piante la pagina restava ferma).
+          const isOpen = Boolean(open[plant.id]);
+          const missingTasks = isOpen && writable && plant.preset ? missingPresetTasks(plant, plan, tr, today, climate).map(t => ({ ...t, wait_days: '', stock_item_id: '', stock_use: '' })) : [];
           const shownLog = fullLog[plant.id] ? entries : entries.slice(0, 5);
-          const plantPhotos = photos.filter(f => f.plant_id === plant.id);
+          const plantPhotos = isOpen ? photos.filter(f => f.plant_id === plant.id) : [];
           // Una foto: miniatura che apre il file, data e didascalia, e il cestino per chi può modificare.
           const photoFigure = photo => <figure key={photo.id}>
             {docs[photo.document_id]?.url ? <a href={docs[photo.document_id].url} target="_blank" rel="noopener noreferrer"><img src={docs[photo.document_id].url} alt={tr('garden.photoAlt', { plant: plant.name, date: day(photo.taken_on) })} loading="lazy" /></a> : <div className="project-photo-missing"><Camera size={18} /></div>}
@@ -659,7 +666,7 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
               <small>{[tr('garden.plantKind.' + plant.kind), plant.location, plant.bed, tr('garden.taskCount', { count: plan.length })].filter(Boolean).join(' · ')}</small>
               {safeFrom && <small className="garden-safe"><ShieldAlert size={13} aria-hidden="true" /> {tr('garden.safeFrom', { date: day(safeFrom) })}</small>}
               {next && <small className="garden-when">{tr('garden.next', { title: next.title, date: day(next.next_on) })}</small>}</span></summary>
-            <div className="garden-plant-body">
+            {isOpen && <div className="garden-plant-body">
               {plant.notes && <p className="garden-notes">{plant.notes}</p>}
               {(harvest || plant.family) && <p className="garden-notes">{[plant.family ? familyLabel(plant.family) : '', harvest ? tr('garden.expectedHarvest', { date: day(harvest) }) : ''].filter(Boolean).join(' · ')}</p>}
               {writable && <div className="extra-buttons">
@@ -751,7 +758,7 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
                 <h3>{tr('garden.photos')}</h3>
                 {!plantPhotos.length ? <p className="muted">{tr('garden.photosEmpty')}</p> : <div className="project-photo-row garden-photos">{plantPhotos.map(photoFigure)}</div>}
               </>}
-            </div>
+            </div>}
           </details>;
         })}</div>}
         {endedPlants.length > 0 && <details className="garden-ended">
@@ -770,13 +777,15 @@ function GardenSection({ client, demo, user, homeId, canWrite, onNotify = () => 
     {!missing && !loading && activeTasks.length > 0 && <section className="panel extra-panel garden-calendar">
       <h2><CalendarDays size={19} /> {tr('garden.calendar')}</h2>
       <p className="muted">{tr('garden.calendarHelp')}</p>
-      <div className="garden-months-grid">{calendar.map((month, index) => <details key={month.key} open={index < 2}>
+      <div className="garden-months-grid">{calendar.map((month, index) => <details key={month.key} open={monthOpen[index] ?? index < 2}
+        onToggle={e => { const isOpen = e.currentTarget.open; setMonthOpen(m => ((m[index] ?? index < 2) === isOpen ? m : { ...m, [index]: isOpen })); }}>
         <summary><b>{new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(month.year, month.month - 1, 15)))}</b>
           <small>{month.entries.length ? tr('garden.calendarCount', { count: month.entries.length }) : tr('garden.calendarEmpty')}</small></summary>
-        {month.entries.length > 0 && <ul>{month.entries.map(({ task, dates }) => <li key={task.id}>
+        {(monthOpen[index] ?? index < 2) && month.entries.length > 0 && <><ul>{month.entries.slice(0, monthShown[index] || 30).map(({ task, dates }) => <li key={task.id}>
           <span className="garden-days">{dates.map(d => Number(d.slice(8))).join(', ')}</span>
           <span><b>{task.title}</b><small>{plantsById.get(task.plant_id)?.name}{task.product ? ' · ' + task.product : ''}</small></span>
-        </li>)}</ul>}
+        </li>)}</ul>
+        <ShowMore shown={Math.min(monthShown[index] || 30, month.entries.length)} total={month.entries.length} onMore={n => setMonthShown(m => ({ ...m, [index]: n }))} /></>}
       </details>)}</div>
     </section>}
 
