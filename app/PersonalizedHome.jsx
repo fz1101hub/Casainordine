@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import {todayRome} from '../lib/dates.mjs';
 import {useLanguage} from './LanguageProvider';
+import {useExtraCards} from './HomeExtraCards';
 import {buildFiveMinuteBriefing} from '../lib/v21-core.mjs';
 import {textGroup} from '../lib/i18n-core.mjs';
 import { friendlyError, shownError } from '../lib/friendly-error.mjs';
@@ -139,7 +140,10 @@ export default function PersonalizedHome({
   }catch(e){console.error('[home]',e?.message||e);setExtraError(tr('home.shoppingFailed'));}
   finally{setShoppingBusy(false);}
  };
+ // Riquadri delle sezioni nuove (HomeExtraCards.jsx): dati letti solo per quelli scelti.
+ const extraCards=useExtraCards({ids:selected,client,demo,user,homeId,canWrite,limit,refreshKey,onNavigate,onNotify,HomeWidget});
  const cards={
+  ...extraCards,
   bills:<HomeWidget key="bills" icon={ReceiptText} title={tr('home.widget.bills')}
     count={tr('home.widget.bills.count',{count:openBills.length,amount:money(dueAmount)})}
     onAction={()=>onNavigate('bills')} actionLabel={tr('home.openAll')}>

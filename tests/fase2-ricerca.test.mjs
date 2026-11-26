@@ -17,9 +17,15 @@ function fakeClient(rows = {}, failing = new Set()) {
         select(fields) { chain.steps.push(['select', fields]); return builder; },
         eq(column, value) { chain.steps.push(['eq', column, value]); return builder; },
         is(column, value) { chain.steps.push(['is', column, value]); return builder; },
+        in(column, values) { chain.steps.push(['in', column, values]); chain.ids = { column, values }; return builder; },
         or(filter) { chain.steps.push(['or', filter]); return builder; },
         order(column, options) { chain.steps.push(['order', column, options]); return builder; },
-        limit(n) { chain.steps.push(['limit', n]); return Promise.resolve(failing.has(table) ? { data: null, error: { code: failing instanceof Map ? failing.get(table) : '57014' } } : { data: rows[table] || [], error: null }); }
+        limit(n) {
+          chain.steps.push(['limit', n]);
+          if (failing.has(table)) return Promise.resolve({ data: null, error: { code: failing instanceof Map ? failing.get(table) : '57014' } });
+          const list = (rows[table] || []).filter(r => !chain.ids || chain.ids.values.includes(r[chain.ids.column]));
+          return Promise.resolve({ data: list, error: null });
+        }
       };
       return builder;
     }
@@ -53,12 +59,34 @@ test('Spazio personale: solo le righe dell’account senza casa; casa condivisa:
 test('Cerca in ogni sezione dello spazio attivo; le sezioni solo di casa non si cercano nello spazio personale', async () => {
   const client = fakeClient({ bills: [{ id: 'b1', title: 'Bolletta luce', supplier: 'Enel', due_date: '2026-12-01' }], home_contracts: [{ id: 'c1', supplier: 'Enel', service: 'Luce', renewal_on: '2027-01-01' }] });
   const personal = await searchEverything(client, { text: 'enel', userId: 'u1' });
-  assert.deepEqual(client.calls.map(c => c.table).sort(), SEARCH_SOURCES.filter(s => !s.homeOnly).map(s => s.table).sort());
+  // Una richiesta per sezione, più una per le voci madri (persone, animali); senza persone né animali
+  // le loro terapie, visite e voci del piano non si cercano.
+  const direct = SEARCH_SOURCES.filter(s => !s.homeOnly && !s.parent).map(s => s.table);
+  const parentTables = [...new Set(SEARCH_SOURCES.filter(s => s.parent).map(s => s.parent.table))];
+  assert.deepEqual(client.calls.map(c => c.table).sort(), [...direct, ...parentTables].sort());
   assert.deepEqual(personal.results.map(r => [r.type, r.tab, r.id]), [['bills', 'bills', 'b1'], ['contracts', 'contracts', 'c1']]);
   assert.equal(personal.results[1].detail, 'Luce');
   const home = fakeClient();
   await searchEverything(home, { text: 'enel', userId: 'u1', homeId: 'h1' });
-  assert.equal(home.calls.length, SEARCH_SOURCES.length);
+  assert.equal(home.calls.length, SEARCH_SOURCES.filter(s => !s.parent).length + parentTables.length);
+});
+
+test('Terapie, visite e piano degli animali: si cercano tra le persone e gli animali dello spazio attivo', async () => {
+  const client = fakeClient({
+    health_people: [{ id: 'p1', name: 'Luca' }],
+    health_therapies: [{ id: 't1', person_id: 'p1', name: 'Tachipirina 250', dose: '5 ml' }, { id: 't2', person_id: 'altro', name: 'Tachipirina di un altro' }],
+    home_pets: [{ id: 'a1', name: 'Fido' }],
+    home_pet_tasks: [{ id: 'k1', pet_id: 'a1', title: 'Tachipirina? no: antiparassitario', next_on: '2026-12-01' }],
+  });
+  const found = await searchEverything(client, { text: 'tachipirina', userId: 'u1', homeId: 'h1' });
+  const people = client.calls.find(c => c.table === 'health_people' && c.steps.some(s => s[0] === 'select' && s[1] === 'id'));
+  assert.deepEqual(people.steps.filter(s => s[0] === 'eq'), [['eq', 'home_id', 'h1']], 'persone della casa attiva');
+  const therapies = client.calls.find(c => c.table === 'health_therapies');
+  assert.deepEqual(therapies.steps.find(s => s[0] === 'in'), ['in', 'person_id', ['p1']]);
+  assert.ok(!therapies.steps.some(s => s[0] === 'eq'), 'le terapie non hanno uno spazio proprio');
+  // (il finto client non filtra per parola: conta solo quali righe arrivano da quale spazio)
+  assert.deepEqual(found.results.filter(r => r.type === 'therapies').map(r => [r.tab, r.id, r.detail]), [['health', 't1', '5 ml']]);
+  assert.deepEqual(found.results.filter(r => r.type === 'petTasks').map(r => [r.tab, r.id]), [['pets', 'k1']]);
 });
 
 test('Una sezione che non risponde non blocca le altre', async () => {
